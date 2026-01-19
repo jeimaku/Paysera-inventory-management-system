@@ -1,175 +1,165 @@
 import { useState, useEffect } from 'react';
-import { 
-  Users, 
-  Laptop, 
-  HardDrive, 
-  Monitor, 
-  Search, 
-  Eye, 
-  User, 
-  Calendar,
-  Cpu,
-  HardDrive as Storage,
-  MemoryStick,
-  Shield,
-  X,
-  ExternalLink
-} from 'lucide-react';
-import '../../styles/employee-device.css';
+import { Users, Package, RotateCcw, Calendar, Monitor, Eye, Edit2, Trash2, Plus, Search } from 'lucide-react';
+import InteractiveDeviceSpecModal from '../../components/IT/InteractiveDeviceSpecModal';
+import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
+import { getEmployeesForDeployment, getAvailableDevices, getAvailableMonitors, deployDevice } from '../../services/deploymentService';
+import '../../styles/inventory.css';
+import '../../styles/deployment.css';
 
-// Mock data service - replace with actual API calls
-const getEmployeeDevices = async (filters = {}) => {
-  // This would be your actual API call
-  return [
-    {
-      id: 1,
-      employee: {
-        name: "John Smith",
-        email: "john.smith@company.com",
-        department: "Engineering",
-        position: "Senior Developer"
-      },
-      devices: [
-        {
-          id: "LP-001",
-          type: "laptop",
-          brand: "LENOVO",
-          model: "ThinkPad X1",
-          operating_system: "Windows 11",
-          cpu: "Intel Core i7-12700H",
-          memory: 32,
-          storage: 1024,
-          storage_type: "SSD",
-          serial_number: "PF123456",
-          warranty_end: "2025-06-15",
-          status: "issued",
-          assigned_date: "2024-01-15"
-        }
-      ]
-    },
-    {
-      id: 2,
-      employee: {
-        name: "Sarah Johnson",
-        email: "sarah.johnson@company.com",
-        department: "Design",
-        position: "UI/UX Designer"
-      },
-      devices: [
-        {
-          id: "LP-002",
-          type: "laptop",
-          brand: "Apple",
-          model: "MacBook Pro",
-          operating_system: "macOS Sonoma",
-          cpu: "Apple M3 Pro",
-          memory: 18,
-          storage: 512,
-          storage_type: "SSD",
-          serial_number: "MBP789012",
-          warranty_end: "2025-09-20",
-          status: "issued",
-          assigned_date: "2024-03-10"
-        },
-        {
-          id: "MN-001",
-          type: "monitor",
-          brand: "Dell",
-          model: "UltraSharp U2723QE",
-          model_code: "U2723QE-BLK",
-          serial_number: "DL345678",
-          status: "issued",
-          assigned_date: "2024-03-10"
-        }
-      ]
-    },
-    {
-      id: 3,
-      employee: {
-        name: "Mike Chen",
-        email: "mike.chen@company.com",
-        department: "Data Science",
-        position: "Data Analyst"
-      },
-      devices: [
-        {
-          id: "DT-001",
-          type: "desktop",
-          operating_system: "Ubuntu 22.04",
-          processor: "AMD Ryzen 9 7900X",
-          desktop_memory: [
-            { slot_number: 1, size_gb: 16 },
-            { slot_number: 2, size_gb: 16 }
-          ],
-          desktop_storage: [
-            { capacity_gb: 1000, storage_type: "NVMe SSD" },
-            { capacity_gb: 2000, storage_type: "SATA SSD" }
-          ],
-          status: "issued",
-          assigned_date: "2024-02-01"
-        }
-      ]
-    }
-  ];
-};
-
-export default function EmployeeDevicesPage() {
-  const [employeeDevices, setEmployeeDevices] = useState([]);
+export default function AdminEmployeeDevices() {
+  const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [returning, setReturning] = useState(null);
+  const [selectedDeployment, setSelectedDeployment] = useState(null);
+  const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
+  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   
+  // Deploy modal states
+  const [employees, setEmployees] = useState([]);
+  const [devices, setDevices] = useState([]);
+  const [monitors, setMonitors] = useState([]);
+  const [deploymentForm, setDeploymentForm] = useState({
+    employeeId: '',
+    deviceType: 'LAPTOP',
+    deviceId: '',
+    monitorIds: []
+  });
+  const [deploying, setDeploying] = useState(false);
+
+  // Filters
   const [filters, setFilters] = useState({
     search: '',
+    deviceType: '',
     department: '',
-    deviceType: ''
   });
 
-  useEffect(() => {
-    loadEmployeeDevices();
-  }, [filters]);
+  // Unique departments for filter
+  const departments = [...new Set(deployments.map(d => d.employees?.departments?.department_name).filter(Boolean))];
 
-  const loadEmployeeDevices = async () => {
+  useEffect(() => {
+    loadDeployments();
+    loadDeploymentData();
+  }, []);
+
+  useEffect(() => {
+    if (deploymentForm.deviceType) {
+      loadDevices();
+    }
+  }, [deploymentForm.deviceType]);
+
+  const loadDeployments = async () => {
     setLoading(true);
     try {
-      const data = await getEmployeeDevices(filters);
-      setEmployeeDevices(data);
+      const data = await getCurrentDeployments();
+      setDeployments(data);
     } catch (error) {
-      console.error('Error loading employee devices:', error);
+      console.error('Error loading deployments:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleViewDevice = (device, employee) => {
-    setSelectedDevice({ ...device, employee });
-    setModalOpen(true);
-  };
-
-  const getDeviceIcon = (type) => {
-    switch (type) {
-      case 'laptop':
-        return <Laptop size={20} />;
-      case 'desktop':
-        return <HardDrive size={20} />;
-      case 'monitor':
-        return <Monitor size={20} />;
-      default:
-        return <HardDrive size={20} />;
+  const loadDeploymentData = async () => {
+    try {
+      const [employeesData, monitorsData] = await Promise.all([
+        getEmployeesForDeployment(),
+        getAvailableMonitors()
+      ]);
+      setEmployees(employeesData);
+      setMonitors(monitorsData);
+    } catch (error) {
+      console.error('Error loading deployment data:', error);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'issued':
-        return '#0a0aa6';
-      case 'available':
-        return '#10b981';
-      case 'defective':
-        return '#ef4444';
-      default:
-        return '#6b7280';
+  const loadDevices = async () => {
+    try {
+      const devicesData = await getAvailableDevices(deploymentForm.deviceType);
+      setDevices(devicesData);
+      setDeploymentForm(prev => ({ ...prev, deviceId: '' }));
+    } catch (error) {
+      console.error('Error loading devices:', error);
     }
+  };
+
+  const handleReturnDevice = async (employeeDeviceId, employeeName, deviceInfo) => {
+    if (!confirm(`Are you sure you want to return the device from ${employeeName}?\n\nDevice: ${deviceInfo}`)) {
+      return;
+    }
+
+    setReturning(employeeDeviceId);
+    try {
+      const result = await returnDevice(employeeDeviceId);
+      
+      if (result.success) {
+        alert('Device returned successfully!');
+        loadDeployments();
+      } else {
+        alert('Failed to return device: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Return error:', error);
+      alert('An error occurred while returning the device');
+    } finally {
+      setReturning(null);
+    }
+  };
+
+  const handleViewSpecs = async (deployment) => {
+    try {
+      // First get the basic deployment data
+      setSelectedDeployment(deployment);
+      setIsSpecModalOpen(true);
+    } catch (error) {
+      console.error('Error loading device specs:', error);
+      alert('Failed to load device specifications');
+    }
+  };
+
+  const handleDeploy = async () => {
+    if (!deploymentForm.employeeId || !deploymentForm.deviceId) {
+      alert('Please select both an employee and a device');
+      return;
+    }
+
+    setDeploying(true);
+    try {
+      const result = await deployDevice(deploymentForm);
+      
+      if (result.success) {
+        alert('Device deployed successfully!');
+        setDeploymentForm({
+          employeeId: '',
+          deviceType: 'LAPTOP',
+          deviceId: '',
+          monitorIds: []
+        });
+        setIsDeployModalOpen(false);
+        loadDeployments();
+        loadDeploymentData();
+        loadDevices();
+      } else {
+        alert('Failed to deploy device: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Deployment error:', error);
+      alert('An error occurred during deployment');
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleFormChange = (field, value) => {
+    setDeploymentForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleMonitorToggle = (monitorId) => {
+    setDeploymentForm(prev => ({
+      ...prev,
+      monitorIds: prev.monitorIds.includes(monitorId)
+        ? prev.monitorIds.filter(id => id !== monitorId)
+        : [...prev.monitorIds, monitorId]
+    }));
   };
 
   const formatDate = (dateString) => {
@@ -181,413 +171,397 @@ export default function EmployeeDevicesPage() {
     });
   };
 
-  const calculateTotalRAM = (device) => {
-    if (device.memory) return `${device.memory} GB`;
-    if (device.desktop_memory && device.desktop_memory.length > 0) {
-      const total = device.desktop_memory.reduce((sum, mem) => sum + mem.size_gb, 0);
-      return `${total} GB`;
-    }
-    return 'N/A';
+  const getDeviceInfo = (deployment) => {
+    return `${deployment.device_type} (ID: ${deployment.device_id})`;
   };
 
-  const calculateTotalStorage = (device) => {
-    if (device.storage) return `${device.storage} GB`;
-    if (device.desktop_storage && device.desktop_storage.length > 0) {
-      const total = device.desktop_storage.reduce((sum, stor) => sum + stor.capacity_gb, 0);
-      return total >= 1000 ? `${(total / 1000).toFixed(1)} TB` : `${total} GB`;
+  const getMonitorsInfo = (deployment) => {
+    if (!deployment.employee_monitors || deployment.employee_monitors.length === 0) {
+      return 'None';
     }
-    return 'N/A';
+    
+    return deployment.employee_monitors.map(em => 
+      `${em.monitors.asset_id} - ${em.monitors.brand} ${em.monitors.model}`
+    ).join(', ');
   };
 
-  const totalDevices = employeeDevices.reduce((total, emp) => total + emp.devices.length, 0);
-  const departments = [...new Set(employeeDevices.map(emp => emp.employee.department))];
+  // Filter deployments based on search and filters
+  const filteredDeployments = deployments.filter(deployment => {
+    const matchesSearch = !filters.search || 
+      deployment.employees?.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      deployment.employees?.employee_code?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      deployment.device_id?.toString().includes(filters.search);
+    
+    const matchesDeviceType = !filters.deviceType || deployment.device_type === filters.deviceType;
+    
+    const matchesDepartment = !filters.department || 
+      deployment.employees?.departments?.department_name === filters.department;
+
+    return matchesSearch && matchesDeviceType && matchesDepartment;
+  });
+
+  const selectedEmployee = employees.find(emp => emp.employee_id === deploymentForm.employeeId);
+  const selectedDevice = devices.find(device => device.device_id === deploymentForm.deviceId);
+
+  if (loading) {
+    return (
+      <div className="inventory-container">
+        <div className="loading">Loading device deployments...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="inventory-container">
-      {/* Enhanced Header */}
-      <header className="inventory-header-improved admin">
-        <div className="header-content-improved">
-          <div className="header-title-improved">
-            <div className="header-icon-improved admin">
-              <Users size={32} />
-            </div>
-            <div className="header-text-improved">
-              <h1>Employee Devices</h1>
-              <p className="subtitle-improved">View and manage devices assigned to employees</p>
-            </div>
+      <header className="inventory-header">
+        <div className="header-title">
+          <Users size={32} className="header-icon" />
+          <div>
+            <h1>Employee Devices</h1>
+            <p className="subtitle">Manage and view current device deployments</p>
           </div>
         </div>
       </header>
 
-      {/* Enhanced Statistics */}
-      <div className="inventory-stats-improved">
-        <div className="stat-card-improved primary admin">
-          <div className="stat-icon-improved">
-            <Users size={20} />
-          </div>
-          <div className="stat-content-improved">
-            <span className="stat-value-improved">{employeeDevices.length}</span>
-            <span className="stat-label-improved">Total Employees</span>
-          </div>
+      <div className="inventory-stats">
+        <div className="stat-item">
+          <span className="stat-label">Total Deployments</span>
+          <span className="stat-value">{deployments.length}</span>
         </div>
-        <div className="stat-card-improved available">
-          <div className="stat-content-improved">
-            <span className="stat-value-improved">{totalDevices}</span>
-            <span className="stat-label-improved">Assigned Devices</span>
-          </div>
+        <div className="stat-item">
+          <span className="stat-label">Laptops Deployed</span>
+          <span className="stat-value stat-issued">
+            {deployments.filter(d => d.device_type === 'LAPTOP').length}
+          </span>
         </div>
-        <div className="stat-card-improved issued">
-          <div className="stat-content-improved">
-            <span className="stat-value-improved">
-              {employeeDevices.reduce((total, emp) => 
-                total + emp.devices.filter(d => d.type === 'laptop').length, 0
-              )}
-            </span>
-            <span className="stat-label-improved">Laptops</span>
-          </div>
+        <div className="stat-item">
+          <span className="stat-label">Desktops Deployed</span>
+          <span className="stat-value stat-issued">
+            {deployments.filter(d => d.device_type === 'DESKTOP').length}
+          </span>
         </div>
-        <div className="stat-card-improved defective">
-          <div className="stat-content-improved">
-            <span className="stat-value-improved">
-              {employeeDevices.reduce((total, emp) => 
-                total + emp.devices.filter(d => d.type === 'desktop').length, 0
-              )}
-            </span>
-            <span className="stat-label-improved">Desktops</span>
-          </div>
-        </div>
-        <div className="stat-card-improved warning">
-          <div className="stat-content-improved">
-            <span className="stat-value-improved">{departments.length}</span>
-            <span className="stat-label-improved">Departments</span>
-          </div>
+        <div className="stat-item">
+          <span className="stat-label">Monitors Deployed</span>
+          <span className="stat-value stat-available">
+            {deployments.reduce((total, d) => total + (d.employee_monitors?.length || 0), 0)}
+          </span>
         </div>
       </div>
 
       {/* Enhanced Controls */}
-      <div className="inventory-controls-improved admin">
-        <div className="search-section-improved">
-          <div className="search-box-improved">
-            <Search size={18} />
-            <input
-              type="text"
-              placeholder="Search by employee name, email, or device..."
-              value={filters.search}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, search: e.target.value }))
-              }
-            />
-          </div>
+      <div className="inventory-controls">
+        <div className="search-box">
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="Search by employee name, code, or device ID..."
+            value={filters.search}
+            onChange={(e) =>
+              setFilters(prev => ({ ...prev, search: e.target.value }))
+            }
+          />
         </div>
 
-        <div className="filters-improved admin">
+        <div className="filters">
           <select
-            className="filter-select-improved"
+            value={filters.deviceType}
+            onChange={(e) =>
+              setFilters(prev => ({ ...prev, deviceType: e.target.value }))
+            }
+          >
+            <option value="">All Device Types</option>
+            <option value="LAPTOP">Laptops</option>
+            <option value="DESKTOP">Desktops</option>
+          </select>
+
+          <select
             value={filters.department}
             onChange={(e) =>
-              setFilters((prev) => ({ ...prev, department: e.target.value }))
+              setFilters(prev => ({ ...prev, department: e.target.value }))
             }
           >
             <option value="">All Departments</option>
-            {departments.map((dept) => (
+            {departments.map(dept => (
               <option key={dept} value={dept}>
                 {dept}
               </option>
             ))}
           </select>
 
-          <select
-            className="filter-select-improved"
-            value={filters.deviceType}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, deviceType: e.target.value }))
-            }
+          <button 
+            className="btn-add" 
+            onClick={() => setIsDeployModalOpen(true)}
           >
-            <option value="">All Device Types</option>
-            <option value="laptop">Laptops</option>
-            <option value="desktop">Desktops</option>
-            <option value="monitor">Monitors</option>
-          </select>
+            <Plus size={18} />
+            Deploy Device
+          </button>
         </div>
       </div>
 
-      {/* Employee Devices Cards */}
-      <div className="employee-devices-grid">
-        {loading ? (
-          <div className="loading-improved">
-            <div className="loading-spinner-improved"></div>
-            <span>Loading employee devices...</span>
-          </div>
-        ) : employeeDevices.length === 0 ? (
-          <div className="no-data-state-improved">
-            <Users size={64} className="no-data-icon-improved" />
-            <h3>No Employee Devices Found</h3>
-            <p>No employees with assigned devices match your current search criteria.</p>
+      <div className="inventory-table-card">
+        {filteredDeployments.length === 0 ? (
+          <div className="no-data-state">
+            <Package size={64} className="no-data-icon" />
+            <h3>No Device Deployments</h3>
+            <p>
+              {filters.search || filters.deviceType || filters.department 
+                ? 'No deployments match your current filters.'
+                : 'No devices are currently deployed to employees.'}
+            </p>
           </div>
         ) : (
-          employeeDevices.map((empData) => (
-            <div key={empData.id} className="employee-card">
-              {/* Employee Header */}
-              <div className="employee-header">
-                <div className="employee-info">
-                  <div className="employee-avatar">
-                    <User size={24} />
-                  </div>
-                  <div className="employee-details">
-                    <h3 className="employee-name">{empData.employee.name}</h3>
-                    <p className="employee-email">{empData.employee.email}</p>
-                    <div className="employee-meta">
-                      <span className="department-badge">{empData.employee.department}</span>
-                      <span className="position-text">{empData.employee.position}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="device-count-badge">
-                  {empData.devices.length} Device{empData.devices.length > 1 ? 's' : ''}
-                </div>
-              </div>
-
-              {/* Devices List */}
-              <div className="devices-list">
-                {empData.devices.map((device) => (
-                  <div key={device.id} className="device-item">
-                    <div className="device-summary">
-                      <div className="device-icon">
-                        {getDeviceIcon(device.type)}
-                      </div>
-                      <div className="device-basic-info">
-                        <div className="device-id-name">
-                          <span className="device-asset-id">{device.id}</span>
-                          <span className="device-brand-model">
-                            {device.brand ? `${device.brand} ${device.model}` : 
-                             device.processor ? `Custom Desktop` : 
-                             `${device.model || 'Device'}`}
-                          </span>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Department</th>
+                  <th>Device Type</th>
+                  <th>Device ID</th>
+                  <th>Monitors</th>
+                  <th>Date Deployed</th>
+                  <th>Days Active</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDeployments.map((deployment) => {
+                  const daysActive = Math.floor(
+                    (new Date() - new Date(deployment.date_issued)) / (1000 * 60 * 60 * 24)
+                  );
+                  
+                  return (
+                    <tr key={deployment.employee_device_id}>
+                      <td className="employee-name">
+                        <div>
+                          <strong>{deployment.employees?.full_name}</strong>
+                          <br />
+                          <small>{deployment.employees?.employee_code}</small>
                         </div>
-                        <div className="device-quick-specs">
-                          {device.operating_system && (
-                            <span className="spec-badge os">{device.operating_system}</span>
+                      </td>
+                      <td>{deployment.employees?.departments?.department_name || 'N/A'}</td>
+                      <td>
+                        <span className={`device-type-badge ${deployment.device_type.toLowerCase()}`}>
+                          {deployment.device_type === 'LAPTOP' ? (
+                            <><Package size={14} /> Laptop</>
+                          ) : (
+                            <><Monitor size={14} /> Desktop</>
                           )}
-                          <span className="spec-badge ram">{calculateTotalRAM(device)}</span>
-                          <span className="spec-badge storage">{calculateTotalStorage(device)}</span>
+                        </span>
+                      </td>
+                      <td className="asset-id">{deployment.device_id}</td>
+                      <td className="monitors-cell">
+                        {getMonitorsInfo(deployment)}
+                      </td>
+                      <td>
+                        <div className="date-cell">
+                          <Calendar size={14} />
+                          {formatDate(deployment.date_issued)}
                         </div>
-                      </div>
-                      <div className="device-status">
-                        <span
-                          className="status-indicator"
-                          style={{
-                            backgroundColor: `${getStatusColor(device.status)}15`,
-                            color: getStatusColor(device.status),
-                            borderColor: getStatusColor(device.status)
-                          }}
-                        >
-                          {device.status}
+                      </td>
+                      <td>
+                        <span className={`days-badge ${daysActive > 365 ? 'long-term' : ''}`}>
+                          {daysActive} days
                         </span>
-                        <span className="assigned-date">
-                          {formatDate(device.assigned_date)}
-                        </span>
-                      </div>
-                    </div>
-                    <button 
-                      className="view-details-btn"
-                      onClick={() => handleViewDevice(device, empData.employee)}
-                      title="View Details"
-                    >
-                      <Eye size={16} />
-                      Details
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button
+                            className="btn-icon btn-view"
+                            onClick={() => handleViewSpecs(deployment)}
+                            title="View Device Specifications"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            className="btn-icon btn-return"
+                            onClick={() => handleReturnDevice(
+                              deployment.employee_device_id,
+                              deployment.employees?.full_name,
+                              getDeviceInfo(deployment)
+                            )}
+                            disabled={returning === deployment.employee_device_id}
+                            title="Return Device"
+                          >
+                            {returning === deployment.employee_device_id ? (
+                              '...'
+                            ) : (
+                              <RotateCcw size={16} />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* Interactive Device Details Modal */}
-      {modalOpen && selectedDevice && (
-        <div className="device-modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="device-modal" onClick={(e) => e.stopPropagation()}>
+      {/* Deploy Device Modal */}
+      {isDeployModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsDeployModalOpen(false)}>
+          <div className="deployment-form-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-title-section">
-                <div className="device-modal-icon">
-                  {getDeviceIcon(selectedDevice.type)}
-                </div>
-                <div>
-                  <h2>Device Details</h2>
-                  <p className="device-asset-id-modal">{selectedDevice.id}</p>
-                </div>
-              </div>
+              <h2>Deploy New Device</h2>
               <button 
-                className="close-modal-btn"
-                onClick={() => setModalOpen(false)}
+                className="modal-close" 
+                onClick={() => setIsDeployModalOpen(false)}
               >
-                <X size={20} />
+                ×
               </button>
             </div>
 
-            <div className="modal-content">
-              {/* Employee Section */}
-              <div className="modal-section">
-                <h3><User size={18} /> Assigned To</h3>
-                <div className="employee-card-modal">
-                  <div className="employee-info-modal">
-                    <div className="employee-name-modal">{selectedDevice.employee.name}</div>
-                    <div className="employee-email-modal">{selectedDevice.employee.email}</div>
-                    <div className="employee-details-modal">
-                      <span className="department-badge-modal">{selectedDevice.employee.department}</span>
-                      <span className="position-modal">{selectedDevice.employee.position}</span>
-                    </div>
-                  </div>
-                  <div className="assignment-info">
-                    <div className="assignment-date">
-                      <Calendar size={16} />
-                      <span>Assigned: {formatDate(selectedDevice.assigned_date)}</span>
-                    </div>
-                  </div>
+            <div className="deployment-steps">
+              {/* Step 1: Select Employee */}
+              <div className="deployment-step">
+                <div className="step-header">
+                  <Users size={20} />
+                  <h3>Step 1: Select Employee</h3>
+                </div>
+                <select 
+                  value={deploymentForm.employeeId}
+                  onChange={(e) => handleFormChange('employeeId', e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">Choose an employee...</option>
+                  {employees.map(employee => (
+                    <option key={employee.employee_id} value={employee.employee_id}>
+                      {employee.full_name} ({employee.employee_code}) - {employee.departments?.department_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Step 2: Select Device Type */}
+              <div className="deployment-step">
+                <div className="step-header">
+                  <Package size={20} />
+                  <h3>Step 2: Select Device Type</h3>
+                </div>
+                <div className="device-type-options">
+                  <label className="device-type-option">
+                    <input 
+                      type="radio" 
+                      value="LAPTOP" 
+                      checked={deploymentForm.deviceType === 'LAPTOP'}
+                      onChange={(e) => handleFormChange('deviceType', e.target.value)}
+                    />
+                    <span>Laptop</span>
+                  </label>
+                  <label className="device-type-option">
+                    <input 
+                      type="radio" 
+                      value="DESKTOP" 
+                      checked={deploymentForm.deviceType === 'DESKTOP'}
+                      onChange={(e) => handleFormChange('deviceType', e.target.value)}
+                    />
+                    <span>Desktop</span>
+                  </label>
                 </div>
               </div>
 
-              {/* Device Information */}
-              <div className="modal-section">
-                <h3>{getDeviceIcon(selectedDevice.type)} Device Information</h3>
-                <div className="device-specs-grid">
-                  <div className="spec-card">
-                    <div className="spec-label">Asset ID</div>
-                    <div className="spec-value primary">{selectedDevice.id}</div>
-                  </div>
-                  
-                  {selectedDevice.brand && (
-                    <div className="spec-card">
-                      <div className="spec-label">Brand & Model</div>
-                      <div className="spec-value">{selectedDevice.brand} {selectedDevice.model}</div>
-                    </div>
-                  )}
-
-                  {selectedDevice.serial_number && (
-                    <div className="spec-card">
-                      <div className="spec-label">Serial Number</div>
-                      <div className="spec-value mono">{selectedDevice.serial_number}</div>
-                    </div>
-                  )}
-
-                  <div className="spec-card">
-                    <div className="spec-label">Status</div>
-                    <div className="spec-value">
-                      <span
-                        className="status-badge-modal"
-                        style={{
-                          backgroundColor: `${getStatusColor(selectedDevice.status)}15`,
-                          color: getStatusColor(selectedDevice.status),
-                          borderColor: getStatusColor(selectedDevice.status)
-                        }}
-                      >
-                        {selectedDevice.status}
-                      </span>
-                    </div>
-                  </div>
+              {/* Step 3: Select Device */}
+              <div className="deployment-step">
+                <div className="step-header">
+                  <Package size={20} />
+                  <h3>Step 3: Select Device</h3>
                 </div>
+                <select 
+                  value={deploymentForm.deviceId}
+                  onChange={(e) => handleFormChange('deviceId', e.target.value)}
+                  className="form-select"
+                  disabled={!deploymentForm.deviceType}
+                >
+                  <option value="">Choose a {deploymentForm.deviceType.toLowerCase()}...</option>
+                  {devices.map(device => (
+                    <option key={device.device_id} value={device.device_id}>
+                      {device.display_name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Technical Specifications */}
-              <div className="modal-section">
-                <h3><Cpu size={18} /> Technical Specifications</h3>
-                <div className="tech-specs-grid">
-                  {selectedDevice.operating_system && (
-                    <div className="tech-spec-card">
-                      <div className="tech-spec-header">
-                        <div className="tech-spec-icon">💿</div>
-                        <div className="tech-spec-label">Operating System</div>
-                      </div>
-                      <div className="tech-spec-value">{selectedDevice.operating_system}</div>
-                    </div>
-                  )}
-
-                  {(selectedDevice.cpu || selectedDevice.processor) && (
-                    <div className="tech-spec-card">
-                      <div className="tech-spec-header">
-                        <Cpu size={16} />
-                        <div className="tech-spec-label">Processor</div>
-                      </div>
-                      <div className="tech-spec-value">{selectedDevice.cpu || selectedDevice.processor}</div>
-                    </div>
-                  )}
-
-                  {(selectedDevice.memory || selectedDevice.desktop_memory) && (
-                    <div className="tech-spec-card">
-                      <div className="tech-spec-header">
-                        <MemoryStick size={16} />
-                        <div className="tech-spec-label">Memory</div>
-                      </div>
-                      <div className="tech-spec-value">
-                        {calculateTotalRAM(selectedDevice)}
-                        {selectedDevice.desktop_memory && selectedDevice.desktop_memory.length > 0 && (
-                          <div className="memory-breakdown">
-                            {selectedDevice.desktop_memory.map((mem, idx) => (
-                              <div key={idx} className="memory-module">
-                                Slot {mem.slot_number}: {mem.size_gb}GB
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {(selectedDevice.storage || selectedDevice.desktop_storage) && (
-                    <div className="tech-spec-card">
-                      <div className="tech-spec-header">
-                        <Storage size={16} />
-                        <div className="tech-spec-label">Storage</div>
-                      </div>
-                      <div className="tech-spec-value">
-                        {calculateTotalStorage(selectedDevice)}
-                        {selectedDevice.storage_type && (
-                          <div className="storage-type">{selectedDevice.storage_type}</div>
-                        )}
-                        {selectedDevice.desktop_storage && selectedDevice.desktop_storage.length > 0 && (
-                          <div className="storage-breakdown">
-                            {selectedDevice.desktop_storage.map((stor, idx) => (
-                              <div key={idx} className="storage-device">
-                                {stor.capacity_gb}GB {stor.storage_type}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+              {/* Step 4: Select Monitors (Optional) */}
+              <div className="deployment-step">
+                <div className="step-header">
+                  <Monitor size={20} />
+                  <h3>Step 4: Select Monitors (Optional)</h3>
+                </div>
+                <div className="monitors-grid">
+                  {monitors.length === 0 ? (
+                    <p className="no-data">No available monitors</p>
+                  ) : (
+                    monitors.map(monitor => (
+                      <label key={monitor.monitor_id} className="monitor-option">
+                        <input 
+                          type="checkbox"
+                          checked={deploymentForm.monitorIds.includes(monitor.monitor_id)}
+                          onChange={() => handleMonitorToggle(monitor.monitor_id)}
+                        />
+                        <span>{monitor.asset_id} - {monitor.brand} {monitor.model}</span>
+                      </label>
+                    ))
                   )}
                 </div>
               </div>
-
-              {/* Warranty & Service */}
-              {selectedDevice.warranty_end && (
-                <div className="modal-section">
-                  <h3><Shield size={18} /> Warranty & Service</h3>
-                  <div className="warranty-info-modal">
-                    <div className="warranty-card-modal">
-                      <div className="warranty-label">Warranty Expires</div>
-                      <div className="warranty-date-modal">{formatDate(selectedDevice.warranty_end)}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
-            <div className="modal-footer">
-              <button 
-                className="btn-secondary-improved"
-                onClick={() => setModalOpen(false)}
+            {/* Deployment Summary */}
+            {(selectedEmployee || selectedDevice || deploymentForm.monitorIds.length > 0) && (
+              <div className="deployment-summary">
+                <h3>Deployment Summary</h3>
+                <div className="summary-details">
+                  {selectedEmployee && (
+                    <div className="summary-item">
+                      <strong>Employee:</strong> {selectedEmployee.full_name} ({selectedEmployee.employee_code})
+                    </div>
+                  )}
+                  {selectedDevice && (
+                    <div className="summary-item">
+                      <strong>Device:</strong> {selectedDevice.display_name}
+                    </div>
+                  )}
+                  {deploymentForm.monitorIds.length > 0 && (
+                    <div className="summary-item">
+                      <strong>Monitors:</strong> {deploymentForm.monitorIds.length} selected
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Deploy Button */}
+            <div className="deployment-actions">
+              <button
+                className="btn-secondary"
+                onClick={() => setIsDeployModalOpen(false)}
               >
-                Close
+                Cancel
               </button>
-              <button className="btn-primary-improved">
-                <ExternalLink size={16} />
-                Edit Device
+              <button 
+                className="btn-primary btn-deploy"
+                onClick={handleDeploy}
+                disabled={!deploymentForm.employeeId || !deploymentForm.deviceId || deploying}
+              >
+                {deploying ? 'Deploying...' : 'Deploy Device'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Device Specifications Modal */}
+      {isSpecModalOpen && selectedDeployment && (
+        <InteractiveDeviceSpecModal
+          deployment={selectedDeployment}
+          onClose={() => {
+            setIsSpecModalOpen(false);
+            setSelectedDeployment(null);
+          }}
+        />
       )}
     </div>
   );
