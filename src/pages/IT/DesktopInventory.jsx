@@ -30,15 +30,32 @@ export default function DesktopInventory() {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'available':
-        return '#10b981';
-      case 'issued':
-        return '#0a0aa6';
-      case 'defective':
-        return '#ef4444';
-      default:
-        return '#6b7280';
+      case 'available': return '#10b981';
+      case 'issued': return '#0a0aa6';
+      case 'defective': return '#ef4444';
+      default: return '#6b7280';
     }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const getWarrantyStatus = (warrantyEnd) => {
+    if (!warrantyEnd) return { status: 'Unknown', color: '#6b7280' };
+    
+    const endDate = new Date(warrantyEnd);
+    const today = new Date();
+    const daysLeft = Math.floor((endDate - today) / (1000 * 60 * 60 * 24));
+    
+    if (daysLeft < 0) return { status: 'Expired', color: '#ef4444' };
+    if (daysLeft < 90) return { status: `${daysLeft} days left`, color: '#f59e0b' };
+    return { status: 'Active', color: '#10b981' };
   };
 
   const calculateTotalRAM = (desktop) => {
@@ -62,14 +79,6 @@ export default function DesktopInventory() {
     );
     const totalFormatted = total >= 1000 ? `${(total / 1000).toFixed(1)} TB` : `${total} GB`;
     return { total: totalFormatted, devices: desktop.desktop_storage.length };
-  };
-
-  const getStorageTypes = (desktop) => {
-    if (!desktop.desktop_storage || desktop.desktop_storage.length === 0) {
-      return 'N/A';
-    }
-    const types = desktop.desktop_storage.map((s) => s.storage_type);
-    return [...new Set(types)].join(', ');
   };
 
   return (
@@ -120,18 +129,6 @@ export default function DesktopInventory() {
             <span className="stat-label-improved">Defective</span>
           </div>
         </div>
-        {/* <div className="stat-card-improved warning">
-          <div className="stat-content-improved">
-            <span className="stat-value-improved">
-              {desktops.reduce((total, desktop) => {
-                const ramInfo = calculateTotalRAM(desktop);
-                const ramValue = ramInfo.total === 'N/A' ? 0 : parseInt(ramInfo.total);
-                return total + ramValue;
-              }, 0)} GB
-            </span>
-            <span className="stat-label-improved">Total Fleet RAM</span>
-          </div>
-        </div> */}
       </div>
 
       <div className="inventory-controls-improved">
@@ -188,11 +185,12 @@ export default function DesktopInventory() {
               <thead>
                 <tr>
                   <th className="col-asset">Asset ID</th>
-                  <th className="col-os">Operating System</th>
-                  <th className="col-cpu">Processor</th>
-                  <th className="col-ram">Memory Configuration</th>
-                  <th className="col-storage">Total Storage</th>
-                  <th className="col-storage-types">Storage Types</th>
+                  {/* --- NEW Grouped Columns for Efficiency --- */}
+                  <th className="col-sys">System Info</th>
+                  <th className="col-os">OS & Architecture</th>
+                  <th className="col-hardware">Hardware Specs</th>
+                  <th className="col-user">Username</th>
+                  <th className="col-procurement">Procurement</th>
                   <th className="col-status">Status</th>
                 </tr>
               </thead>
@@ -200,47 +198,81 @@ export default function DesktopInventory() {
                 {desktops.map((desktop) => {
                   const ramInfo = calculateTotalRAM(desktop);
                   const storageInfo = calculateTotalStorage(desktop);
+                  const warrantyInfo = getWarrantyStatus(desktop.warranty_end);
                   
                   return (
                     <tr key={desktop.desktop_id} className="table-row-improved">
+                      {/* Asset ID */}
                       <td className="asset-cell-improved">
                         <span className="asset-id-improved">{desktop.asset_id}</span>
+                        {/* Serial Number Display */}
+                        {desktop.serial_number && (
+                          <div style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '4px'}}>
+                            SN: {desktop.serial_number}
+                          </div>
+                        )}
                       </td>
+
+                      {/* System Info (Manufacturer, Model, BIOS) */}
+                      <td className="spec-cell-improved">
+                        <div style={{fontWeight: '600', color: '#374151'}}>
+                          {desktop.system_manufacturer || 'Unknown Mfg'}
+                        </div>
+                        <div style={{fontSize: '0.8rem', color: '#6b7280'}}>
+                          {desktop.system_model || 'Unknown Model'}
+                        </div>
+                        <div style={{fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px'}}>
+                          BIOS: {desktop.bios_mode || 'N/A'}
+                        </div>
+                      </td>
+
+                      {/* OS & Architecture */}
                       <td className="os-cell-improved">
                         <span className="os-badge-improved">
                           {desktop.operating_system || 'N/A'}
                         </span>
-                      </td>
-                      <td className="cpu-cell-improved">
-                        <span className="cpu-text-improved" title={desktop.processor}>
-                          {desktop.processor || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="ram-cell-improved">
-                        <div className="memory-info-improved">
-                          <div className="memory-total-improved">{ramInfo.total}</div>
-                          {ramInfo.slots > 0 && (
-                            <small className="memory-details-improved">
-                              {ramInfo.slots} module{ramInfo.slots > 1 ? 's' : ''}
-                            </small>
-                          )}
+                        <div style={{fontSize: '0.75rem', marginTop: '4px', color: '#6b7280'}}>
+                          Ver: {desktop.windows_version || 'N/A'} ({desktop.system_architecture || 'x64'})
                         </div>
                       </td>
-                      <td className="storage-cell-improved">
-                        <div className="storage-info-improved">
-                          <div className="storage-total-improved">{storageInfo.total}</div>
-                          {storageInfo.devices > 0 && (
-                            <small className="storage-details-improved">
-                              {storageInfo.devices} device{storageInfo.devices > 1 ? 's' : ''}
-                            </small>
-                          )}
+
+                      {/* Hardware Specs (CPU, GPU, RAM, Storage) */}
+                      <td className="spec-cell-improved">
+                        <div style={{fontSize: '0.8rem', marginBottom: '2px'}}>
+                          <strong>CPU:</strong> {desktop.processor || 'N/A'}
+                        </div>
+                        <div style={{fontSize: '0.8rem', marginBottom: '2px'}}>
+                          <strong>GPU:</strong> <span title={desktop.graphics_card}>
+                            {desktop.graphics_card ? (desktop.graphics_card.length > 20 ? desktop.graphics_card.substring(0,20)+'...' : desktop.graphics_card) : 'N/A'}
+                          </span>
+                        </div>
+                        <div className="memory-info-improved" style={{marginTop: '4px'}}>
+                          <span className="memory-badge-improved" style={{fontSize: '0.75rem', padding: '2px 6px'}}>
+                            RAM: {ramInfo.total}
+                          </span>
+                          <span className="memory-badge-improved" style={{fontSize: '0.75rem', padding: '2px 6px', marginLeft: '4px'}}>
+                            Sto: {storageInfo.total}
+                          </span>
                         </div>
                       </td>
-                      <td className="storage-types-cell-improved">
-                        <span className="storage-types-improved">
-                          {getStorageTypes(desktop)}
-                        </span>
+
+                      {/* Username */}
+                      <td className="spec-cell-improved">
+                        {desktop.username || <span style={{color: '#9ca3af', fontStyle: 'italic'}}>Unassigned</span>}
                       </td>
+
+                      {/* Procurement Info */}
+                      <td className="procurement-cell-improved">
+                        <div style={{fontSize: '0.8rem'}}>{desktop.supplier || 'No Supplier'}</div>
+                        <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
+                          Bought: {formatDate(desktop.purchase_date)}
+                        </div>
+                        <div style={{fontSize: '0.75rem', marginTop: '2px'}}>
+                          Warranty: <span style={{color: warrantyInfo.color, fontWeight: '500'}}>{warrantyInfo.status}</span>
+                        </div>
+                      </td>
+
+                      {/* Status */}
                       <td className="status-cell-improved">
                         <span
                           className="status-badge-improved"

@@ -365,12 +365,11 @@ export async function returnDevice(employeeDeviceId) {
   }
 }
 
-// Get available monitors for deployment
 export async function getAvailableMonitors() {
   try {
     const { data, error } = await supabase
       .from('monitors')
-      .select('*')
+      .select('*') // This will now include the new columns automatically
       .eq('status', 'available')
       .order('asset_id');
 

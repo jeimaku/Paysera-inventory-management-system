@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, HardDrive } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, HardDrive, Eye } from 'lucide-react';
 import DesktopModal from '../../components/Admin/DesktopModal';
+import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import {
   getDesktops,
   createDesktop,
@@ -8,6 +9,7 @@ import {
   deleteDesktop,
 } from '../../services/deviceService';
 import '../../styles/inventory.css';
+import '../../styles/new_modal.css';
 
 export default function DesktopInventory() {
   const [desktops, setDesktops] = useState([]);
@@ -15,6 +17,9 @@ export default function DesktopInventory() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDesktop, setSelectedDesktop] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  const [specsModalOpen, setSpecsModalOpen] = useState(false);
+  const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -51,11 +56,14 @@ export default function DesktopInventory() {
     setDeleteConfirm(desktop);
   };
 
+  const handleViewSpecs = (desktop) => {
+    setViewSpecsDevice(desktop);
+    setSpecsModalOpen(true);
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
-
     const result = await deleteDesktop(deleteConfirm.desktop_id);
-
     if (result.success) {
       setDesktops((prev) =>
         prev.filter((desktop) => desktop.desktop_id !== deleteConfirm.desktop_id)
@@ -68,13 +76,11 @@ export default function DesktopInventory() {
 
   const handleModalSubmit = async (formData) => {
     let result;
-
     if (selectedDesktop) {
       result = await updateDesktop(selectedDesktop.desktop_id, formData);
     } else {
       result = await createDesktop(formData);
     }
-
     if (result.success) {
       setIsModalOpen(false);
       loadDesktops();
@@ -85,45 +91,20 @@ export default function DesktopInventory() {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'available':
-        return '#10b981';
-      case 'issued':
-        return '#0a0aa6';
-      case 'defective':
-        return '#ef4444';
-      default:
-        return '#6b7280';
+      case 'available': return '#10b981';
+      case 'issued': return '#0a0aa6';
+      case 'defective': return '#ef4444';
+      default: return '#6b7280';
     }
   };
 
-  const calculateTotalRAM = (desktop) => {
-    if (!desktop.desktop_memory || desktop.desktop_memory.length === 0) {
-      return 'N/A';
-    }
-    const total = desktop.desktop_memory.reduce(
-      (sum, mem) => sum + (mem.size_gb || 0),
-      0
-    );
-    return `${total}GB`;
-  };
-
-  const calculateTotalStorage = (desktop) => {
-    if (!desktop.desktop_storage || desktop.desktop_storage.length === 0) {
-      return 'N/A';
-    }
-    const total = desktop.desktop_storage.reduce(
-      (sum, stor) => sum + (stor.capacity_gb || 0),
-      0
-    );
-    return `${total}GB`;
-  };
-
-  const getStorageTypes = (desktop) => {
-    if (!desktop.desktop_storage || desktop.desktop_storage.length === 0) {
-      return 'N/A';
-    }
-    const types = desktop.desktop_storage.map((s) => s.storage_type);
-    return [...new Set(types)].join(', ');
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
   return (
@@ -139,6 +120,7 @@ export default function DesktopInventory() {
       </header>
 
       <div className="inventory-stats">
+        {/* ... stats kept same ... */}
         <div className="stat-item">
           <span className="stat-label">Total Desktops</span>
           <span className="stat-value">{desktops.length}</span>
@@ -170,28 +152,22 @@ export default function DesktopInventory() {
             type="text"
             placeholder="Search by asset ID or processor..."
             value={filters.search}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, search: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
           />
         </div>
 
         <div className="filters">
           <select
             value={filters.status}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, status: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
           >
             <option value="">All Status</option>
             <option value="available">Available</option>
             <option value="issued">Issued</option>
             <option value="defective">Defective</option>
           </select>
-
           <button className="btn-add" onClick={handleAddDesktop}>
-            <Plus size={18} />
-            Add Desktop
+            <Plus size={18} /> Add Desktop
           </button>
         </div>
       </div>
@@ -206,30 +182,53 @@ export default function DesktopInventory() {
                 <tr>
                   <th>Asset ID</th>
                   <th>Operating System</th>
-                  <th>Processor</th>
-                  <th>Total RAM</th>
-                  <th>Total Storage</th>
-                  <th>Storage Type</th>
+                  <th>Specs</th>
+                  {/* New Procurement Columns */}
+                  <th>Purchase Date</th>
+                  <th>Warranty</th>
+                  <th>Supplier</th>
+                  <th>Created At</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {desktops.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="no-data">
-                      No desktops found
-                    </td>
-                  </tr>
+                  <tr><td colSpan="9" className="no-data">No desktops found</td></tr>
                 ) : (
                   desktops.map((desktop) => (
                     <tr key={desktop.desktop_id}>
                       <td className="asset-id">{desktop.asset_id}</td>
                       <td>{desktop.operating_system || 'N/A'}</td>
-                      <td className="cpu-cell">{desktop.processor || 'N/A'}</td>
-                      <td>{calculateTotalRAM(desktop)}</td>
-                      <td>{calculateTotalStorage(desktop)}</td>
-                      <td>{getStorageTypes(desktop)}</td>
+                      
+                      {/* View Specs Button with Text */}
+                      <td>
+                        <button 
+                          className="btn-icon"
+                          style={{ 
+                            color: '#8b5cf6', 
+                            backgroundColor: '#8b5cf620', 
+                            width: 'auto', 
+                            padding: '6px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            borderRadius: '6px'
+                          }}
+                          onClick={() => handleViewSpecs(desktop)}
+                          title="View Specifications"
+                        >
+                          <Eye size={16} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>View</span>
+                        </button>
+                      </td>
+
+                      {/* New Procurement Data */}
+                      <td>{formatDate(desktop.purchase_date)}</td>
+                      <td>{formatDate(desktop.warranty_end)}</td>
+                      <td>{desktop.supplier || desktop.distributor || 'N/A'}</td>
+
+                      <td>{formatDate(desktop.created_at)}</td>
                       <td>
                         <span
                           className="status-badge"
@@ -274,26 +273,22 @@ export default function DesktopInventory() {
         onSubmit={handleModalSubmit}
         desktop={selectedDesktop}
       />
+      
+      <NewSpecsModal_Admin 
+        isOpen={specsModalOpen}
+        onClose={() => setSpecsModalOpen(false)}
+        device={viewSpecsDevice}
+        type="desktop"
+      />
 
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Delete Desktop</h3>
-            <p>
-              Are you sure you want to delete{' '}
-              <strong>{deleteConfirm.asset_id}</strong>?
-            </p>
-            <p className="warning-text">This action cannot be undone.</p>
+            <p>Are you sure you want to delete <strong>{deleteConfirm.asset_id}</strong>?</p>
             <div className="modal-actions">
-              <button
-                className="btn-secondary"
-                onClick={() => setDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button className="btn-danger" onClick={handleDeleteConfirm}>
-                Delete
-              </button>
+              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn-danger" onClick={handleDeleteConfirm}>Delete</button>
             </div>
           </div>
         </div>

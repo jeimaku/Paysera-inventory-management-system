@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Laptop as LaptopIcon, Eye, Info, Shield } from 'lucide-react';
+import { Search, Laptop as LaptopIcon, Eye, Shield } from 'lucide-react';
 import { getLaptops } from '../../services/deviceService';
 import '../../styles/read-only-inventory.css';
 
@@ -34,16 +34,11 @@ export default function LaptopInventory() {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'available':
-        return '#10b981';
-      case 'issued':
-        return '#0a0aa6';
-      case 'defective':
-        return '#ef4444';
-      case 'retired':
-        return '#6b7280';
-      default:
-        return '#6b7280';
+      case 'available': return '#10b981';
+      case 'issued': return '#0a0aa6';
+      case 'defective': return '#ef4444';
+      case 'retired': return '#6b7280';
+      default: return '#6b7280';
     }
   };
 
@@ -70,7 +65,6 @@ export default function LaptopInventory() {
 
   return (
     <div className="inventory-container">
-      {/* Enhanced Header with Better Positioning */}
       <header className="inventory-header-improved">
         <div className="header-content-improved">
           <div className="header-title-improved">
@@ -89,7 +83,6 @@ export default function LaptopInventory() {
         </div>
       </header>
 
-      {/* Enhanced Statistics Cards */}
       <div className="inventory-stats-improved">
         <div className="stat-card-improved primary">
           <div className="stat-icon-improved">
@@ -132,7 +125,6 @@ export default function LaptopInventory() {
         </div>
       </div>
 
-      {/* Enhanced Controls */}
       <div className="inventory-controls-improved">
         <div className="search-section-improved">
           <div className="search-box-improved">
@@ -185,7 +177,6 @@ export default function LaptopInventory() {
         </div>
       </div>
 
-      {/* Enhanced Table with Better Organization */}
       <div className="inventory-table-improved">
         {loading ? (
           <div className="loading-improved">
@@ -204,14 +195,20 @@ export default function LaptopInventory() {
               <thead>
                 <tr>
                   <th className="col-asset">Asset ID</th>
-                  <th className="col-brand">Brand</th>
-                  <th className="col-model">Model</th>
+                  <th className="col-brand">Brand/Model</th>
                   <th className="col-serial">Serial No.</th>
-                  <th className="col-os">OS</th>
-                  <th className="col-cpu">CPU</th>
-                  <th className="col-ram">RAM (GB)</th>
-                  <th className="col-storage">Storage</th>
-                  <th className="col-warranty">Warranty Status</th>
+                  
+                  {/* --- NEW Technical Specs Columns --- */}
+                  <th className="col-spec">Graphics</th>
+                  <th className="col-spec">Screen</th>
+                  <th className="col-spec">Connectivity</th>
+                  <th className="col-spec">Dimensions/Weight</th>
+                  
+                  {/* --- NEW Procurement Columns --- */}
+                  <th className="col-procurement">Supplier</th>
+                  <th className="col-procurement">Purchase Date</th>
+                  <th className="col-warranty">Warranty</th>
+                  
                   <th className="col-status">Status</th>
                 </tr>
               </thead>
@@ -227,40 +224,47 @@ export default function LaptopInventory() {
                       <td className="brand-cell-improved">
                         <div className="brand-info">
                           <strong className="brand-name-improved">{laptop.brand}</strong>
+                          <span className="model-text-improved" style={{ display: 'block', fontSize: '0.8rem', color: '#6b7280' }}>
+                            {laptop.model}
+                          </span>
                         </div>
-                      </td>
-                      <td className="model-cell-improved">
-                        <span className="model-text-improved">{laptop.model}</span>
                       </td>
                       <td className="serial-cell-improved">
                         <span className="serial-number-improved">{laptop.serial_number || 'N/A'}</span>
                       </td>
-                      <td className="os-cell-improved">
-                        <span className="os-badge-improved">
-                          {laptop.operating_system || 'N/A'}
+
+                      {/* --- Technical Data Mapping --- */}
+                      <td className="spec-cell-improved">
+                        <span title={laptop.graphics_card || 'N/A'}>
+                          {laptop.graphics_card ? (laptop.graphics_card.length > 20 ? laptop.graphics_card.substring(0,20)+'...' : laptop.graphics_card) : 'N/A'}
                         </span>
                       </td>
-                      <td className="cpu-cell-improved">
-                        <span className="cpu-text-improved" title={laptop.cpu}>
-                          {laptop.cpu || 'N/A'}
-                        </span>
+                      <td className="spec-cell-improved">
+                        {laptop.screen_size || 'N/A'}
                       </td>
-                      <td className="ram-cell-improved">
-                        <span className="memory-badge-improved">
-                          {laptop.memory ? `${laptop.memory} GB` : 'N/A'}
-                        </span>
-                      </td>
-                      <td className="storage-cell-improved">
-                        <div className="storage-info-improved">
-                          {laptop.storage ? (
-                            <>
-                              <span className="storage-size-improved">{laptop.storage}GB</span>
-                              <span className="storage-type-improved">{laptop.storage_type}</span>
-                            </>
-                          ) : (
-                            <span className="no-info-improved">N/A</span>
-                          )}
+                      <td className="spec-cell-improved">
+                        <div style={{ fontSize: '0.75rem' }}>
+                          <div title={laptop.wireless_connection}>
+                            {laptop.wireless_connection ? 'Wi-Fi/BT' : 'N/A'}
+                          </div>
+                          <div style={{ color: '#6b7280' }} title={laptop.usb_ports}>
+                            {laptop.usb_ports ? (laptop.usb_ports.length > 15 ? 'View Ports' : laptop.usb_ports) : ''}
+                          </div>
                         </div>
+                      </td>
+                      <td className="spec-cell-improved">
+                        <div style={{ fontSize: '0.75rem' }}>
+                          <div>{laptop.dimensions || 'N/A'}</div>
+                          <div style={{ color: '#6b7280' }}>{laptop.weight || ''}</div>
+                        </div>
+                      </td>
+
+                      {/* --- Procurement Data Mapping --- */}
+                      <td className="procurement-cell-improved">
+                        {laptop.supplier || 'N/A'}
+                      </td>
+                      <td className="procurement-cell-improved">
+                        {formatDate(laptop.purchase_date)}
                       </td>
                       <td className="warranty-cell-improved">
                         <span
@@ -270,6 +274,7 @@ export default function LaptopInventory() {
                           {warrantyInfo.status}
                         </span>
                       </td>
+
                       <td className="status-cell-improved">
                         <span
                           className="status-badge-improved"
@@ -291,7 +296,6 @@ export default function LaptopInventory() {
         )}
       </div>
 
-      {/* Enhanced Results Summary */}
       {laptops.length > 0 && (
         <div className="results-summary-improved">
           <div className="summary-content-improved">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, Monitor as MonitorIcon } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Monitor as MonitorIcon, Eye } from 'lucide-react';
 import MonitorModal from '../../components/Admin/MonitorModal';
+import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import {
   getMonitors,
   createMonitor,
@@ -8,6 +9,7 @@ import {
   deleteMonitor,
 } from '../../services/deviceService';
 import '../../styles/inventory.css';
+import '../../styles/new_modal.css';
 
 export default function MonitorInventory() {
   const [monitors, setMonitors] = useState([]);
@@ -15,6 +17,9 @@ export default function MonitorInventory() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMonitor, setSelectedMonitor] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  
+  const [specsModalOpen, setSpecsModalOpen] = useState(false);
+  const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -22,7 +27,6 @@ export default function MonitorInventory() {
     brand: '',
   });
 
-  // Get unique brands for filter
   const brands = [...new Set(monitors.map((m) => m.brand).filter(Boolean))];
 
   useEffect(() => {
@@ -55,11 +59,14 @@ export default function MonitorInventory() {
     setDeleteConfirm(monitor);
   };
 
+  const handleViewSpecs = (monitor) => {
+    setViewSpecsDevice(monitor);
+    setSpecsModalOpen(true);
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
-
     const result = await deleteMonitor(deleteConfirm.monitor_id);
-
     if (result.success) {
       setMonitors((prev) =>
         prev.filter((monitor) => monitor.monitor_id !== deleteConfirm.monitor_id)
@@ -72,13 +79,11 @@ export default function MonitorInventory() {
 
   const handleModalSubmit = async (formData) => {
     let result;
-
     if (selectedMonitor) {
       result = await updateMonitor(selectedMonitor.monitor_id, formData);
     } else {
       result = await createMonitor(formData);
     }
-
     if (result.success) {
       setIsModalOpen(false);
       loadMonitors();
@@ -89,15 +94,20 @@ export default function MonitorInventory() {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'available':
-        return '#10b981';
-      case 'issued':
-        return '#0a0aa6';
-      case 'defective':
-        return '#ef4444';
-      default:
-        return '#6b7280';
+      case 'available': return '#10b981';
+      case 'issued': return '#0a0aa6';
+      case 'defective': return '#ef4444';
+      default: return '#6b7280';
     }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
   return (
@@ -113,6 +123,7 @@ export default function MonitorInventory() {
       </header>
 
       <div className="inventory-stats">
+        {/* ... stats ... */}
         <div className="stat-item">
           <span className="stat-label">Total Monitors</span>
           <span className="stat-value">{monitors.length}</span>
@@ -144,42 +155,31 @@ export default function MonitorInventory() {
             type="text"
             placeholder="Search by asset ID, brand, or model..."
             value={filters.search}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, search: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
           />
         </div>
 
         <div className="filters">
           <select
             value={filters.status}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, status: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
           >
             <option value="">All Status</option>
             <option value="available">Available</option>
             <option value="issued">Issued</option>
             <option value="defective">Defective</option>
           </select>
-
           <select
             value={filters.brand}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, brand: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, brand: e.target.value }))}
           >
             <option value="">All Brands</option>
             {brands.map((brand) => (
-              <option key={brand} value={brand}>
-                {brand}
-              </option>
+              <option key={brand} value={brand}>{brand}</option>
             ))}
           </select>
-
           <button className="btn-add" onClick={handleAddMonitor}>
-            <Plus size={18} />
-            Add Monitor
+            <Plus size={18} /> Add Monitor
           </button>
         </div>
       </div>
@@ -195,8 +195,11 @@ export default function MonitorInventory() {
                   <th>Asset ID</th>
                   <th>Brand</th>
                   <th>Model</th>
-                  <th>Model Code</th>
-                  <th>Serial Number</th>
+                  <th>Specs</th>
+                  {/* New Procurement Columns */}
+                  <th>Purchase Date</th>
+                  <th>Warranty</th>
+                  <th>Supplier</th>
                   <th>Date Added</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -204,25 +207,45 @@ export default function MonitorInventory() {
               </thead>
               <tbody>
                 {monitors.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="no-data">
-                      No monitors found
-                    </td>
-                  </tr>
+                  <tr><td colSpan="10" className="no-data">No monitors found</td></tr>
                 ) : (
                   monitors.map((monitor) => (
                     <tr key={monitor.monitor_id}>
                       <td className="asset-id">{monitor.asset_id}</td>
                       <td>{monitor.brand}</td>
                       <td>{monitor.model}</td>
-                      <td>{monitor.model_code || 'N/A'}</td>
-                      <td>{monitor.serial_number || 'N/A'}</td>
+                      
+                      {/* View Specs Button with Text */}
+                      <td>
+                        <button 
+                          className="btn-icon"
+                          style={{ 
+                            color: '#8b5cf6', 
+                            backgroundColor: '#8b5cf620', 
+                            width: 'auto', 
+                            padding: '6px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            borderRadius: '6px'
+                          }}
+                          onClick={() => handleViewSpecs(monitor)}
+                          title="View Specifications"
+                        >
+                          <Eye size={16} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>View</span>
+                        </button>
+                      </td>
+
+                      {/* Procurement Data */}
+                      <td>{formatDate(monitor.purchase_date)}</td>
+                      <td>{formatDate(monitor.warranty_end)}</td>
+                      <td>{monitor.supplier || monitor.distributor || 'N/A'}</td>
+
                       <td>
                         {monitor.created_at
                           ? new Date(monitor.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
+                              month: 'short', day: 'numeric', year: 'numeric',
                             })
                           : 'N/A'}
                       </td>
@@ -270,29 +293,22 @@ export default function MonitorInventory() {
         onSubmit={handleModalSubmit}
         monitor={selectedMonitor}
       />
+      
+      <NewSpecsModal_Admin 
+        isOpen={specsModalOpen}
+        onClose={() => setSpecsModalOpen(false)}
+        device={viewSpecsDevice}
+        type="monitor"
+      />
 
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Delete Monitor</h3>
-            <p>
-              Are you sure you want to delete{' '}
-              <strong>
-                {deleteConfirm.brand} {deleteConfirm.model}
-              </strong>{' '}
-              ({deleteConfirm.asset_id})?
-            </p>
-            <p className="warning-text">This action cannot be undone.</p>
+            <p>Are you sure you want to delete <strong>{deleteConfirm.brand} {deleteConfirm.model}</strong>?</p>
             <div className="modal-actions">
-              <button
-                className="btn-secondary"
-                onClick={() => setDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button className="btn-danger" onClick={handleDeleteConfirm}>
-                Delete
-              </button>
+              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn-danger" onClick={handleDeleteConfirm}>Delete</button>
             </div>
           </div>
         </div>

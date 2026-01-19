@@ -1,17 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Users, Package, RotateCcw, Calendar, Monitor, Eye, Edit2, Trash2, Plus, Search } from 'lucide-react';
-import InteractiveDeviceSpecModal from '../../components/IT/InteractiveDeviceSpecModal';
+import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
 import { getEmployeesForDeployment, getAvailableDevices, getAvailableMonitors, deployDevice } from '../../services/deploymentService';
 import '../../styles/inventory.css';
 import '../../styles/deployment.css';
+import '../../styles/new_modal.css';
 
 export default function AdminEmployeeDevices() {
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [returning, setReturning] = useState(null);
-  const [selectedDeployment, setSelectedDeployment] = useState(null);
+  
+  // Specs Modal States
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
+  const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
+  const [viewSpecsType, setViewSpecsType] = useState('');
+  
+  // New State for passing deployment info to modal
+  const [selectedDeployment, setSelectedDeployment] = useState(null);
+
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   
   // Deploy modal states
@@ -33,7 +41,6 @@ export default function AdminEmployeeDevices() {
     department: '',
   });
 
-  // Unique departments for filter
   const departments = [...new Set(deployments.map(d => d.employees?.departments?.department_name).filter(Boolean))];
 
   useEffect(() => {
@@ -107,9 +114,19 @@ export default function AdminEmployeeDevices() {
 
   const handleViewSpecs = async (deployment) => {
     try {
-      // First get the basic deployment data
-      setSelectedDeployment(deployment);
-      setIsSpecModalOpen(true);
+      const fullDeviceData = await getDetailedDeviceSpecs(deployment.device_type, deployment.device_id);
+      
+      if (fullDeviceData) {
+        setViewSpecsDevice(fullDeviceData);
+        setViewSpecsType(deployment.device_type.toLowerCase());
+        
+        // Save the deployment info specifically for the modal tab
+        setSelectedDeployment(deployment);
+        
+        setIsSpecModalOpen(true);
+      } else {
+        alert('Could not fetch detailed specifications for this device.');
+      }
     } catch (error) {
       console.error('Error loading device specs:', error);
       alert('Failed to load device specifications');
@@ -179,13 +196,11 @@ export default function AdminEmployeeDevices() {
     if (!deployment.employee_monitors || deployment.employee_monitors.length === 0) {
       return 'None';
     }
-    
     return deployment.employee_monitors.map(em => 
       `${em.monitors.asset_id} - ${em.monitors.brand} ${em.monitors.model}`
     ).join(', ');
   };
 
-  // Filter deployments based on search and filters
   const filteredDeployments = deployments.filter(deployment => {
     const matchesSearch = !filters.search || 
       deployment.employees?.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -248,7 +263,6 @@ export default function AdminEmployeeDevices() {
         </div>
       </div>
 
-      {/* Enhanced Controls */}
       <div className="inventory-controls">
         <div className="search-box">
           <Search size={18} />
@@ -367,12 +381,24 @@ export default function AdminEmployeeDevices() {
                       <td>
                         <div className="action-buttons">
                           <button
-                            className="btn-icon btn-view"
+                            className="btn-icon"
+                            style={{ 
+                              color: '#8b5cf6', 
+                              backgroundColor: '#8b5cf620', 
+                              width: 'auto', 
+                              padding: '6px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              borderRadius: '6px'
+                            }}
                             onClick={() => handleViewSpecs(deployment)}
-                            title="View Device Specifications"
+                            title="View Specifications"
                           >
                             <Eye size={16} />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>View</span>
                           </button>
+
                           <button
                             className="btn-icon btn-return"
                             onClick={() => handleReturnDevice(
@@ -400,7 +426,6 @@ export default function AdminEmployeeDevices() {
         )}
       </div>
 
-      {/* Deploy Device Modal */}
       {isDeployModalOpen && (
         <div className="modal-overlay" onClick={() => setIsDeployModalOpen(false)}>
           <div className="deployment-form-card" onClick={(e) => e.stopPropagation()}>
@@ -415,7 +440,6 @@ export default function AdminEmployeeDevices() {
             </div>
 
             <div className="deployment-steps">
-              {/* Step 1: Select Employee */}
               <div className="deployment-step">
                 <div className="step-header">
                   <Users size={20} />
@@ -435,7 +459,6 @@ export default function AdminEmployeeDevices() {
                 </select>
               </div>
 
-              {/* Step 2: Select Device Type */}
               <div className="deployment-step">
                 <div className="step-header">
                   <Package size={20} />
@@ -463,7 +486,6 @@ export default function AdminEmployeeDevices() {
                 </div>
               </div>
 
-              {/* Step 3: Select Device */}
               <div className="deployment-step">
                 <div className="step-header">
                   <Package size={20} />
@@ -484,7 +506,6 @@ export default function AdminEmployeeDevices() {
                 </select>
               </div>
 
-              {/* Step 4: Select Monitors (Optional) */}
               <div className="deployment-step">
                 <div className="step-header">
                   <Monitor size={20} />
@@ -509,7 +530,6 @@ export default function AdminEmployeeDevices() {
               </div>
             </div>
 
-            {/* Deployment Summary */}
             {(selectedEmployee || selectedDevice || deploymentForm.monitorIds.length > 0) && (
               <div className="deployment-summary">
                 <h3>Deployment Summary</h3>
@@ -533,7 +553,6 @@ export default function AdminEmployeeDevices() {
               </div>
             )}
 
-            {/* Deploy Button */}
             <div className="deployment-actions">
               <button
                 className="btn-secondary"
@@ -553,16 +572,14 @@ export default function AdminEmployeeDevices() {
         </div>
       )}
 
-      {/* Device Specifications Modal */}
-      {isSpecModalOpen && selectedDeployment && (
-        <InteractiveDeviceSpecModal
-          deployment={selectedDeployment}
-          onClose={() => {
-            setIsSpecModalOpen(false);
-            setSelectedDeployment(null);
-          }}
-        />
-      )}
+      <NewSpecsModal_Admin
+        isOpen={isSpecModalOpen}
+        onClose={() => setIsSpecModalOpen(false)}
+        device={viewSpecsDevice}
+        type={viewSpecsType}
+        showDeployment={true} // Enabled for Admin Side
+        deploymentDetails={selectedDeployment} // Pass the deployment object
+      />
     </div>
   );
 }

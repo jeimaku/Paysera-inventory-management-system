@@ -125,12 +125,6 @@ export default function MonitorInventory() {
             <span className="stat-label-improved">Defective</span>
           </div>
         </div>
-        {/* <div className="stat-card-improved warning">
-          <div className="stat-content-improved">
-            <span className="stat-value-improved">{brands.length}</span>
-            <span className="stat-label-improved">Unique Brands</span>
-          </div>
-        </div> */}
       </div>
 
       <div className="inventory-controls-improved">
@@ -204,10 +198,20 @@ export default function MonitorInventory() {
                   <th className="col-asset">Asset ID</th>
                   <th className="col-brand">Brand</th>
                   <th className="col-model">Model</th>
-                  <th className="col-model-code">Model Code</th>
-                  <th className="col-serial">Serial Number</th>
+                  <th className="col-serial">Serial No.</th>
+                  
+                  {/* --- NEW Technical Specs Columns --- */}
+                  <th className="col-spec">Size</th>
+                  <th className="col-spec">Res/Refresh</th>
+                  <th className="col-spec">Panel/Type</th>
+                  <th className="col-spec">Ports</th>
+                  
+                  {/* --- NEW Procurement Columns --- */}
+                  <th className="col-procurement">Supplier</th>
+                  <th className="col-procurement">Purchase Date</th>
+                  <th className="col-procurement">Warranty</th>
+
                   <th className="col-date">Date Added</th>
-                  <th className="col-age">Age</th>
                   <th className="col-status">Status</th>
                 </tr>
               </thead>
@@ -224,29 +228,48 @@ export default function MonitorInventory() {
                     </td>
                     <td className="model-cell-improved">
                       <span className="model-text-improved">{monitor.model}</span>
-                    </td>
-                    <td className="model-code-cell-improved">
-                      <span className="model-code-improved">
-                        {monitor.model_code || 'N/A'}
-                      </span>
+                      <br/>
+                      <small style={{color: '#6b7280', fontSize: '0.75rem'}}>{monitor.model_code}</small>
                     </td>
                     <td className="serial-cell-improved">
                       <span className="serial-number-improved">
                         {monitor.serial_number || 'N/A'}
                       </span>
                     </td>
+
+                    {/* --- Technical Data Mapping --- */}
+                    <td className="spec-cell-improved">
+                      {monitor.size_inches ? `${monitor.size_inches}"` : 'N/A'}
+                    </td>
+                    <td className="spec-cell-improved">
+                      <div>{monitor.resolution || 'N/A'}</div>
+                      <small style={{color: '#6b7280'}}>{monitor.refresh_rate ? `${monitor.refresh_rate}Hz` : ''}</small>
+                    </td>
+                    <td className="spec-cell-improved">
+                      <div>{monitor.panel_type || 'N/A'}</div>
+                      <small style={{color: '#6b7280'}}>{monitor.screen_type || 'Flat'}</small>
+                    </td>
+                    <td className="spec-cell-improved">
+                      <span title={monitor.ports} style={{cursor: 'help'}}>
+                        {monitor.ports ? (monitor.ports.length > 15 ? 'View Ports' : monitor.ports) : 'N/A'}
+                      </span>
+                    </td>
+
+                    {/* --- Procurement Data Mapping --- */}
+                    <td className="procurement-cell-improved">
+                      {monitor.supplier || 'N/A'}
+                    </td>
+                    <td className="procurement-cell-improved">
+                      {formatDate(monitor.purchase_date)}
+                    </td>
+                    <td className="procurement-cell-improved">
+                      {formatDate(monitor.warranty_end)}
+                    </td>
+
                     <td className="date-cell-improved">
                       <div className="date-added-improved">
                         {formatDate(monitor.created_at)}
                       </div>
-                    </td>
-                    <td className="age-cell-improved">
-                      <span 
-                        className="age-badge-improved"
-                        style={{ color: getAgeColor(monitor.created_at) }}
-                      >
-                        {getMonitorAge(monitor.created_at)}
-                      </span>
                     </td>
                     <td className="status-cell-improved">
                       <span

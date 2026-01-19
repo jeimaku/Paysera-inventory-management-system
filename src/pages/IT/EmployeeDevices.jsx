@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Users, Package, RotateCcw, Calendar, Monitor } from 'lucide-react';
-import { getCurrentDeployments, returnDevice } from '../../services/deploymentService';
+import { Users, Package, RotateCcw, Calendar, Monitor, Eye } from 'lucide-react';
+import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
+import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import '../../styles/inventory.css';
+import '../../styles/new_modal.css';
 
 export default function EmployeeDevices() {
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [returning, setReturning] = useState(null);
+  
+  // Specs Modal State
+  const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
+  const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
+  const [viewSpecsType, setViewSpecsType] = useState('');
 
   useEffect(() => {
     loadDeployments();
@@ -47,6 +54,23 @@ export default function EmployeeDevices() {
     }
   };
 
+  const handleViewSpecs = async (deployment) => {
+    try {
+      // Fetch full details since the deployment list might strictly have ID/Asset tags
+      const fullDeviceData = await getDetailedDeviceSpecs(deployment.device_type, deployment.device_id);
+      
+      if (fullDeviceData) {
+        setViewSpecsDevice(fullDeviceData);
+        setViewSpecsType(deployment.device_type.toLowerCase());
+        setIsSpecModalOpen(true);
+      } else {
+        alert('Could not fetch detailed specifications for this device.');
+      }
+    } catch (error) {
+      console.error('Error opening specs:', error);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -57,7 +81,6 @@ export default function EmployeeDevices() {
   };
 
   const getDeviceInfo = (deployment) => {
-    // This would need to be enhanced to get actual device details
     return `${deployment.device_type} (ID: ${deployment.device_id})`;
   };
 
@@ -179,25 +202,44 @@ export default function EmployeeDevices() {
                         </span>
                       </td>
                       <td>
-                        <button
-                          className="btn-icon btn-return"
-                          onClick={() => handleReturnDevice(
-                            deployment.employee_device_id,
-                            deployment.employees?.full_name,
-                            getDeviceInfo(deployment)
-                          )}
-                          disabled={returning === deployment.employee_device_id}
-                          title="Return Device"
-                        >
-                          {returning === deployment.employee_device_id ? (
-                            'Returning...'
-                          ) : (
-                            <>
+                        <div className="action-buttons">
+                          {/* View Specs Button with Text */}
+                          <button
+                            className="btn-icon"
+                            style={{ 
+                              color: '#8b5cf6', 
+                              backgroundColor: '#8b5cf620', 
+                              width: 'auto', 
+                              padding: '6px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              borderRadius: '6px'
+                            }}
+                            onClick={() => handleViewSpecs(deployment)}
+                            title="View Specifications"
+                          >
+                            <Eye size={16} />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>View</span>
+                          </button>
+
+                          <button
+                            className="btn-icon btn-return"
+                            onClick={() => handleReturnDevice(
+                              deployment.employee_device_id,
+                              deployment.employees?.full_name,
+                              getDeviceInfo(deployment)
+                            )}
+                            disabled={returning === deployment.employee_device_id}
+                            title="Return Device"
+                          >
+                            {returning === deployment.employee_device_id ? (
+                              '...'
+                            ) : (
                               <RotateCcw size={16} />
-                              Return
-                            </>
-                          )}
-                        </button>
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -207,6 +249,14 @@ export default function EmployeeDevices() {
           </div>
         )}
       </div>
+
+      {/* Specs Modal Instance */}
+      <NewSpecsModal_Admin 
+        isOpen={isSpecModalOpen}
+        onClose={() => setIsSpecModalOpen(false)}
+        device={viewSpecsDevice}
+        type={viewSpecsType}
+      />
     </div>
   );
 }
