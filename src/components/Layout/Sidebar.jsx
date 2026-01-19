@@ -80,16 +80,16 @@ export default function Sidebar() {
         },
       ],
     },
-    {
-      section: 'Settings',
-      items: [
-        {
-          title: 'Database',
-          icon: Database,
-          path: '/admin/database',
-        },
-      ],
-    },
+    // {
+    //   section: 'Settings',
+    //   items: [
+    //     {
+    //       title: 'Database',
+    //       icon: Database,
+    //       path: '/admin/database',
+    //     },
+    //   ],
+    // },
   ];
 
   const handleNavigation = (path) => {

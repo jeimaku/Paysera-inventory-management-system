@@ -29,7 +29,6 @@ export async function getEmployeesForDeployment() {
     return [];
   }
 }
-
 // Get available devices for deployment (not currently issued)
 export async function getAvailableDevices(deviceType) {
   try {
@@ -45,12 +44,19 @@ export async function getAvailableDevices(deviceType) {
     if (error) throw error;
     
     // Format data consistently
-    return data?.map(device => ({
-      ...device,
-      device_id: device[idField],
-      device_type: deviceType,
-      display_name: `${device.asset_id} - ${device.brand || 'Unknown'} ${device.model || 'Unknown'}`
-    })) || [];
+    return data?.map(device => {
+      // Determine the display label based on device type
+      const displayLabel = deviceType === 'LAPTOP' 
+        ? `${device.brand || 'Unknown'} ${device.model || 'Unknown'}`
+        : `${device.operating_system || 'No OS'} (${device.processor || 'Unknown CPU'})`;
+
+      return {
+        ...device,
+        device_id: device[idField],
+        device_type: deviceType,
+        display_name: `${device.asset_id} - ${displayLabel}`
+      };
+    }) || [];
   } catch (error) {
     console.error('Error fetching available devices:', error);
     return [];
