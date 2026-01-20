@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   UserCog,
+  Wrench,
 } from 'lucide-react';
 import { supabase } from '../../supabase/client';
 import '../../styles/sidebar.css';
@@ -77,6 +78,11 @@ export default function Sidebar() {
           title: 'Monitors',
           icon: Monitor,
           path: '/admin/monitors',
+        },
+        {
+          title: 'Maintenance',
+          icon: Wrench,
+          path: '/admin/maintenance',
         },
       ],
     },

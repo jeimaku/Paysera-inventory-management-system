@@ -1,16 +1,37 @@
 import { useState, useEffect } from 'react';
 import { Search, HardDrive, Eye, Shield } from 'lucide-react';
 import { getDesktops } from '../../services/deviceService';
+import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
+import '../../styles/new_modal.css'; 
 import '../../styles/read-only-inventory.css';
 
 export default function DesktopInventory() {
   const [desktops, setDesktops] = useState([]);
+  const [brandOptions, setBrandOptions] = useState([]); // Added for consistency
   const [loading, setLoading] = useState(true);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDesktop, setSelectedDesktop] = useState(null);
 
   const [filters, setFilters] = useState({
     search: '',
     status: '',
+    brand: '', // Added Brand filter
+    device_condition: '',
   });
+
+  // Fetch unique brands for the filter (Consistent with Laptop)
+  useEffect(() => {
+    const fetchBrands = async () => {
+      const allData = await getDesktops({}); 
+      if (allData) {
+        const uniqueBrands = [...new Set(allData.map((d) => d.system_manufacturer).filter(Boolean))];
+        setBrandOptions(uniqueBrands);
+      }
+    };
+    fetchBrands();
+  }, []);
 
   useEffect(() => {
     loadDesktops();
@@ -19,12 +40,42 @@ export default function DesktopInventory() {
   const loadDesktops = async () => {
     setLoading(true);
     try {
+      // Note: Ensure your getDesktops service handles the 'brand' filter if you want it to work server-side.
+      // If client-side filtering is needed for brands on desktops, let me know.
       const data = await getDesktops(filters);
-      setDesktops(data);
+      
+      // If the API doesn't filter by system_manufacturer (brand) yet, we can filter here:
+      const filteredData = filters.brand 
+        ? data.filter(d => d.system_manufacturer === filters.brand)
+        : data;
+
+      setDesktops(filteredData);
     } catch (error) {
       console.error('Error loading desktops:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewSpecs = (desktop) => {
+    setSelectedDesktop(desktop);
+    setIsModalOpen(true);
+  };
+
+  // --- Helpers ---
+  const getConditionColor = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return '#0284c7';
+      case 'second_hand': return '#d97706';
+      default: return '#6b7280';
+    }
+  };
+
+  const getConditionText = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return 'Brand New';
+      case 'second_hand': return 'Second Hand';
+      default: return 'Unknown';
     }
   };
 
@@ -58,29 +109,6 @@ export default function DesktopInventory() {
     return { status: 'Active', color: '#10b981' };
   };
 
-  const calculateTotalRAM = (desktop) => {
-    if (!desktop.desktop_memory || desktop.desktop_memory.length === 0) {
-      return { total: 'N/A', slots: 0 };
-    }
-    const total = desktop.desktop_memory.reduce(
-      (sum, mem) => sum + (mem.size_gb || 0),
-      0
-    );
-    return { total: `${total} GB`, slots: desktop.desktop_memory.length };
-  };
-
-  const calculateTotalStorage = (desktop) => {
-    if (!desktop.desktop_storage || desktop.desktop_storage.length === 0) {
-      return { total: 'N/A', devices: 0 };
-    }
-    const total = desktop.desktop_storage.reduce(
-      (sum, stor) => sum + (stor.capacity_gb || 0),
-      0
-    );
-    const totalFormatted = total >= 1000 ? `${(total / 1000).toFixed(1)} TB` : `${total} GB`;
-    return { total: totalFormatted, devices: desktop.desktop_storage.length };
-  };
-
   return (
     <div className="inventory-container">
       <header className="inventory-header-improved">
@@ -103,9 +131,7 @@ export default function DesktopInventory() {
 
       <div className="inventory-stats-improved">
         <div className="stat-card-improved primary">
-          <div className="stat-icon-improved">
-            <HardDrive size={20} />
-          </div>
+          <div className="stat-icon-improved"><HardDrive size={20} /></div>
           <div className="stat-content-improved">
             <span className="stat-value-improved">{desktops.length}</span>
             <span className="stat-label-improved">Total Desktops</span>
@@ -117,16 +143,20 @@ export default function DesktopInventory() {
             <span className="stat-label-improved">Available</span>
           </div>
         </div>
-        <div className="stat-card-improved issued">
+        <div className="stat-card-improved" style={{ borderLeft: '4px solid #0284c7' }}>
           <div className="stat-content-improved">
-            <span className="stat-value-improved">{desktops.filter((d) => d.status === 'issued').length}</span>
-            <span className="stat-label-improved">Issued</span>
+            <span className="stat-value-improved" style={{ color: '#0284c7' }}>
+              {desktops.filter(d => d.device_condition === 'brand_new').length}
+            </span>
+            <span className="stat-label-improved">Brand New</span>
           </div>
         </div>
-        <div className="stat-card-improved defective">
+        <div className="stat-card-improved" style={{ borderLeft: '4px solid #d97706' }}>
           <div className="stat-content-improved">
-            <span className="stat-value-improved">{desktops.filter((d) => d.status === 'defective').length}</span>
-            <span className="stat-label-improved">Defective</span>
+            <span className="stat-value-improved" style={{ color: '#d97706' }}>
+              {desktops.filter(d => d.device_condition === 'second_hand').length}
+            </span>
+            <span className="stat-label-improved">Second Hand</span>
           </div>
         </div>
       </div>
@@ -137,7 +167,7 @@ export default function DesktopInventory() {
             <Search size={18} />
             <input
               type="text"
-              placeholder="Search by asset ID, processor, or operating system..."
+              placeholder="Search by asset ID, manufacturer, or model..."
               value={filters.search}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, search: e.target.value }))
@@ -160,10 +190,33 @@ export default function DesktopInventory() {
             <option value="defective">Defective</option>
           </select>
 
-          <div className="access-notice-improved">
-            <Eye size={16} />
-            <span>Read-only access for IT users</span>
-          </div>
+          {/* Added Brand Filter for Consistency */}
+          <select
+            className="filter-select-improved"
+            value={filters.brand}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, brand: e.target.value }))
+            }
+          >
+            <option value="">All Manufacturers</option>
+            {brandOptions.map((brand) => (
+              <option key={brand} value={brand}>
+                {brand}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="filter-select-improved"
+            value={filters.device_condition}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, device_condition: e.target.value }))
+            }
+          >
+            <option value="">All Conditions</option>
+            <option value="brand_new">Brand New</option>
+            <option value="second_hand">Second Hand</option>
+          </select>
         </div>
       </div>
 
@@ -177,7 +230,6 @@ export default function DesktopInventory() {
           <div className="no-data-state-improved">
             <HardDrive size={64} className="no-data-icon-improved" />
             <h3>No Desktops Found</h3>
-            <p>No desktop computers match your current search criteria.</p>
           </div>
         ) : (
           <div className="table-container-improved">
@@ -185,91 +237,95 @@ export default function DesktopInventory() {
               <thead>
                 <tr>
                   <th className="col-asset">Asset ID</th>
-                  {/* --- NEW Grouped Columns for Efficiency --- */}
-                  <th className="col-sys">System Info</th>
-                  <th className="col-os">OS & Architecture</th>
-                  <th className="col-hardware">Hardware Specs</th>
-                  <th className="col-user">Username</th>
-                  <th className="col-procurement">Procurement</th>
+                  <th className="col-brand">Brand/Model</th>
+                  <th className="col-serial">Serial No.</th>
+                  
+                  {/* Layout Consistent with Laptop Inventory */}
+                  <th style={{ width: '120px' }}>Condition</th>
+                  <th style={{ width: '100px', textAlign: 'center' }}>Details</th>
+                  
+                  <th className="col-procurement">Supplier</th>
+                  <th className="col-procurement">Purchase Date</th>
+                  <th className="col-warranty">Warranty</th>
                   <th className="col-status">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {desktops.map((desktop) => {
-                  const ramInfo = calculateTotalRAM(desktop);
-                  const storageInfo = calculateTotalStorage(desktop);
                   const warrantyInfo = getWarrantyStatus(desktop.warranty_end);
-                  
                   return (
                     <tr key={desktop.desktop_id} className="table-row-improved">
                       {/* Asset ID */}
                       <td className="asset-cell-improved">
                         <span className="asset-id-improved">{desktop.asset_id}</span>
-                        {/* Serial Number Display */}
-                        {desktop.serial_number && (
-                          <div style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '4px'}}>
-                            SN: {desktop.serial_number}
-                          </div>
-                        )}
                       </td>
 
-                      {/* System Info (Manufacturer, Model, BIOS) */}
-                      <td className="spec-cell-improved">
-                        <div style={{fontWeight: '600', color: '#374151'}}>
-                          {desktop.system_manufacturer || 'Unknown Mfg'}
-                        </div>
-                        <div style={{fontSize: '0.8rem', color: '#6b7280'}}>
-                          {desktop.system_model || 'Unknown Model'}
-                        </div>
-                        <div style={{fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px'}}>
-                          BIOS: {desktop.bios_mode || 'N/A'}
+                      {/* Brand & Model (Mapped from System Manufacturer & Model) */}
+                      <td className="brand-cell-improved">
+                        <div className="brand-info">
+                          <strong className="brand-name-improved">
+                            {desktop.system_manufacturer}
+                          </strong>
+                          <span className="model-text-improved" style={{ display: 'block', fontSize: '0.8rem', color: '#6b7280' }}>
+                            {desktop.system_model}
+                          </span>
                         </div>
                       </td>
 
-                      {/* OS & Architecture */}
-                      <td className="os-cell-improved">
-                        <span className="os-badge-improved">
-                          {desktop.operating_system || 'N/A'}
+                      {/* Serial Number */}
+                      <td className="serial-cell-improved">
+                        <span className="serial-number-improved">
+                          {desktop.serial_number || 'N/A'}
                         </span>
-                        <div style={{fontSize: '0.75rem', marginTop: '4px', color: '#6b7280'}}>
-                          Ver: {desktop.windows_version || 'N/A'} ({desktop.system_architecture || 'x64'})
-                        </div>
                       </td>
 
-                      {/* Hardware Specs (CPU, GPU, RAM, Storage) */}
-                      <td className="spec-cell-improved">
-                        <div style={{fontSize: '0.8rem', marginBottom: '2px'}}>
-                          <strong>CPU:</strong> {desktop.processor || 'N/A'}
-                        </div>
-                        <div style={{fontSize: '0.8rem', marginBottom: '2px'}}>
-                          <strong>GPU:</strong> <span title={desktop.graphics_card}>
-                            {desktop.graphics_card ? (desktop.graphics_card.length > 20 ? desktop.graphics_card.substring(0,20)+'...' : desktop.graphics_card) : 'N/A'}
-                          </span>
-                        </div>
-                        <div className="memory-info-improved" style={{marginTop: '4px'}}>
-                          <span className="memory-badge-improved" style={{fontSize: '0.75rem', padding: '2px 6px'}}>
-                            RAM: {ramInfo.total}
-                          </span>
-                          <span className="memory-badge-improved" style={{fontSize: '0.75rem', padding: '2px 6px', marginLeft: '4px'}}>
-                            Sto: {storageInfo.total}
-                          </span>
-                        </div>
+                      {/* Condition Badge */}
+                      <td>
+                        <span style={{ 
+                          color: getConditionColor(desktop.device_condition),
+                          backgroundColor: `${getConditionColor(desktop.device_condition)}15`,
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {getConditionText(desktop.device_condition)}
+                        </span>
                       </td>
 
-                      {/* Username */}
-                      <td className="spec-cell-improved">
-                        {desktop.username || <span style={{color: '#9ca3af', fontStyle: 'italic'}}>Unassigned</span>}
+                      {/* View Button */}
+                      <td style={{ textAlign: 'center' }}>
+                         <button 
+                            onClick={() => handleViewSpecs(desktop)}
+                            style={{ 
+                              border: 'none',
+                              background: '#8b5cf615', 
+                              color: '#8b5cf6',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '0.8rem',
+                              fontWeight: '500',
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#8b5cf625'}
+                            onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf615'}
+                          >
+                            <Eye size={14} /> View
+                          </button>
                       </td>
 
-                      {/* Procurement Info */}
-                      <td className="procurement-cell-improved">
-                        <div style={{fontSize: '0.8rem'}}>{desktop.supplier || 'No Supplier'}</div>
-                        <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
-                          Bought: {formatDate(desktop.purchase_date)}
-                        </div>
-                        <div style={{fontSize: '0.75rem', marginTop: '2px'}}>
-                          Warranty: <span style={{color: warrantyInfo.color, fontWeight: '500'}}>{warrantyInfo.status}</span>
-                        </div>
+                      {/* Procurement Columns (Restored for Consistency) */}
+                      <td className="procurement-cell-improved">{desktop.supplier || 'N/A'}</td>
+                      <td className="procurement-cell-improved">{formatDate(desktop.purchase_date)}</td>
+                      <td className="warranty-cell-improved">
+                        <span className="warranty-status-improved" style={{ color: warrantyInfo.color }}>
+                          {warrantyInfo.status}
+                        </span>
                       </td>
 
                       {/* Status */}
@@ -294,6 +350,14 @@ export default function DesktopInventory() {
         )}
       </div>
 
+      <NewSpecsModal_IT 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        device={selectedDesktop}
+        type="desktop"
+        deploymentDetails={null} 
+      />
+      
       {desktops.length > 0 && (
         <div className="results-summary-improved">
           <div className="summary-content-improved">

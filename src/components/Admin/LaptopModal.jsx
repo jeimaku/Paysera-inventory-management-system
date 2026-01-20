@@ -10,6 +10,7 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
     serial_number: '',
     unit: '',
     system_model: '',
+    device_condition: 'brand_new', // NEW: Device condition field
     // Specs
     operating_system: '',
     cpu: '',
@@ -41,6 +42,7 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
         serial_number: laptop.serial_number || '',
         unit: laptop.unit || '',
         system_model: laptop.system_model || '',
+        device_condition: laptop.device_condition || 'brand_new', // NEW: Include device condition
         operating_system: laptop.operating_system || '',
         cpu: laptop.cpu || '',
         memory: laptop.memory || '',
@@ -66,6 +68,7 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
         serial_number: '',
         unit: '',
         system_model: '',
+        device_condition: 'brand_new', // NEW: Default to brand new for new devices
         operating_system: '',
         cpu: '',
         memory: '',
@@ -209,6 +212,40 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                 />
               </div>
             </div>
+
+            {/* NEW: Device Condition Row */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Device Condition <span className="required">*</span></label>
+                <select 
+                  name="device_condition" 
+                  value={formData.device_condition} 
+                  onChange={handleChange}
+                  style={{
+                    backgroundColor: formData.device_condition === 'brand_new' ? '#f0f9ff' : '#fef3c7',
+                    borderColor: formData.device_condition === 'brand_new' ? '#0284c7' : '#d97706'
+                  }}
+                >
+                  <option value="brand_new">Brand New</option>
+                  <option value="second_hand">Second Hand</option>
+                </select>
+                <small className="field-hint">
+                  {formData.device_condition === 'brand_new' 
+                    ? 'Device is brand new, unused' 
+                    : 'Device has been previously used or refurbished'
+                  }
+                </small>
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select name="status" value={formData.status} onChange={handleChange}>
+                  <option value="available">Available</option>
+                  <option value="issued">Issued</option>
+                  <option value="defective">Defective</option>
+                  <option value="retired">Retired</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* 2. Technical Specifications */}
@@ -341,14 +378,9 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                   placeholder="LxWxH"
                 />
               </div>
+              {/* Moved Status field to Device Identity section above */}
               <div className="form-group">
-                <label>Status</label>
-                <select name="status" value={formData.status} onChange={handleChange}>
-                  <option value="available">Available</option>
-                  <option value="issued">Issued</option>
-                  <option value="defective">Defective</option>
-                  <option value="retired">Retired</option>
-                </select>
+                {/* Empty div to maintain form-row structure */}
               </div>
             </div>
           </div>

@@ -13,6 +13,7 @@ import AdminMonitorInventory from './pages/Admin/MonitorInventory';
 import DepartmentManagement from './pages/Admin/DepartmentManagement';
 import PositionManagement from './pages/Admin/PositionManagement';
 import EmployeeDevicesPage from './pages/Admin/Employeedevicepage';
+import MaintenanceHistory from './pages/Admin/MaintenanceHistory';
 
 // IT Pages (Deployment & Management)
 import DeployDevice from './pages/IT/DeployDevice';
@@ -40,6 +41,8 @@ export default function App() {
         <Route path="departments" element={<DepartmentManagement />} />
         <Route path="positions" element={<PositionManagement />} />
         <Route path="/admin/employee-devices" element={<EmployeeDevicesPage />} />
+        <Route path="maintenance" element={<MaintenanceHistory />} />
+        <Route path="maintenance/:deviceType/:deviceId" element={<MaintenanceHistory />} />
       </Route>
 
       {/* IT Routes - Deployment Management + Read-only Inventory */}

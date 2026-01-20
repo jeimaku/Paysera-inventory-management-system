@@ -16,6 +16,7 @@ import '../../styles/new_modal.css';
 export default function LaptopInventory() {
   const navigate = useNavigate();
   const [laptops, setLaptops] = useState([]);
+  const [brandOptions, setBrandOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLaptop, setSelectedLaptop] = useState(null);
@@ -28,9 +29,25 @@ export default function LaptopInventory() {
     search: '',
     status: '',
     brand: '',
+    device_condition: '', // NEW: Device condition filter
   });
 
+  // Get unique brands for filter
   const brands = [...new Set(laptops.map((l) => l.brand).filter(Boolean))];
+
+  // Fetch brands only once when the component mounts
+  useEffect(() => {
+    const fetchBrands = async () => {
+      // We call getLaptops with empty object {} to get ALL laptops without filters
+      const allData = await getLaptops({}); 
+      if (allData) {
+        // Extract unique brands from the full list
+        const uniqueBrands = [...new Set(allData.map((l) => l.brand).filter(Boolean))];
+        setBrandOptions(uniqueBrands);
+      }
+    };
+    fetchBrands();
+  }, []);
 
   useEffect(() => {
     loadLaptops();
@@ -110,6 +127,24 @@ export default function LaptopInventory() {
     }
   };
 
+  // NEW: Device condition helper function
+  const getDeviceConditionColor = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return '#0284c7';
+      case 'second_hand': return '#d97706';
+      default: return '#6b7280';
+    }
+  };
+
+  // NEW: Device condition display text
+  const getDeviceConditionText = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return 'Brand New';
+      case 'second_hand': return 'Second Hand';
+      default: return 'Unknown';
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -117,6 +152,18 @@ export default function LaptopInventory() {
       day: 'numeric',
       year: 'numeric',
     });
+  };
+
+  const getWarrantyStatus = (warrantyEnd) => {
+    if (!warrantyEnd) return { status: 'Unknown', color: '#6b7280' };
+    
+    const endDate = new Date(warrantyEnd);
+    const today = new Date();
+    const daysLeft = Math.floor((endDate - today) / (1000 * 60 * 60 * 24));
+    
+    if (daysLeft < 0) return { status: 'Expired', color: '#ef4444' };
+    if (daysLeft < 90) return { status: `${daysLeft} days left`, color: '#f59e0b' };
+    return { status: 'Active', color: '#10b981' };
   };
 
   return (
@@ -162,6 +209,19 @@ export default function LaptopInventory() {
             {laptops.filter((l) => l.status === 'defective').length}
           </span>
         </div>
+        {/* NEW: Device condition statistics */}
+        <div className="stat-item">
+          <span className="stat-label">Brand New</span>
+          <span className="stat-value" style={{ color: '#0284c7' }}>
+            {laptops.filter((l) => l.device_condition === 'brand_new').length}
+          </span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Second Hand</span>
+          <span className="stat-value" style={{ color: '#d97706' }}>
+            {laptops.filter((l) => l.device_condition === 'second_hand').length}
+          </span>
+        </div>
       </div>
 
       <div className="inventory-controls">
@@ -186,15 +246,30 @@ export default function LaptopInventory() {
             <option value="defective">Defective</option>
             <option value="retired">Retired</option>
           </select>
+          
           <select
             value={filters.brand}
             onChange={(e) => setFilters((prev) => ({ ...prev, brand: e.target.value }))}
           >
             <option value="">All Brands</option>
-            {brands.map((brand) => (
-              <option key={brand} value={brand}>{brand}</option>
+            {/* CHANGE THIS PART BELOW */}
+            {brandOptions.map((brand) => (
+              <option key={brand} value={brand}>
+                {brand}
+              </option>
             ))}
           </select>
+
+          {/* NEW: Device condition filter */}
+          <select
+            value={filters.device_condition}
+            onChange={(e) => setFilters((prev) => ({ ...prev, device_condition: e.target.value }))}
+          >
+            <option value="">All Conditions</option>
+            <option value="brand_new">Brand New</option>
+            <option value="second_hand">Second Hand</option>
+          </select>
+
           <button className="btn-add" onClick={handleAddLaptop}>
             <Plus size={18} /> Add Laptop
           </button>
@@ -212,8 +287,8 @@ export default function LaptopInventory() {
                   <th>Asset ID</th>
                   <th>Brand</th>
                   <th>Model</th>
+                  <th>Condition</th> {/* NEW: Device condition column */}
                   <th>Specs</th>
-                  {/* New Procurement Columns */}
                   <th>Purchase Date</th>
                   <th>Warranty</th>
                   <th>Supplier</th>
@@ -223,72 +298,95 @@ export default function LaptopInventory() {
               </thead>
               <tbody>
                 {laptops.length === 0 ? (
-                  <tr><td colSpan="9" className="no-data">No laptops found</td></tr>
+                  <tr><td colSpan="10" className="no-data">No laptops found</td></tr>
                 ) : (
-                  laptops.map((laptop) => (
-                    <tr key={laptop.laptop_id}>
-                      <td className="asset-id">{laptop.asset_id}</td>
-                      <td>{laptop.brand}</td>
-                      <td>{laptop.model}</td>
-                      
-                      {/* View Specs Button with Text */}
-                      <td>
-                        <button 
-                          className="btn-icon"
-                          style={{ 
-                            color: '#8b5cf6', 
-                            backgroundColor: '#8b5cf620', 
-                            width: 'auto', 
-                            padding: '6px 12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            borderRadius: '6px'
-                          }}
-                          onClick={() => handleViewSpecs(laptop)}
-                          title="View Specifications"
-                        >
-                          <Eye size={16} />
-                          <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>View</span>
-                        </button>
-                      </td>
-
-                      {/* Procurement Data */}
-                      <td>{formatDate(laptop.purchase_date)}</td>
-                      <td>{formatDate(laptop.warranty_end)}</td>
-                      <td>{laptop.supplier || laptop.distributor || 'N/A'}</td>
-
-                      <td>
-                        <span
-                          className="status-badge"
-                          style={{
-                            backgroundColor: `${getStatusColor(laptop.status)}20`,
-                            color: getStatusColor(laptop.status),
-                          }}
-                        >
-                          {laptop.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="action-buttons">
-                          <button
-                            className="btn-icon btn-edit"
-                            onClick={() => handleEditLaptop(laptop)}
-                            title="Edit"
+                  laptops.map((laptop) => {
+                    const warrantyInfo = getWarrantyStatus(laptop.warranty_end);
+                    
+                    return (
+                      <tr key={laptop.laptop_id}>
+                        <td className="asset-id">{laptop.asset_id}</td>
+                        <td>{laptop.brand}</td>
+                        <td>{laptop.model}</td>
+                        
+                        {/* NEW: Device condition display */}
+                        <td>
+                          <span
+                            className="status-badge"
+                            style={{
+                              backgroundColor: `${getDeviceConditionColor(laptop.device_condition)}20`,
+                              color: getDeviceConditionColor(laptop.device_condition),
+                              fontSize: '0.85rem',
+                              fontWeight: 500
+                            }}
                           >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            className="btn-icon btn-delete"
-                            onClick={() => handleDeleteClick(laptop)}
-                            title="Delete"
+                            {getDeviceConditionText(laptop.device_condition)}
+                          </span>
+                        </td>
+                        
+                        {/* View Specs Button */}
+                        <td>
+                          <button 
+                            className="btn-icon"
+                            style={{ 
+                              color: '#8b5cf6', 
+                              backgroundColor: '#8b5cf620', 
+                              width: 'auto', 
+                              padding: '6px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              borderRadius: '6px'
+                            }}
+                            onClick={() => handleViewSpecs(laptop)}
+                            title="View Specifications"
                           >
-                            <Trash2 size={16} />
+                            <Eye size={16} />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>View</span>
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+
+                        {/* Procurement Data */}
+                        <td>{formatDate(laptop.purchase_date)}</td>
+                        <td>
+                          <span style={{ color: warrantyInfo.color, fontWeight: 500, fontSize: '0.85rem' }}>
+                            {warrantyInfo.status}
+                          </span>
+                        </td>
+                        <td>{laptop.supplier || laptop.distributor || 'N/A'}</td>
+
+                        <td>
+                          <span
+                            className="status-badge"
+                            style={{
+                              backgroundColor: `${getStatusColor(laptop.status)}20`,
+                              color: getStatusColor(laptop.status),
+                            }}
+                          >
+                            {laptop.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button
+                              className="btn-icon btn-edit"
+                              onClick={() => handleEditLaptop(laptop)}
+                              title="Edit"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              className="btn-icon btn-delete"
+                              onClick={() => handleDeleteClick(laptop)}
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -17,6 +17,14 @@ export async function getLaptops(filters = {}) {
       query = query.eq('brand', filters.brand);
     }
 
+    // --- ADD THIS BLOCK ---
+    if (filters.device_condition) {
+      // Make sure your Supabase column is named 'device_condition'
+      // If it is named just 'condition', change the string below to 'condition'
+      query = query.eq('device_condition', filters.device_condition);
+    }
+    // ----------------------
+
     if (filters.search) {
       query = query.or(
         `asset_id.ilike.%${filters.search}%,brand.ilike.%${filters.search}%,model.ilike.%${filters.search}%,serial_number.ilike.%${filters.search}%`
@@ -109,6 +117,12 @@ export async function getDesktops(filters = {}) {
     if (filters.status) {
       query = query.eq('status', filters.status);
     }
+
+    // --- ADD THIS BLOCK FOR DESKTOPS ---
+    if (filters.device_condition) {
+      query = query.eq('device_condition', filters.device_condition);
+    }
+    // -----------------------------------
 
     if (filters.search) {
       query = query.or(
@@ -261,6 +275,12 @@ export async function getMonitors(filters = {}) {
     if (filters.brand) {
       query = query.eq('brand', filters.brand);
     }
+
+    // --- ADD THIS BLOCK FOR MONITORS ---
+    if (filters.device_condition) {
+      query = query.eq('device_condition', filters.device_condition);
+    }
+    // -----------------------------------
 
     if (filters.search) {
       query = query.or(

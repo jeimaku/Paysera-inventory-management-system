@@ -5,6 +5,7 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
   const [formData, setFormData] = useState({
     asset_id: '',
     serial_number: '',
+    device_condition: 'brand_new', // <--- ADD THIS LINE
     // Specs
     system_manufacturer: '',
     system_model: '',
@@ -37,6 +38,7 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
       setFormData({
         asset_id: desktop.asset_id || '',
         serial_number: desktop.serial_number || '',
+        device_condition: desktop.device_condition || 'brand_new', // <--- ADD THIS LINE
         system_manufacturer: desktop.system_manufacturer || '',
         system_model: desktop.system_model || '',
         operating_system: desktop.operating_system || '',
@@ -77,6 +79,7 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
       setFormData({
         asset_id: '',
         serial_number: '',
+        device_condition: 'brand_new', // <--- ADD THIS LINE
         system_manufacturer: '',
         system_model: '',
         operating_system: '',
@@ -199,16 +202,6 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
                 />
                 {errors.asset_id && <span className="error-message">{errors.asset_id}</span>}
               </div>
-              <div className="form-group">
-                <label>Serial Number</label>
-                <input
-                  type="text"
-                  name="serial_number"
-                  value={formData.serial_number}
-                  onChange={handleChange}
-                  placeholder="e.g., SN12345678"
-                />
-              </div>
             </div>
             <div className="form-row">
               <div className="form-group">
@@ -232,6 +225,45 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
                 />
               </div>
             </div>
+
+            {/* --- INSERT THIS NEW ROW --- */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Device Condition <span className="required">*</span></label>
+                <select 
+                  name="device_condition" 
+                  value={formData.device_condition} 
+                  onChange={handleChange}
+                  style={{
+                    backgroundColor: formData.device_condition === 'brand_new' ? '#f0f9ff' : '#fef3c7',
+                    borderColor: formData.device_condition === 'brand_new' ? '#0284c7' : '#d97706'
+                  }}
+                >
+                  <option value="brand_new">Brand New</option>
+                  <option value="second_hand">Second Hand</option>
+                </select>
+                <small className="field-hint">
+                  {formData.device_condition === 'brand_new' 
+                    ? 'Device is brand new, unused' 
+                    : 'Device has been previously used or refurbished'
+                  }
+                </small>
+              </div>
+              
+              {/* You can move the Serial Number or Status here to balance the row if you prefer */}
+              <div className="form-group"></div>
+              <div className="form-group">
+                <label>Serial Number</label>
+                <input
+                  type="text"
+                  name="serial_number"
+                  value={formData.serial_number}
+                  onChange={handleChange}
+                  placeholder="e.g., SN12345678"
+                />
+              </div>
+            </div>
+            {/* --------------------------- */}
           </div>
 
           {/* 2. Technical Specifications */}

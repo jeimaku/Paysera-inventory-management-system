@@ -13,6 +13,7 @@ import '../../styles/new_modal.css';
 
 export default function MonitorInventory() {
   const [monitors, setMonitors] = useState([]);
+  const [brandOptions, setBrandOptions] = useState([]); // Store all brands here
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMonitor, setSelectedMonitor] = useState(null);
@@ -25,10 +26,22 @@ export default function MonitorInventory() {
     search: '',
     status: '',
     brand: '',
+    device_condition: '', // Added Condition Filter
   });
 
-  const brands = [...new Set(monitors.map((m) => m.brand).filter(Boolean))];
+  // 1. Fetch brands once on mount to prevent them from disappearing
+  useEffect(() => {
+    const fetchBrands = async () => {
+      const data = await getMonitors({}); // Fetch all monitors without filters
+      if (data) {
+        const uniqueBrands = [...new Set(data.map((m) => m.brand).filter(Boolean))];
+        setBrandOptions(uniqueBrands);
+      }
+    };
+    fetchBrands();
+  }, []);
 
+  // 2. Load monitors whenever filters change
   useEffect(() => {
     loadMonitors();
   }, [filters]);
@@ -92,6 +105,8 @@ export default function MonitorInventory() {
     }
   };
 
+  // --- HELPER FUNCTIONS ---
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'available': return '#10b981';
@@ -100,6 +115,24 @@ export default function MonitorInventory() {
       default: return '#6b7280';
     }
   };
+
+  // --- MISSING FUNCTIONS ADDED HERE ---
+  const getConditionColor = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return '#0284c7'; // Blue
+      case 'second_hand': return '#d97706'; // Orange
+      default: return '#6b7280'; // Gray
+    }
+  };
+
+  const getConditionText = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return 'Brand New';
+      case 'second_hand': return 'Second Hand';
+      default: return condition || 'Unknown';
+    }
+  };
+  // ------------------------------------
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -123,7 +156,6 @@ export default function MonitorInventory() {
       </header>
 
       <div className="inventory-stats">
-        {/* ... stats ... */}
         <div className="stat-item">
           <span className="stat-label">Total Monitors</span>
           <span className="stat-value">{monitors.length}</span>
@@ -169,15 +201,28 @@ export default function MonitorInventory() {
             <option value="issued">Issued</option>
             <option value="defective">Defective</option>
           </select>
+          
+          {/* Brand Filter (Fixed) */}
           <select
             value={filters.brand}
             onChange={(e) => setFilters((prev) => ({ ...prev, brand: e.target.value }))}
           >
             <option value="">All Brands</option>
-            {brands.map((brand) => (
+            {brandOptions.map((brand) => (
               <option key={brand} value={brand}>{brand}</option>
             ))}
           </select>
+            
+          {/* Condition Filter */}
+          <select
+            value={filters.device_condition}
+            onChange={(e) => setFilters((prev) => ({ ...prev, device_condition: e.target.value }))}
+          >
+            <option value="">All Conditions</option>
+            <option value="brand_new">Brand New</option>
+            <option value="second_hand">Second Hand</option>
+          </select>
+
           <button className="btn-add" onClick={handleAddMonitor}>
             <Plus size={18} /> Add Monitor
           </button>
@@ -195,8 +240,8 @@ export default function MonitorInventory() {
                   <th>Asset ID</th>
                   <th>Brand</th>
                   <th>Model</th>
+                  <th>Condition</th> {/* New Column */}
                   <th>Specs</th>
-                  {/* New Procurement Columns */}
                   <th>Purchase Date</th>
                   <th>Warranty</th>
                   <th>Supplier</th>
@@ -207,15 +252,31 @@ export default function MonitorInventory() {
               </thead>
               <tbody>
                 {monitors.length === 0 ? (
-                  <tr><td colSpan="10" className="no-data">No monitors found</td></tr>
+                  <tr><td colSpan="11" className="no-data">No monitors found</td></tr>
                 ) : (
                   monitors.map((monitor) => (
                     <tr key={monitor.monitor_id}>
                       <td className="asset-id">{monitor.asset_id}</td>
                       <td>{monitor.brand}</td>
                       <td>{monitor.model}</td>
-                      
-                      {/* View Specs Button with Text */}
+
+                      {/* Condition Column */}
+                      <td>
+                        <span
+                          style={{
+                            backgroundColor: `${getConditionColor(monitor.device_condition)}15`,
+                            color: getConditionColor(monitor.device_condition),
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600'
+                          }}
+                        >
+                          {getConditionText(monitor.device_condition)}
+                        </span>
+                      </td>
+
+                      {/* View Button */}
                       <td>
                         <button 
                           className="btn-icon"
@@ -237,7 +298,6 @@ export default function MonitorInventory() {
                         </button>
                       </td>
 
-                      {/* Procurement Data */}
                       <td>{formatDate(monitor.purchase_date)}</td>
                       <td>{formatDate(monitor.warranty_end)}</td>
                       <td>{monitor.supplier || monitor.distributor || 'N/A'}</td>

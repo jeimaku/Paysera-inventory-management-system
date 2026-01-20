@@ -24,6 +24,7 @@ export default function DesktopInventory() {
   const [filters, setFilters] = useState({
     search: '',
     status: '',
+    device_condition: '', // <--- Add this
   });
 
   useEffect(() => {
@@ -107,6 +108,22 @@ export default function DesktopInventory() {
     });
   };
 
+  const getConditionColor = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return '#0284c7';
+      case 'second_hand': return '#d97706';
+      default: return '#6b7280';
+    }
+  };
+
+  const getConditionText = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return 'Brand New';
+      case 'second_hand': return 'Second Hand';
+      default: return condition || 'Unknown';
+    }
+  };
+
   return (
     <div className="inventory-container">
       <header className="inventory-header">
@@ -166,6 +183,18 @@ export default function DesktopInventory() {
             <option value="issued">Issued</option>
             <option value="defective">Defective</option>
           </select>
+
+          {/* --- ADD THIS SELECT --- */}
+          <select
+            value={filters.device_condition}
+            onChange={(e) => setFilters((prev) => ({ ...prev, device_condition: e.target.value }))}
+          >
+            <option value="">All Conditions</option>
+            <option value="brand_new">Brand New</option>
+            <option value="second_hand">Second Hand</option>
+          </select>
+          {/* ----------------------- */}
+
           <button className="btn-add" onClick={handleAddDesktop}>
             <Plus size={18} /> Add Desktop
           </button>
@@ -182,6 +211,7 @@ export default function DesktopInventory() {
                 <tr>
                   <th>Asset ID</th>
                   <th>Operating System</th>
+                  <th>Condition</th> {/* <--- NEW HEADER */}
                   <th>Specs</th>
                   {/* New Procurement Columns */}
                   <th>Purchase Date</th>
@@ -200,6 +230,24 @@ export default function DesktopInventory() {
                     <tr key={desktop.desktop_id}>
                       <td className="asset-id">{desktop.asset_id}</td>
                       <td>{desktop.operating_system || 'N/A'}</td>
+
+                      {/* --- NEW CONDITION COLUMN --- */}
+                      <td>
+                        <span
+                          style={{
+                            backgroundColor: `${getConditionColor(desktop.device_condition)}15`,
+                            color: getConditionColor(desktop.device_condition),
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {getConditionText(desktop.device_condition)}
+                        </span>
+                      </td>
+                      {/* ---------------------------- */}
                       
                       {/* View Specs Button with Text */}
                       <td>

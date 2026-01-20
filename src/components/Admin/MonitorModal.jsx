@@ -9,6 +9,7 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
     model: '',
     model_code: '',
     serial_number: '',
+    device_condition: 'brand_new', // <--- ADD THIS LINE
     // Specs
     size_inches: '',
     resolution: '',
@@ -35,6 +36,7 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
         model: monitor.model || '',
         model_code: monitor.model_code || '',
         serial_number: monitor.serial_number || '',
+        device_condition: monitor.device_condition || 'brand_new',
         status: monitor.status || 'available',
         size_inches: monitor.size_inches || '',
         resolution: monitor.resolution || '',
@@ -55,6 +57,7 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
         model: '',
         model_code: '',
         serial_number: '',
+        device_condition: 'brand_new', // <--- ADD THIS LINE
         status: 'available',
         size_inches: '',
         resolution: '',
@@ -175,6 +178,25 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
                   onChange={handleChange}
                 />
               </div>
+
+              {/* --- INSERT THIS BLOCK --- */}
+              <div className="form-group">
+                <label>Device Condition <span className="required">*</span></label>
+                <select 
+                  name="device_condition" 
+                  value={formData.device_condition} 
+                  onChange={handleChange}
+                  style={{
+                    backgroundColor: formData.device_condition === 'brand_new' ? '#f0f9ff' : '#fef3c7',
+                    borderColor: formData.device_condition === 'brand_new' ? '#0284c7' : '#d97706'
+                  }}
+                >
+                  <option value="brand_new">Brand New</option>
+                  <option value="second_hand">Second Hand</option>
+                </select>
+              </div>
+              {/* ------------------------- */}
+
               <div className="form-group">
                 <label>Status</label>
                 <select name="status" value={formData.status} onChange={handleChange}>
