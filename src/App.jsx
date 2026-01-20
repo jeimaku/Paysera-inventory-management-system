@@ -20,6 +20,7 @@ import DeployDevice from './pages/IT/DeployDevice';
 import EmployeeDevices from './pages/IT/EmployeeDevices';
 import DeploymentHistory from './pages/IT/DeploymentHistory';
 import ReturnedDevices from './pages/IT/ReturnedDevices';
+import RepairHistory from './pages/IT/RepairHistory';
 
 // IT Inventory Pages (Read-only)
 import ITLaptopInventory from './pages/IT/LaptopInventory';
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="laptops" element={<ITLaptopInventory />} />
         <Route path="desktops" element={<ITDesktopInventory />} />
         <Route path="monitors" element={<ITMonitorInventory />} />
+        <Route path="repairs" element={<RepairHistory />} />
       </Route>
 
     </Routes>

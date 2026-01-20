@@ -3,18 +3,36 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Wrench, Plus, Search, Calendar, AlertCircle, 
   CheckCircle, Clock, DollarSign, User, FileText,
-  ArrowLeft, Filter, Download
+  ArrowLeft, Filter, Download, CheckSquare, ShieldAlert // Added CheckSquare, ShieldAlert
 } from 'lucide-react';
 import MaintenanceModal from '../../components/Admin/MaintenanceDetailModal';
+
+// --- INSERT THIS IMPORT ---
+import MaintenanceActionModal from '../../components/Admin/MaintenanceActionModal';
+// --------------------------
+
+// --- ADD THIS IMPORT (Reusing IT's view modal) ---
+import RepairDetailsModal from '../../components/IT/RepairDetailsModal';
+// -------------------------------------------------
+
 import {
   getDeviceMaintenanceHistory,
   getDeviceMaintenanceSummary,
-  getAllMaintenanceRecords,
+  getAllMaintenanceRecords, // We might replace this with getAllRepairRecords for better filtering if needed
   getMaintenanceStatistics,
   createMaintenanceRecord,
   updateMaintenanceRecord,
   deleteMaintenanceRecord
 } from '../../services/maintenanceService';
+
+// --- INSERT THESE IMPORTS ---
+import { 
+  processRepairApproval, 
+  overrideWarrantyStatus,
+  getAllRepairRecords // Use this to fetch records with the new approval filters
+} from '../../services/repairService';
+// ----------------------------
+
 import { getDetailedDeviceSpecs } from '../../services/deploymentService';
 import '../../styles/maintenance.css';
 
@@ -30,6 +48,11 @@ export default function MaintenanceHistory() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // --- INSERT THIS LINE ---
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  // ------------------------
+
   const [selectedMaintenance, setSelectedMaintenance] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -39,7 +62,8 @@ export default function MaintenanceHistory() {
     status: '',
     priority: '',
     date_from: '',
-    date_to: ''
+    date_to: '',
+    admin_approval: 'pending'
   });
 
   const [view, setView] = useState('device'); // 'device' or 'all'
@@ -67,7 +91,7 @@ export default function MaintenanceHistory() {
         // All maintenance view
         setView('all');
         const [records, stats] = await Promise.all([
-          getAllMaintenanceRecords(filters),
+          getAllRepairRecords(filters),
           getMaintenanceStatistics()
         ]);
         
@@ -99,6 +123,38 @@ export default function MaintenanceHistory() {
   const handleDeleteClick = (maintenance) => {
     setDeleteConfirm(maintenance);
   };
+
+  // --- INSERT THESE NEW HANDLERS ---
+  const handleOpenAction = (maintenance) => {
+    setSelectedMaintenance(maintenance);
+    setIsActionModalOpen(true);
+  };
+
+  const handleProcess = async (record, decision, notes) => {
+    const result = await processRepairApproval(
+      record.maintenance_id, 
+      decision, 
+      notes, 
+      record.device_type, 
+      record.device_id
+    );
+    
+    if (result.success) {
+      loadData(); // Refresh table
+    } else {
+      alert('Error processing request: ' + result.error);
+    }
+  };
+
+  const handleOverride = async (maintenanceId, newStatus) => {
+    const result = await overrideWarrantyStatus(maintenanceId, newStatus);
+    if (result.success) {
+      loadData(); // Refresh table
+    } else {
+      alert('Failed to override warranty');
+    }
+  };
+  // ---------------------------------
 
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
@@ -247,10 +303,7 @@ export default function MaintenanceHistory() {
             <div className="stat-icon">
               <DollarSign size={20} />
             </div>
-            <div className="stat-content">
-              <span className="stat-value">{formatCurrency(maintenanceSummary.total_maintenance_cost)}</span>
-              <span className="stat-label">Total Cost</span>
-            </div>
+
           </div>
         </div>
       ) : (
@@ -324,6 +377,21 @@ export default function MaintenanceHistory() {
             <option value="cancelled">Cancelled</option>
           </select>
 
+          {/* --- INSERT THIS SELECT --- */}
+          <select
+            value={filters.admin_approval}
+            onChange={(e) =>
+              setFilters(prev => ({ ...prev, admin_approval: e.target.value }))
+            }
+            style={{ fontWeight: '600', color: filters.admin_approval === 'pending' ? '#d97706' : '#374151' }}
+          >
+            <option value="">All Approvals</option>
+            <option value="pending">Pending Approval</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          {/* -------------------------- */}
+
           <button className="btn-add" onClick={handleAddMaintenance}>
             <Plus size={18} />
             Add Maintenance
@@ -347,11 +415,14 @@ export default function MaintenanceHistory() {
                   {view === 'all' && <th>Device</th>}
                   <th>Type</th>
                   <th>Issue Description</th>
+                  {/* --- ADD/UPDATE HEADERS --- */}
+                  <th>Warranty</th>
                   <th>Status</th>
+                  <th>Approval</th> 
+                  {/* -------------------------- */}
                   <th>Priority</th>
                   <th>Technician</th>
                   <th>Date Reported</th>
-                  <th>Cost</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -375,6 +446,16 @@ export default function MaintenanceHistory() {
                     <td className="issue-description">
                       {maintenance.issue_description || 'No description'}
                     </td>
+                    {/* --- INSERT WARRANTY CELL --- */}
+                    <td>
+                      <span style={{ 
+                        color: maintenance.warranty_status_at_repair === 'active' ? '#059669' : '#dc2626',
+                        fontWeight: '500', fontSize: '13px'
+                      }}>
+                        {maintenance.warranty_status_at_repair === 'active' ? 'Active' : 'Expired'}
+                      </span>
+                    </td>
+                    {/* --------------------------- */}
                     <td>
                       <span
                         className="status-badge"
@@ -386,6 +467,18 @@ export default function MaintenanceHistory() {
                         {maintenance.status}
                       </span>
                     </td>
+                    {/* --- INSERT APPROVAL CELL --- */}
+                    <td>
+                      <span className="priority-badge" style={{
+                          background: maintenance.admin_approval_status === 'pending' ? '#fff7ed' : 
+                                      maintenance.admin_approval_status === 'approved' ? '#f0fdf4' : '#fef2f2',
+                          color: maintenance.admin_approval_status === 'pending' ? '#c2410c' : 
+                                maintenance.admin_approval_status === 'approved' ? '#15803d' : '#b91c1c'
+                      }}>
+                        {maintenance.admin_approval_status || 'PENDING'}
+                      </span>
+                    </td>
+                    {/* --------------------------- */}
                     <td>
                       <span
                         className="priority-badge"
@@ -399,9 +492,9 @@ export default function MaintenanceHistory() {
                     </td>
                     <td>{maintenance.technician_name || 'Unassigned'}</td>
                     <td>{formatDate(maintenance.date_reported)}</td>
-                    <td>{formatCurrency(maintenance.total_cost)}</td>
                     <td>
                       <div className="action-buttons">
+                        {/* 1. VIEW DETAILS (Blue) - Always First */}
                         <button
                           className="btn-icon btn-view"
                           onClick={() => handleViewDetails(maintenance)}
@@ -409,17 +502,33 @@ export default function MaintenanceHistory() {
                         >
                           <FileText size={16} />
                         </button>
+
+                        {/* 2. PROCESS REQUEST (Purple) - Only shows if Pending */}
+                        {maintenance.admin_approval_status === 'pending' && (
+                          <button 
+                            className="btn-icon" 
+                            onClick={() => handleOpenAction(maintenance)}
+                            style={{ color: '#7c3aed', borderColor: '#7c3aed' }}
+                            title="Process Request"
+                          >
+                            <CheckSquare size={16} />
+                          </button>
+                        )}
+
+                        {/* 3. EDIT RECORD (Orange/Green) */}
                         <button
                           className="btn-icon btn-edit"
                           onClick={() => handleEditMaintenance(maintenance)}
-                          title="Edit"
+                          title="Edit Record"
                         >
                           <Wrench size={16} />
                         </button>
+
+                        {/* 4. DELETE (Red) - Always Last (Danger) */}
                         <button
                           className="btn-icon btn-delete"
                           onClick={() => handleDeleteClick(maintenance)}
-                          title="Delete"
+                          title="Delete Record"
                         >
                           <AlertCircle size={16} />
                         </button>
@@ -433,7 +542,9 @@ export default function MaintenanceHistory() {
         )}
       </div>
 
-      {/* Modals */}
+      {/* ================= MODALS SECTION ================= */}
+
+      {/* 1. Edit / Create Modal (Form) */}
       <MaintenanceModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -443,19 +554,35 @@ export default function MaintenanceHistory() {
         deviceId={deviceId}
       />
 
-      {/* <MaintenanceDetailModal
+      {/* 2. View Details Modal (Read-Only) */}
+      <RepairDetailsModal
         isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalModal(false)}
-        maintenance={selectedMaintenance}
-      /> */}
+        onClose={() => setIsDetailModalOpen(false)}
+        record={selectedMaintenance}
+      />
 
-      {/* Delete Confirmation */}
+      {/* 3. Admin Process Modal (Approve/Reject) */}
+      <MaintenanceActionModal 
+        isOpen={isActionModalOpen}
+        onClose={() => setIsActionModalOpen(false)}
+        record={selectedMaintenance}
+        onProcess={handleProcess}
+        onOverrideWarranty={handleOverride}
+      />
+
+      {/* 4. Delete Confirmation Dialog */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>Delete Maintenance Record</h3>
+            <div className="dialog-header">
+              <div className="icon-box danger">
+                <AlertCircle size={24} />
+              </div>
+              <h3>Delete Record</h3>
+            </div>
             <p>
-              Are you sure you want to delete this maintenance record?
+              Are you sure you want to delete maintenance record <strong>#{deleteConfirm.maintenance_id}</strong>? 
+              This action cannot be undone.
             </p>
             <div className="modal-actions">
               <button
@@ -465,7 +592,7 @@ export default function MaintenanceHistory() {
                 Cancel
               </button>
               <button className="btn-danger" onClick={handleDeleteConfirm}>
-                Delete
+                Delete Record
               </button>
             </div>
           </div>

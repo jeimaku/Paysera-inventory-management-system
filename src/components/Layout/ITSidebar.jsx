@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Wrench,
 } from 'lucide-react';
 import { supabase } from '../../supabase/client';
 import '../../styles/sidebar.css';
@@ -84,6 +85,17 @@ export default function ITSidebar() {
           title: 'Monitors',
           icon: Monitor,
           path: '/it/monitors',
+          exact: true,
+        },
+      ],
+    },
+    {
+      section: 'Maintenance',
+      items: [
+        {
+          title: 'Repair History',
+          icon: Wrench, // You'll need to import Wrench from lucide-react
+          path: '/it/repairs',
           exact: true,
         },
       ],
