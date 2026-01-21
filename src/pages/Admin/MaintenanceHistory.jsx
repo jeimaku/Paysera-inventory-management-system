@@ -1,37 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Wrench, Plus, Search, Calendar, AlertCircle, 
-  CheckCircle, Clock, DollarSign, User, FileText,
-  ArrowLeft, Filter, Download, CheckSquare, ShieldAlert // Added CheckSquare, ShieldAlert
+  Wrench, Search, Calendar, AlertCircle, 
+  CheckCircle, Clock, DollarSign, FileText,
+  ArrowLeft, CheckSquare, ShieldAlert 
 } from 'lucide-react';
-import MaintenanceModal from '../../components/Admin/MaintenanceDetailModal';
 
-// --- INSERT THIS IMPORT ---
 import MaintenanceActionModal from '../../components/Admin/MaintenanceActionModal';
-// --------------------------
-
-// --- ADD THIS IMPORT (Reusing IT's view modal) ---
 import RepairDetailsModal from '../../components/IT/RepairDetailsModal';
-// -------------------------------------------------
 
 import {
   getDeviceMaintenanceHistory,
   getDeviceMaintenanceSummary,
-  getAllMaintenanceRecords, // We might replace this with getAllRepairRecords for better filtering if needed
-  getMaintenanceStatistics,
-  createMaintenanceRecord,
-  updateMaintenanceRecord,
-  deleteMaintenanceRecord
+  getMaintenanceStatistics
 } from '../../services/maintenanceService';
 
-// --- INSERT THESE IMPORTS ---
 import { 
   processRepairApproval, 
   overrideWarrantyStatus,
-  getAllRepairRecords // Use this to fetch records with the new approval filters
+  getAllRepairRecords 
 } from '../../services/repairService';
-// ----------------------------
 
 import { getDetailedDeviceSpecs } from '../../services/deploymentService';
 import '../../styles/maintenance.css';
@@ -46,15 +34,9 @@ export default function MaintenanceHistory() {
   const [deviceDetails, setDeviceDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-
-  // --- INSERT THIS LINE ---
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
-  // ------------------------
-
   const [selectedMaintenance, setSelectedMaintenance] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -66,7 +48,7 @@ export default function MaintenanceHistory() {
     admin_approval: 'pending'
   });
 
-  const [view, setView] = useState('device'); // 'device' or 'all'
+  const [view, setView] = useState('device');
 
   useEffect(() => {
     loadData();
@@ -76,7 +58,6 @@ export default function MaintenanceHistory() {
     setLoading(true);
     try {
       if (deviceType && deviceId) {
-        // Device-specific view
         setView('device');
         const [records, summary, specs] = await Promise.all([
           getDeviceMaintenanceHistory(deviceType, deviceId),
@@ -88,7 +69,6 @@ export default function MaintenanceHistory() {
         setMaintenanceSummary(summary);
         setDeviceDetails(specs);
       } else {
-        // All maintenance view
         setView('all');
         const [records, stats] = await Promise.all([
           getAllRepairRecords(filters),
@@ -105,26 +85,11 @@ export default function MaintenanceHistory() {
     }
   };
 
-  const handleAddMaintenance = () => {
-    setSelectedMaintenance(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditMaintenance = (maintenance) => {
-    setSelectedMaintenance(maintenance);
-    setIsModalOpen(true);
-  };
-
   const handleViewDetails = (maintenance) => {
     setSelectedMaintenance(maintenance);
     setIsDetailModalOpen(true);
   };
 
-  const handleDeleteClick = (maintenance) => {
-    setDeleteConfirm(maintenance);
-  };
-
-  // --- INSERT THESE NEW HANDLERS ---
   const handleOpenAction = (maintenance) => {
     setSelectedMaintenance(maintenance);
     setIsActionModalOpen(true);
@@ -140,7 +105,7 @@ export default function MaintenanceHistory() {
     );
     
     if (result.success) {
-      loadData(); // Refresh table
+      loadData(); 
     } else {
       alert('Error processing request: ' + result.error);
     }
@@ -149,47 +114,9 @@ export default function MaintenanceHistory() {
   const handleOverride = async (maintenanceId, newStatus) => {
     const result = await overrideWarrantyStatus(maintenanceId, newStatus);
     if (result.success) {
-      loadData(); // Refresh table
+      loadData(); 
     } else {
       alert('Failed to override warranty');
-    }
-  };
-  // ---------------------------------
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteConfirm) return;
-
-    const result = await deleteMaintenanceRecord(deleteConfirm.maintenance_id);
-    if (result.success) {
-      setMaintenanceRecords(prev => 
-        prev.filter(m => m.maintenance_id !== deleteConfirm.maintenance_id)
-      );
-      setDeleteConfirm(null);
-    } else {
-      alert('Failed to delete maintenance record: ' + result.error);
-    }
-  };
-
-  const handleModalSubmit = async (formData) => {
-    let result;
-
-    // Add device info if in device-specific view
-    if (view === 'device') {
-      formData.device_type = deviceType?.toUpperCase();
-      formData.device_id = parseInt(deviceId);
-    }
-
-    if (selectedMaintenance) {
-      result = await updateMaintenanceRecord(selectedMaintenance.maintenance_id, formData);
-    } else {
-      result = await createMaintenanceRecord(formData);
-    }
-
-    if (result.success) {
-      setIsModalOpen(false);
-      loadData();
-    } else {
-      alert('Error: ' + result.error);
     }
   };
 
@@ -214,20 +141,36 @@ export default function MaintenanceHistory() {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+      day: 'numeric'
     });
   };
 
-  const formatCurrency = (amount) => {
-    if (!amount) return '$0.00';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+  // Helper to format: "10:43 AM 1/21/26 – Ongoing"
+  const formatTimelineEntry = (dateString, label, color) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    
+    const time = date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    });
+    
+    const day = date.toLocaleDateString('en-US', { 
+      month: 'numeric', 
+      day: 'numeric', 
+      year: '2-digit' 
+    });
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: color, marginBottom: '4px' }}>
+        <span style={{ fontWeight: '600' }}>{time} {day}</span>
+        <span style={{ color: '#64748b' }}>– {label}</span>
+      </div>
+    );
   };
 
   if (loading) {
@@ -269,41 +212,28 @@ export default function MaintenanceHistory() {
         </div>
       </header>
 
-      {/* Statistics/Summary Cards */}
       {view === 'device' ? (
         <div className="maintenance-stats">
           <div className="stat-card">
-            <div className="stat-icon">
-              <Wrench size={20} />
-            </div>
+            <div className="stat-icon"><Wrench size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{maintenanceSummary.total_maintenance_count || 0}</span>
               <span className="stat-label">Total Services</span>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">
-              <AlertCircle size={20} />
-            </div>
+            <div className="stat-icon"><AlertCircle size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{maintenanceSummary.repair_count || 0}</span>
               <span className="stat-label">Repairs</span>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">
-              <Clock size={20} />
-            </div>
+            <div className="stat-icon"><Clock size={20} /></div>
             <div className="stat-content">
               <span className="stat-value">{maintenanceSummary.reformat_count || 0}</span>
               <span className="stat-label">Reformats</span>
             </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">
-              <DollarSign size={20} />
-            </div>
-
           </div>
         </div>
       ) : (
@@ -335,7 +265,6 @@ export default function MaintenanceHistory() {
         </div>
       )}
 
-      {/* Controls */}
       <div className="maintenance-controls">
         <div className="search-box">
           <Search size={18} />
@@ -343,32 +272,25 @@ export default function MaintenanceHistory() {
             type="text"
             placeholder="Search maintenance records..."
             value={filters.search}
-            onChange={(e) =>
-              setFilters(prev => ({ ...prev, search: e.target.value }))
-            }
+            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
           />
         </div>
 
         <div className="filters">
           <select
             value={filters.maintenance_type}
-            onChange={(e) =>
-              setFilters(prev => ({ ...prev, maintenance_type: e.target.value }))
-            }
+            onChange={(e) => setFilters(prev => ({ ...prev, maintenance_type: e.target.value }))}
           >
             <option value="">All Types</option>
             <option value="repair">Repair</option>
             <option value="reformat">Reformat</option>
             <option value="upgrade">Upgrade</option>
             <option value="cleaning">Cleaning</option>
-            <option value="inspection">Inspection</option>
           </select>
 
           <select
             value={filters.status}
-            onChange={(e) =>
-              setFilters(prev => ({ ...prev, status: e.target.value }))
-            }
+            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
           >
             <option value="">All Status</option>
             <option value="pending">Pending</option>
@@ -377,12 +299,9 @@ export default function MaintenanceHistory() {
             <option value="cancelled">Cancelled</option>
           </select>
 
-          {/* --- INSERT THIS SELECT --- */}
           <select
             value={filters.admin_approval}
-            onChange={(e) =>
-              setFilters(prev => ({ ...prev, admin_approval: e.target.value }))
-            }
+            onChange={(e) => setFilters(prev => ({ ...prev, admin_approval: e.target.value }))}
             style={{ fontWeight: '600', color: filters.admin_approval === 'pending' ? '#d97706' : '#374151' }}
           >
             <option value="">All Approvals</option>
@@ -390,22 +309,15 @@ export default function MaintenanceHistory() {
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
-          {/* -------------------------- */}
-
-          <button className="btn-add" onClick={handleAddMaintenance}>
-            <Plus size={18} />
-            Add Maintenance
-          </button>
         </div>
       </div>
 
-      {/* Maintenance Records Table */}
       <div className="maintenance-table-card">
         {maintenanceRecords.length === 0 ? (
           <div className="no-data-state">
             <Wrench size={64} className="no-data-icon" />
             <h3>No Maintenance Records</h3>
-            <p>No maintenance or repair records found for this device.</p>
+            <p>No maintenance or repair records found.</p>
           </div>
         ) : (
           <div className="table-container">
@@ -415,14 +327,12 @@ export default function MaintenanceHistory() {
                   {view === 'all' && <th>Device</th>}
                   <th>Type</th>
                   <th>Issue Description</th>
-                  {/* --- ADD/UPDATE HEADERS --- */}
                   <th>Warranty</th>
                   <th>Status</th>
-                  <th>Approval</th> 
-                  {/* -------------------------- */}
+                  <th>Approval</th>
                   <th>Priority</th>
                   <th>Technician</th>
-                  <th>Date Reported</th>
+                  <th>Repair Timeline</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -446,7 +356,6 @@ export default function MaintenanceHistory() {
                     <td className="issue-description">
                       {maintenance.issue_description || 'No description'}
                     </td>
-                    {/* --- INSERT WARRANTY CELL --- */}
                     <td>
                       <span style={{ 
                         color: maintenance.warranty_status_at_repair === 'active' ? '#059669' : '#dc2626',
@@ -455,7 +364,6 @@ export default function MaintenanceHistory() {
                         {maintenance.warranty_status_at_repair === 'active' ? 'Active' : 'Expired'}
                       </span>
                     </td>
-                    {/* --------------------------- */}
                     <td>
                       <span
                         className="status-badge"
@@ -467,7 +375,6 @@ export default function MaintenanceHistory() {
                         {maintenance.status}
                       </span>
                     </td>
-                    {/* --- INSERT APPROVAL CELL --- */}
                     <td>
                       <span className="priority-badge" style={{
                           background: maintenance.admin_approval_status === 'pending' ? '#fff7ed' : 
@@ -478,7 +385,6 @@ export default function MaintenanceHistory() {
                         {maintenance.admin_approval_status || 'PENDING'}
                       </span>
                     </td>
-                    {/* --------------------------- */}
                     <td>
                       <span
                         className="priority-badge"
@@ -491,10 +397,46 @@ export default function MaintenanceHistory() {
                       </span>
                     </td>
                     <td>{maintenance.technician_name || 'Unassigned'}</td>
-                    <td>{formatDate(maintenance.date_reported)}</td>
+                    
+                    {/* COMPREHENSIVE REPAIR TIMELINE */}
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {/* 1. Reported Date */}
+                        {formatTimelineEntry(maintenance.date_reported, 'Reported', '#64748b')}
+                        
+                        {/* 2. Started Date */}
+                        {maintenance.date_started && 
+                          formatTimelineEntry(maintenance.date_started, 'Started', '#3b82f6')
+                        }
+                        
+                        {/* 3. Completed Date (IT Finished Work) */}
+                        {maintenance.date_completed && 
+                          formatTimelineEntry(maintenance.date_completed, 'Work Done', '#10b981')
+                        }
+
+                        {/* 4. Admin Decision */}
+                        {maintenance.admin_approval_date && (
+                          <>
+                            {maintenance.admin_approval_status === 'approved' && 
+                              formatTimelineEntry(maintenance.admin_approval_date, 'Approved', '#059669')
+                            }
+                            {maintenance.admin_approval_status === 'rejected' && 
+                              formatTimelineEntry(maintenance.admin_approval_date, 'Rejected', '#dc2626')
+                            }
+                          </>
+                        )}
+
+                        {/* 5. Cancelled State */}
+                        {maintenance.status === 'cancelled' && maintenance.admin_approval_status !== 'rejected' && 
+                          <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', marginTop: '4px' }}>
+                            ⛔ Cancelled
+                          </div>
+                        }
+                      </div>
+                    </td>
+
                     <td>
                       <div className="action-buttons">
-                        {/* 1. VIEW DETAILS (Blue) - Always First */}
                         <button
                           className="btn-icon btn-view"
                           onClick={() => handleViewDetails(maintenance)}
@@ -503,7 +445,6 @@ export default function MaintenanceHistory() {
                           <FileText size={16} />
                         </button>
 
-                        {/* 2. PROCESS REQUEST (Purple) - Only shows if Pending */}
                         {maintenance.admin_approval_status === 'pending' && (
                           <button 
                             className="btn-icon" 
@@ -514,24 +455,6 @@ export default function MaintenanceHistory() {
                             <CheckSquare size={16} />
                           </button>
                         )}
-
-                        {/* 3. EDIT RECORD (Orange/Green) */}
-                        <button
-                          className="btn-icon btn-edit"
-                          onClick={() => handleEditMaintenance(maintenance)}
-                          title="Edit Record"
-                        >
-                          <Wrench size={16} />
-                        </button>
-
-                        {/* 4. DELETE (Red) - Always Last (Danger) */}
-                        <button
-                          className="btn-icon btn-delete"
-                          onClick={() => handleDeleteClick(maintenance)}
-                          title="Delete Record"
-                        >
-                          <AlertCircle size={16} />
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -542,26 +465,12 @@ export default function MaintenanceHistory() {
         )}
       </div>
 
-      {/* ================= MODALS SECTION ================= */}
-
-      {/* 1. Edit / Create Modal (Form) */}
-      <MaintenanceModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleModalSubmit}
-        maintenance={selectedMaintenance}
-        deviceType={deviceType}
-        deviceId={deviceId}
-      />
-
-      {/* 2. View Details Modal (Read-Only) */}
       <RepairDetailsModal
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
         record={selectedMaintenance}
       />
 
-      {/* 3. Admin Process Modal (Approve/Reject) */}
       <MaintenanceActionModal 
         isOpen={isActionModalOpen}
         onClose={() => setIsActionModalOpen(false)}
@@ -569,35 +478,6 @@ export default function MaintenanceHistory() {
         onProcess={handleProcess}
         onOverrideWarranty={handleOverride}
       />
-
-      {/* 4. Delete Confirmation Dialog */}
-      {deleteConfirm && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-header">
-              <div className="icon-box danger">
-                <AlertCircle size={24} />
-              </div>
-              <h3>Delete Record</h3>
-            </div>
-            <p>
-              Are you sure you want to delete maintenance record <strong>#{deleteConfirm.maintenance_id}</strong>? 
-              This action cannot be undone.
-            </p>
-            <div className="modal-actions">
-              <button
-                className="btn-secondary"
-                onClick={() => setDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button className="btn-danger" onClick={handleDeleteConfirm}>
-                Delete Record
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

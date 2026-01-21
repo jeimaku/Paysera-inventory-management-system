@@ -88,31 +88,35 @@ export async function getAllRepairRecords(filters = {}) {
 export async function createRepairRecord(repairData) {
   try {
     const { data, error } = await supabase
-      .from('device_maintenance')
-      .insert([{
-        device_type: repairData.device_type,
-        device_id: repairData.device_id,
-        maintenance_type: repairData.maintenance_type,
-        issue_description: repairData.issue_description,
-        priority: repairData.priority,
-        estimated_completion: repairData.estimated_completion || null,
-        parts_replaced: repairData.parts_replaced || [],
-        labor_hours: repairData.labor_hours || 0,
-        technician_name: repairData.technician_name || 'IT Staff',
-        warranty_status_at_repair: repairData.warranty_status_at_repair,
-        warranty_check_date: repairData.warranty_check_date,
-        warranty_expires_on: repairData.warranty_expires_on,
-        repair_location: repairData.repair_location,
-        status: repairData.repair_location === 'warranty' ? 'warranty_sent' : 'pending',
-        admin_approval_status: 'pending'
-      }])
-      .select(`
-        *,
-        reported_by:employees!reported_by_employee_id(employee_id, full_name, employee_code)
-      `)
-      .single();
+          .from('device_maintenance')
+          .insert([{
+            device_type: repairData.device_type,
+            device_id: repairData.device_id,
+            maintenance_type: repairData.maintenance_type,
+            issue_description: repairData.issue_description,
+            priority: repairData.priority,
+            estimated_completion: repairData.estimated_completion || null,
+            parts_replaced: repairData.parts_replaced || [],
+            labor_hours: repairData.labor_hours || 0,
+            technician_name: repairData.technician_name || 'IT Staff',
+            warranty_status_at_repair: repairData.warranty_status_at_repair,
+            warranty_check_date: repairData.warranty_check_date,
+            warranty_expires_on: repairData.warranty_expires_on,
+            repair_location: repairData.repair_location,
+            status: repairData.repair_location === 'warranty' ? 'warranty_sent' : 'pending',
+            admin_approval_status: 'pending',
+            
+            // --- ADD THIS LINE ---
+            date_reported: repairData.date_reported // <--- This passes the time from your modal
+            // ---------------------
+          }])
+          .select(`
+            *,
+            reported_by:employees!reported_by_employee_id(employee_id, full_name, employee_code)
+          `)
+          .single();
 
-    if (error) throw error;
+        if (error) throw error;
 
     // Update device status to under_repair
     await updateDeviceStatus(repairData.device_type, repairData.device_id, 'under_repair');
@@ -409,27 +413,45 @@ export async function processRepairApproval(maintenanceId, decision, notes, devi
   try {
     const isApproved = decision === 'approved';
     
-    // 1. Determine new Device Status based on Admin Decision
-    // If Approved -> 'available' (Ready for use)
-    // If Rejected -> 'retired' (Or 'defective', depending on your preference)
+    // 1. Fetch current record to check if it's a warranty case
+    const { data: currentRecord, error: fetchError } = await supabase
+      .from('device_maintenance')
+      .select('repair_location')
+      .eq('maintenance_id', maintenanceId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // 2. Logic: What happens to the device status?
+    // If Approved -> 'available' (It's being fixed, so it will be available eventually)
+    // If Rejected -> 'retired' (It's broken and we aren't fixing it)
     const newDeviceStatus = isApproved ? 'available' : 'retired'; 
 
-    // 2. Update the Maintenance Record
-    // We do NOT change the 'status' here because IT already marked it as 'completed'.
-    // We only update the approval fields.
+    // 3. Prepare Maintenance Updates
+    const updates = {
+      admin_approval_status: decision,
+      admin_approval_date: new Date().toISOString(),
+      admin_approval_notes: notes,
+      can_redeploy: isApproved
+    };
+
+    // --- SMART STATUS AUTOMATION ---
+    if (decision === 'rejected') {
+      updates.status = 'cancelled';
+    } else if (isApproved && currentRecord.repair_location === 'warranty') {
+      // If Admin approves a Warranty claim, AUTO-UPDATE status to 'warranty_sent'
+      updates.status = 'warranty_sent'; 
+    }
+    // -------------------------------
+
     const { error: maintenanceError } = await supabase
       .from('device_maintenance')
-      .update({
-        admin_approval_status: decision, // 'approved' or 'rejected'
-        admin_approval_date: new Date().toISOString(),
-        admin_approval_notes: notes,
-        can_redeploy: isApproved
-      })
+      .update(updates)
       .eq('maintenance_id', maintenanceId);
 
     if (maintenanceError) throw maintenanceError;
 
-    // 3. Update the Device Inventory Status
+    // 4. Update the Device Inventory Status
     let tableName = '';
     let idColumn = '';
     

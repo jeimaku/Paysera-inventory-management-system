@@ -35,7 +35,7 @@ export default function LoginForm() {
       return;
     }
 
-    // 🔁 ROLE-BASED REDIRECT
+    // 🔐 ROLE-BASED REDIRECT
     if (role === 'ADMIN') navigate('/admin');
     else if (role === 'IT') navigate('/it');
     else navigate('/employee');
@@ -45,28 +45,55 @@ export default function LoginForm() {
 
   return (
     <form className="login-card" onSubmit={handleLogin}>
+      <div className="login-icon"></div>
+      
       <h2>Inventory Management System</h2>
 
-      <label>Email</label>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-      />
+      <div className="form-group">
+        <label htmlFor="email">Email Address</label>
+        <input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter your email"
+          required
+          autoComplete="email"
+        />
+      </div>
 
-      <label>Password</label>
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
+      <div className="form-group">
+        <label htmlFor="password">Password</label>
+        <input
+          id="password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Enter your password"
+          required
+          autoComplete="current-password"
+        />
+      </div>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
 
-      <button type="submit" disabled={loading}>
-        {loading ? 'Signing in...' : 'Sign In'}
+      <button 
+        type="submit" 
+        className={`login-button ${loading ? 'loading' : ''}`}
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <span className="loading-spinner"></span>
+            <span className="loading-text">Signing in...</span>
+          </>
+        ) : (
+          'Sign In'
+        )}
       </button>
     </form>
   );

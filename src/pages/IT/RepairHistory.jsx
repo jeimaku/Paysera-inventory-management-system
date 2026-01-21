@@ -172,6 +172,33 @@ export default function RepairHistory() {
     return `${days} day${days !== 1 ? 's' : ''}`;
   };
 
+  // Helper to format: "10:43 AM 1/21/26 – Ongoing"
+  const formatTimelineEntry = (dateString, label, color) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    
+    // Format Time: 10:43 AM
+    const time = date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    });
+    
+    // Format Date: 1/21/26
+    const day = date.toLocaleDateString('en-US', { 
+      month: 'numeric', 
+      day: 'numeric', 
+      year: '2-digit' 
+    });
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: color, marginBottom: '4px' }}>
+        <span style={{ fontWeight: '600' }}>{time} {day}</span>
+        <span style={{ color: '#64748b' }}>– {label}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="repair-history-container">
       {/* Header */}
@@ -314,7 +341,7 @@ export default function RepairHistory() {
                   <th>Issue</th>
                   <th>Warranty</th>
                   <th>Status</th>
-                  <th>Duration</th>
+                  <th>Repair Timeline</th>
                   <th>Admin Approval</th>
                   <th>Actions</th>
                 </tr>
@@ -351,7 +378,42 @@ export default function RepairHistory() {
                         {record.status?.replace('_', ' ').toUpperCase()}
                       </span>
                     </td>
-                    <td>{getRepairDuration(record.date_started, record.date_completed)}</td>
+                    {/* COMPREHENSIVE REPAIR TIMELINE */}
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {/* 1. Reported Date */}
+                        {formatTimelineEntry(record.date_reported, 'Reported', '#64748b')}
+                        
+                        {/* 2. Started Date */}
+                        {record.date_started && 
+                          formatTimelineEntry(record.date_started, 'Started', '#3b82f6')
+                        }
+                        
+                        {/* 3. Completed Date (IT Finished Work) */}
+                        {record.date_completed && 
+                          formatTimelineEntry(record.date_completed, 'Work Done', '#10b981')
+                        }
+
+                        {/* 4. Admin Decision (The Final Step) */}
+                        {record.admin_approval_date && (
+                          <>
+                            {record.admin_approval_status === 'approved' && 
+                              formatTimelineEntry(record.admin_approval_date, 'Admin Approved', '#059669')
+                            }
+                            {record.admin_approval_status === 'rejected' && 
+                              formatTimelineEntry(record.admin_approval_date, 'Admin Rejected', '#dc2626')
+                            }
+                          </>
+                        )}
+
+                        {/* 5. Cancelled State (If cancelled manually without rejection) */}
+                        {record.status === 'cancelled' && record.admin_approval_status !== 'rejected' && 
+                          <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', marginTop: '4px' }}>
+                            ⛔ Cancelled
+                          </div>
+                        }
+                      </div>
+                    </td>
                     <td>
                       <span
                         className="approval-badge"
