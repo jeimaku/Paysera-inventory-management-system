@@ -14,6 +14,7 @@ export async function getReturnedDevices() {
         date_issued,
         date_returned,
         status,
+        return_reason, 
         created_at,
         employees (
           employee_id,

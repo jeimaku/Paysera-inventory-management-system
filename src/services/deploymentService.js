@@ -306,36 +306,36 @@ export async function getDetailedDeviceSpecs(deviceType, deviceId) {
   }
 }
 
-// Return device (end deployment)
-export async function returnDevice(employeeDeviceId) {
+// Update this function to accept a 'reason'
+export async function returnDevice(employeeDeviceId, reason = '') {
   try {
-    // Get deployment details first
+    // Step 1: Get the deployment details to know what devices to free up
     const { data: deployment, error: fetchError } = await supabase
       .from('employee_devices')
       .select(`
-        device_type,
-        device_id,
+        *,
         employee_monitors (
           monitor_id
         )
       `)
       .eq('employee_device_id', employeeDeviceId)
       .single();
-
+    
     if (fetchError) throw fetchError;
 
-    // Step 1: Update employee_device status
+    // Step 2: Update status to returned AND save the reason
     const { error: updateError } = await supabase
       .from('employee_devices')
       .update({ 
-        status: 'returned',
-        date_returned: new Date().toISOString().split('T')[0]
+        status: 'returned', 
+        date_returned: new Date().toISOString(),
+        return_reason: reason // <--- NEW FIELD
       })
       .eq('employee_device_id', employeeDeviceId);
 
     if (updateError) throw updateError;
 
-    // Step 2: Update device status to 'available'
+    // Step 3: Update main device status to 'available'
     const tableName = deployment.device_type === 'LAPTOP' ? 'laptops' : 'desktops';
     const idField = deployment.device_type === 'LAPTOP' ? 'laptop_id' : 'desktop_id';
     
@@ -346,7 +346,7 @@ export async function returnDevice(employeeDeviceId) {
 
     if (deviceUpdateError) throw deviceUpdateError;
 
-    // Step 3: Return monitors if any
+    // Step 4: Return monitors if any
     if (deployment.employee_monitors?.length > 0) {
       const monitorIds = deployment.employee_monitors.map(m => m.monitor_id);
       
@@ -377,6 +377,32 @@ export async function getAvailableMonitors() {
     return data || [];
   } catch (error) {
     console.error('Error fetching available monitors:', error);
+    return [];
+  }
+}
+
+
+// NEW: Fetch usage history for a specific device
+export async function getDeviceUsageHistory(deviceType, deviceId) {
+  try {
+    const { data, error } = await supabase
+      .from('employee_devices')
+      .select(`
+        *,
+        employees (
+          full_name,
+          employee_code,
+          departments ( department_name )
+        )
+      `)
+      .eq('device_type', deviceType)
+      .eq('device_id', deviceId)
+      .order('date_issued', { ascending: false }); // Show newest first
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching device history:', error);
     return [];
   }
 }

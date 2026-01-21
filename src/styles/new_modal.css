@@ -380,3 +380,48 @@
         grid-column: auto;
     }
 }
+
+
+/* History Table Styles */
+.nm-table-wrapper {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.nm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.nm-table th {
+  background: #f8fafc;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.nm-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.nm-table tr:last-child td {
+  border-bottom: none;
+}
+
+.nm-emp-name { font-weight: 600; color: #1e293b; }
+.nm-emp-dept { font-size: 0.8rem; color: #94a3b8; }
+.nm-status-active { 
+  background: #dbeafe; color: #1e40af; 
+  padding: 2px 8px; border-radius: 99px; font-size: 0.75rem; font-weight: 700; 
+}
+.nm-no-data {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 40px; color: #94a3b8;
+}

@@ -640,6 +640,7 @@ export default function ReturnedDevices() {
                   <th>Device ID</th>
                   <th>Deployment Period</th>
                   <th>Date Returned</th>
+                  <th>Reason</th> {/* <--- ADD THIS */}
                   <th>Days Used</th>
                   <th>Monitors</th>
                   <th>Actions</th>
@@ -693,6 +694,19 @@ export default function ReturnedDevices() {
                           </small>
                         </div>
                       </td>
+                      {/* --- ADD THIS NEW BLOCK FOR REASON --- */}
+                      <td style={{ maxWidth: '200px' }}>
+                        <div title={device.return_reason} style={{ 
+                          whiteSpace: 'nowrap', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis',
+                          color: '#475569',
+                          fontSize: '0.85rem'
+                        }}>
+                          {device.return_reason || '-'}
+                        </div>
+                      </td>
+                      {/* ------------------------------------- */}
                       <td>
                         <span className={`days-badge ${daysUsed > 365 ? 'long-term' : daysUsed > 180 ? 'medium-term' : 'short-term'}`}>
                           {daysUsed} days

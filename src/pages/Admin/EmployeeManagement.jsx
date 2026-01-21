@@ -177,8 +177,14 @@ export default function EmployeeManagement() {
                     </div>
                   </td>
                   <td>
-                    <div className="col-main-text">{employee.position_name || 'No Position'}</div>
-                    <div className="col-sub-text">{employee.department_name || 'No Department'}</div>
+                    <div className="col-main-text">
+                      {/* Access the nested 'positions' object */}
+                      {employee.positions?.position_name || 'No Position'} 
+                    </div>
+                    <div className="col-sub-text">
+                      {/* Access the nested 'departments' object */}
+                      {employee.departments?.department_name || 'No Department'}
+                    </div>
                   </td>
                   <td>
                     <div className="col-main-text">

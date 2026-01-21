@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Users, Package, RotateCcw, Calendar, Monitor, Eye } from 'lucide-react';
+import { 
+  Users, Package, RotateCcw, Calendar, Monitor, Eye, Search, HardDrive 
+} from 'lucide-react';
 import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
-import '../../styles/inventory.css';
+
+// IMPORT THE NEW DEDICATED CSS
+import '../../styles/employee-devices.css'; 
 import '../../styles/new_modal.css';
 
 export default function EmployeeDevices() {
@@ -14,6 +18,11 @@ export default function EmployeeDevices() {
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
   const [viewSpecsType, setViewSpecsType] = useState('');
+  const [selectedDeployment, setSelectedDeployment] = useState(null); // <--- ADD THIS
+
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('');
 
   useEffect(() => {
     loadDeployments();
@@ -32,230 +41,230 @@ export default function EmployeeDevices() {
   };
 
   const handleReturnDevice = async (employeeDeviceId, employeeName, deviceInfo) => {
-    if (!confirm(`Are you sure you want to return the device from ${employeeName}?\n\nDevice: ${deviceInfo}`)) {
+    // 1. Use 'prompt' instead of 'confirm' to capture the text input
+    const reason = prompt(
+      `Returning device from ${employeeName}.\n\nDevice: ${deviceInfo}\n\nPlease enter the REASON for return:`
+    );
+
+    // 2. Handle Cancel or Empty Input
+    if (reason === null) return; // User clicked Cancel
+    if (reason.trim() === "") {
+      alert("Return cancelled: You must provide a reason for transparency.");
       return;
     }
 
     setReturning(employeeDeviceId);
     try {
-      const result = await returnDevice(employeeDeviceId);
+      // 3. Pass the 'reason' variable to your service
+      const result = await returnDevice(employeeDeviceId, reason);
       
       if (result.success) {
-        alert('Device returned successfully!');
-        loadDeployments(); // Refresh the list
+        loadDeployments();
       } else {
-        alert('Failed to return device: ' + result.error);
+        alert('Failed to return device: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Return error:', error);
-      alert('An error occurred while returning the device');
+      console.error('Error returning device:', error);
     } finally {
       setReturning(null);
     }
   };
-
+  
   const handleViewSpecs = async (deployment) => {
     try {
-      // Fetch full details since the deployment list might strictly have ID/Asset tags
+      // 1. Fetch full technical specs (RAM, CPU, etc.)
       const fullDeviceData = await getDetailedDeviceSpecs(deployment.device_type, deployment.device_id);
       
       if (fullDeviceData) {
         setViewSpecsDevice(fullDeviceData);
         setViewSpecsType(deployment.device_type.toLowerCase());
+        
+        // 2. SAVE THE DEPLOYMENT DETAILS (Employee info, Date Issued)
+        setSelectedDeployment(deployment); // <--- ADD THIS LINE
+        
         setIsSpecModalOpen(true);
-      } else {
-        alert('Could not fetch detailed specifications for this device.');
       }
     } catch (error) {
-      console.error('Error opening specs:', error);
+      console.error('Error fetching specs:', error);
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const getDeviceInfo = (deployment) => {
-    return `${deployment.device_type} (ID: ${deployment.device_id})`;
-  };
-
-  const getMonitorsInfo = (deployment) => {
-    if (!deployment.employee_monitors || deployment.employee_monitors.length === 0) {
-      return 'None';
-    }
-    
-    return deployment.employee_monitors.map(em => 
-      `${em.monitors.asset_id} - ${em.monitors.brand} ${em.monitors.model}`
-    ).join(', ');
-  };
-
-  if (loading) {
-    return (
-      <div className="inventory-container">
-        <div className="loading">Loading device deployments...</div>
-      </div>
-    );
-  }
+  // Filter Logic
+  const filteredDeployments = deployments.filter(d => {
+    const matchesSearch = 
+      d.employees?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.device_asset_id?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType ? d.device_type === filterType : true;
+    return matchesSearch && matchesType;
+  });
 
   return (
-    <div className="inventory-container">
-      <header className="inventory-header">
-        <div className="header-title">
-          <Users size={32} className="header-icon" />
-          <div>
-            <h1>Employee Devices</h1>
-            <p className="subtitle">View and manage current device deployments</p>
+    <div className="ed-container">
+      
+      {/* 1. HEADER */}
+      <div className="ed-header">
+        <div className="ed-title">
+          <div className="ed-header-icon">
+            <Users size={24} />
           </div>
-        </div>
-      </header>
-
-      <div className="inventory-stats">
-        <div className="stat-item">
-          <span className="stat-label">Total Deployments</span>
-          <span className="stat-value">{deployments.length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Laptops Deployed</span>
-          <span className="stat-value stat-issued">
-            {deployments.filter(d => d.device_type === 'LAPTOP').length}
-          </span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Desktops Deployed</span>
-          <span className="stat-value stat-issued">
-            {deployments.filter(d => d.device_type === 'DESKTOP').length}
-          </span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Monitors Deployed</span>
-          <span className="stat-value stat-available">
-            {deployments.reduce((total, d) => total + (d.employee_monitors?.length || 0), 0)}
-          </span>
+          <h1>Employee Devices</h1>
         </div>
       </div>
 
-      <div className="inventory-table-card">
-        {deployments.length === 0 ? (
-          <div className="no-data-state">
-            <Package size={64} className="no-data-icon" />
-            <h3>No Device Deployments</h3>
-            <p>No devices are currently deployed to employees.</p>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Department</th>
-                  <th>Device Type</th>
-                  <th>Device ID</th>
-                  <th>Monitors</th>
-                  <th>Date Deployed</th>
-                  <th>Days Active</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deployments.map((deployment) => {
-                  const daysActive = Math.floor(
-                    (new Date() - new Date(deployment.date_issued)) / (1000 * 60 * 60 * 24)
-                  );
+      {/* 2. CONTROLS */}
+      <div className="ed-controls">
+        <div className="ed-search-box">
+          <Search size={18} className="ed-search-icon" />
+          <input 
+            type="text" 
+            className="ed-search-input"
+            placeholder="Search employee or asset ID..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        <select 
+          className="ed-filter-select"
+          value={filterType} 
+          onChange={(e) => setFilterType(e.target.value)}
+        >
+          <option value="">All Device Types</option>
+          <option value="LAPTOP">Laptops</option>
+          <option value="DESKTOP">Desktops</option>
+        </select>
+      </div>
+
+      {/* 3. TABLE */}
+      <div className="ed-table-wrapper">
+        <table className="ed-table">
+          <thead>
+            <tr>
+              <th style={{ width: '25%' }}>Employee Profile</th>
+              <th style={{ width: '20%' }}>Assigned Device</th>
+              <th style={{ width: '25%' }}>Monitors/Peripherals</th>
+              <th style={{ width: '15%' }}>Deployment Date</th>
+              <th style={{ width: '15%', textAlign: 'center' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan="5" className="ed-empty">Loading active devices...</td></tr>
+            ) : filteredDeployments.length === 0 ? (
+              <tr><td colSpan="5" className="ed-empty">No active devices found.</td></tr>
+            ) : (
+              filteredDeployments.map((deployment) => (
+                <tr key={deployment.employee_device_id}>
                   
-                  return (
-                    <tr key={deployment.employee_device_id}>
-                      <td className="employee-name">
-                        <div>
-                          <strong>{deployment.employees?.full_name}</strong>
-                          <br />
-                          <small>{deployment.employees?.employee_code}</small>
-                        </div>
-                      </td>
-                      <td>{deployment.employees?.departments?.department_name || 'N/A'}</td>
-                      <td>
-                        <span className={`device-type-badge ${deployment.device_type.toLowerCase()}`}>
-                          {deployment.device_type === 'LAPTOP' ? (
-                            <><Package size={14} /> Laptop</>
-                          ) : (
-                            <><Monitor size={14} /> Desktop</>
-                          )}
+                  {/* Employee Column */}
+                  <td>
+                    <div className="ed-emp-flex">
+                      <div className="ed-avatar">
+                        {deployment.employees?.full_name?.charAt(0) || 'U'}
+                      </div>
+                      <div>
+                        <span className="ed-emp-name">
+                          {deployment.employees?.full_name || 'Unknown'}
                         </span>
-                      </td>
-                      <td className="asset-id">{deployment.device_id}</td>
-                      <td className="monitors-cell">
-                        {getMonitorsInfo(deployment)}
-                      </td>
-                      <td>
-                        <div className="date-cell">
-                          <Calendar size={14} />
-                          {formatDate(deployment.date_issued)}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`days-badge ${daysActive > 365 ? 'long-term' : ''}`}>
-                          {daysActive} days
+                        <span className="ed-emp-dept">
+                          {deployment.employees?.departments?.department_name || 'No Dept'}
                         </span>
-                      </td>
-                      <td>
-                        <div className="action-buttons">
-                          {/* View Specs Button with Text */}
-                          <button
-                            className="btn-icon"
-                            style={{ 
-                              color: '#8b5cf6', 
-                              backgroundColor: '#8b5cf620', 
-                              width: 'auto', 
-                              padding: '6px 12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              borderRadius: '6px'
-                            }}
-                            onClick={() => handleViewSpecs(deployment)}
-                            title="View Specifications"
-                          >
-                            <Eye size={16} />
-                            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>View</span>
-                          </button>
+                      </div>
+                    </div>
+                  </td>
 
-                          <button
-                            className="btn-icon btn-return"
-                            onClick={() => handleReturnDevice(
-                              deployment.employee_device_id,
-                              deployment.employees?.full_name,
-                              getDeviceInfo(deployment)
-                            )}
-                            disabled={returning === deployment.employee_device_id}
-                            title="Return Device"
-                          >
-                            {returning === deployment.employee_device_id ? (
-                              '...'
-                            ) : (
-                              <RotateCcw size={16} />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  {/* Device Column - Single Row Layout */}
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {/* 1. Device Type Badge */}
+                      <span className={`ed-badge ${deployment.device_type === 'LAPTOP' ? 'ed-badge-laptop' : 'ed-badge-desktop'}`}>
+                        {deployment.device_type}
+                      </span>
+
+                      {/* 2. Asset ID */}
+                      <span className="ed-asset-id">
+                        {deployment.device_asset_id}
+                      </span>
+
+                      {/* 3. Divider */}
+                      <span style={{ color: '#e2e8f0' }}>|</span>
+
+                      {/* 4. Icon + Brand/Model */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.85rem' }}>
+                        {deployment.device_type === 'LAPTOP' ? <Package size={14} /> : <HardDrive size={14} />}
+                        <span style={{ fontWeight: '500' }}>
+                          {deployment.device_brand} {deployment.device_model}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Peripherals Column */}
+                  <td>
+                    {deployment.employee_monitors?.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        {deployment.employee_monitors.map((m, idx) => (
+                          <div key={idx} className="ed-monitor-tag">
+                            <Monitor size={12} /> 
+                            <span>{m.monitors.asset_id}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ color: '#cbd5e1', fontStyle: 'italic', fontSize: '0.85rem' }}>None</span>
+                    )}
+                  </td>
+
+                  {/* Date Column */}
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
+                      <Calendar size={14} />
+                      {new Date(deployment.date_issued).toLocaleDateString()}
+                    </div>
+                  </td>
+
+                  {/* Actions Column */}
+                  <td>
+                    <div className="ed-actions">
+                      <button 
+                        className="ed-btn-icon ed-btn-view"
+                        onClick={() => handleViewSpecs(deployment)}
+                        title="View Specs"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      
+                      <button 
+                        className="ed-btn-icon ed-btn-return"
+                        onClick={() => handleReturnDevice(
+                          deployment.employee_device_id,
+                          deployment.employees?.full_name,
+                          `${deployment.device_type} (${deployment.device_asset_id})`
+                        )}
+                        disabled={returning === deployment.employee_device_id}
+                        title="Return Device"
+                      >
+                        {returning === deployment.employee_device_id ? '...' : <RotateCcw size={16} />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Specs Modal Instance */}
+      {/* Specs Modal */}
       <NewSpecsModal_Admin 
         isOpen={isSpecModalOpen}
         onClose={() => setIsSpecModalOpen(false)}
         device={viewSpecsDevice}
         type={viewSpecsType}
+        // --- ADD THESE PROPS ---
+        showDeployment={true}             // Tells modal to show the "Deployment" tab
+        deploymentDetails={selectedDeployment} // Passes the employee/date info
+        // -----------------------
       />
     </div>
   );

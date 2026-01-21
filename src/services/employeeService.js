@@ -14,6 +14,8 @@ export async function getEmployees(filters = {}) {
         date_left,
         status,
         created_at,
+        department_id,  
+        position_id,    
         departments (
           department_id,
           department_name
