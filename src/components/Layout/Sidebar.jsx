@@ -14,6 +14,7 @@ import {
   X,
   UserCog,
   Wrench,
+  UserPlus,
 } from 'lucide-react';
 import { supabase } from '../../supabase/client';
 import '../../styles/sidebar.css';
@@ -44,6 +45,13 @@ export default function Sidebar() {
           icon: Users,
           path: '/admin/employees',
         },
+        // --- ADD THIS BLOCK ---
+        {
+          title: 'System Users',
+          icon: UserPlus,
+          path: '/admin/users',
+        },
+        // ----------------------
         {
           title: 'Employee Devices',
           icon: UserCog,

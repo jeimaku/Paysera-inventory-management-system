@@ -162,8 +162,8 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
                   onChange={handleChange}
                 >
                   <option value="brand_new">Brand New</option>
-                  <option value="good_condition">Good Condition</option>
-                  <option value="minor_issues">Minor Issues</option>
+                  <option value="good_condition">Good Condition</option> {/* Added */}
+                  <option value="second_hand">Second Hand</option>
                 </select>
               </div>
               <div className="form-group">

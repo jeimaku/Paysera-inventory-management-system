@@ -221,3 +221,233 @@
   text-align: center;
   color: #64748b;
 }
+
+
+/* --- Danger Confirmation Modal --- */
+.confirm-dialog {
+  background: white;
+  padding: 32px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center; /* Center alignment focuses attention */
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Red Warning Circle */
+.confirm-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  background: #fef2f2;
+  color: #dc2626;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px; /* Centered */
+}
+
+.confirm-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.confirm-desc {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin-bottom: 32px;
+  line-height: 1.5;
+}
+
+/* Side-by-side Buttons */
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.btn-cancel-modern {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #374151;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-cancel-modern:hover { background: #f9fafb; }
+
+.btn-delete-modern {
+  padding: 12px;
+  background: #dc2626; /* Strong Red */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3);
+  transition: all 0.2s;
+}
+.btn-delete-modern:hover { 
+  background: #b91c1c; 
+  transform: translateY(-1px);
+}
+
+
+/* Dynamic Form Rows */
+.dynamic-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.dynamic-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.dynamic-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.unit-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.btn-icon-danger {
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-danger:hover {
+  background: #fecaca;
+}
+
+.btn-add-slot {
+  background: transparent;
+  border: 1px dashed #3b82f6;
+  color: #3b82f6;
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-add-slot:hover {
+  background: #eff6ff;
+}
+
+.fixed-footer {
+  flex-shrink: 0;
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
+  background: white;
+  margin-top: auto; /* Push to bottom */
+}
+
+
+/* --- FIXED HEIGHT MODAL WITH SCROLL --- */
+
+/* 1. Main Modal Container */
+.large-modal {
+  width: 800px;
+  max-width: 95vw;
+  height: 90vh; /* Fixed height is required for internal scrolling */
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevents the whole modal from scrolling */
+  border-radius: 12px; /* Ensure corners are rounded */
+}
+
+/* 2. Header (Stays Fixed at Top) */
+.modal-header {
+  flex-shrink: 0; /* Prevents header from shrinking */
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 3. Form Container (Takes Remaining Space) */
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* Fills the space between Header and Footer */
+  overflow: hidden; /* Contains the scroll area */
+  min-height: 0; /* Critical for Flexbox scrolling */
+}
+
+/* 4. Scrollable Content Area */
+.form-scroll-area {
+  flex: 1; /* Takes all available space */
+  overflow-y: auto; /* ENABLES THE SCROLLBAR */
+  padding: 24px;
+  
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 5. Footer (Stays Fixed at Bottom) */
+.fixed-footer {
+  flex-shrink: 0; /* Prevents footer from shrinking */
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: white;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* --- OPTIONAL: Custom Scrollbar Styling --- */
+.form-scroll-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.form-scroll-area::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.form-scroll-area::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.form-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

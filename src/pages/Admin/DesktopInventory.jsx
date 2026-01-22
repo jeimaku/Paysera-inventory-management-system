@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, HardDrive, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, HardDrive, Eye, AlertTriangle } from 'lucide-react';
 import DesktopModal from '../../components/Admin/DesktopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getDesktops, createDesktop, updateDesktop, deleteDesktop } from '../../services/deviceService';
@@ -33,12 +33,19 @@ export default function DesktopInventory() {
   };
 
   const handleModalSubmit = async (formData) => {
-    try {
-      if (selectedDesktop) await updateDesktop(selectedDesktop.desktop_id, formData);
-      else await createDesktop(formData);
+    let result;
+    if (selectedDesktop) {
+      result = await updateDesktop(selectedDesktop.desktop_id, formData);
+    } else {
+      result = await createDesktop(formData);
+    }
+
+    if (result.success) {
       setIsModalOpen(false);
       loadDesktops();
-    } catch (error) { console.error(error); }
+    } else {
+      alert(`Failed to save desktop: ${result.error}`);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -144,16 +151,40 @@ export default function DesktopInventory() {
       <DesktopModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleModalSubmit} desktop={selectedDesktop} />
       <NewSpecsModal_Admin isOpen={specsModalOpen} onClose={() => setSpecsModalOpen(false)} device={viewSpecsDevice} type="desktop" />
       
+      {/* Enhanced Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>Delete Desktop</h3>
-            <p>Are you sure you want to delete <strong>{deleteConfirm.asset_id}</strong>?</p>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-danger" onClick={handleDeleteConfirm}>Delete</button>
+            
+            {/* 1. Warning Icon */}
+            <div className="confirm-icon-wrapper">
+              <AlertTriangle size={32} />
             </div>
-          </div>
+
+            {/* 2. Text Content */}
+            <h3 className="confirm-title">Delete Device?</h3>
+            <p className="confirm-desc">
+              You are about to permanently delete <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong>. 
+              This action cannot be undone.
+            </p>
+
+            {/* 3. Side-by-Side Actions */}
+            <div className="confirm-actions">
+              <button 
+                className="btn-cancel-modern" 
+                onClick={() => setDeleteConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-delete-modern" 
+                onClick={handleDeleteConfirm}
+              >
+                Delete
+              </button>
+            </div>
+
+          </div> 
         </div>
       )}
     </div>

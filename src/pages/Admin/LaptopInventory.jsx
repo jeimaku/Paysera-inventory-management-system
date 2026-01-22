@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Search, Laptop as LaptopIcon, Eye, Filter } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Laptop as LaptopIcon, Eye, Filter, AlertTriangle } from 'lucide-react';
 import LaptopModal from '../../components/Admin/LaptopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getLaptops, createLaptop, updateLaptop, deleteLaptop } from '../../services/deviceService';
@@ -66,16 +66,18 @@ export default function LaptopInventory() {
   };
 
   const handleModalSubmit = async (formData) => {
-    try {
-      if (selectedLaptop) {
-        await updateLaptop(selectedLaptop.laptop_id, formData);
-      } else {
-        await createLaptop(formData);
-      }
+    let result;
+    if (selectedLaptop) {
+      result = await updateLaptop(selectedLaptop.laptop_id, formData);
+    } else {
+      result = await createLaptop(formData);
+    }
+
+    if (result.success) {
       setIsModalOpen(false);
       loadLaptops();
-    } catch (error) {
-      console.error('Error saving laptop:', error);
+    } else {
+      alert(`Failed to save laptop: ${result.error}`);
     }
   };
 
@@ -152,6 +154,7 @@ export default function LaptopInventory() {
               <th>Asset Information</th>
               <th>Technical Specs</th>
               <th>Warranty</th>
+              <th>Condition</th> {/* <--- ADD THIS LINE */}
               <th>Status</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
@@ -165,8 +168,17 @@ export default function LaptopInventory() {
               laptops.map((laptop) => (
                 <tr key={laptop.laptop_id}>
                   <td>
-                    <div className="col-asset">{laptop.asset_id}</div>
-                    <div className="col-sub-text">{laptop.serial_number}</div>
+                  <div className="col-asset">{laptop.asset_id}</div>
+                  <div className="col-sub-text">
+                    {/* If Brand is Acer and SNID exists, show SNID. Otherwise, show Serial Number */}
+                    {laptop.brand?.toLowerCase().includes('acer') && laptop.snid ? (
+                      <span title="SNID" style={{ color: '#0369a1', fontWeight: 500 }}>
+                        {laptop.snid} <span style={{ color: '#94a3b8', fontSize: '0.75em' }}>(SNID)</span>
+                      </span>
+                    ) : (
+                      laptop.serial_number
+                    )}
+                  </div>
                   </td>
                   <td>
                     <div className="col-main-text">{laptop.brand} {laptop.model}</div>
@@ -178,6 +190,13 @@ export default function LaptopInventory() {
                     </div>
                     {/* Basic warranty calculation logic could go here */}
                   </td>
+                  {/* --- NEW CONDITION COLUMN --- */}
+                  <td>
+                    <div className="col-sub-text" style={{ textTransform: 'capitalize', color: '#475569', fontWeight: 500 }}>
+                      {laptop.device_condition?.replace(/_/g, ' ') || '-'}
+                    </div>
+                  </td>
+                  {/* ---------------------------- */}
                   <td>
                     <span className={`admin-badge badge-${laptop.status}`}>
                       {laptop.status}
@@ -218,15 +237,39 @@ export default function LaptopInventory() {
       />
       
       {/* Keeping Delete Confirmation Logic (omitted for brevity, same as before) */}
+      {/* Enhanced Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>Delete Laptop</h3>
-            <p>Are you sure you want to delete <strong>{deleteConfirm.asset_id}</strong>?</p>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-danger" onClick={handleDeleteConfirm}>Delete</button>
+            
+            {/* 1. Warning Icon */}
+            <div className="confirm-icon-wrapper">
+              <AlertTriangle size={32} />
             </div>
+
+            {/* 2. Text Content */}
+            <h3 className="confirm-title">Delete Device?</h3>
+            <p className="confirm-desc">
+              You are about to permanently delete <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong>. 
+              This action cannot be undone.
+            </p>
+
+            {/* 3. Side-by-Side Actions */}
+            <div className="confirm-actions">
+              <button 
+                className="btn-cancel-modern" 
+                onClick={() => setDeleteConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-delete-modern" 
+                onClick={handleDeleteConfirm}
+              >
+                Delete
+              </button>
+            </div>
+
           </div> 
         </div>
       )}

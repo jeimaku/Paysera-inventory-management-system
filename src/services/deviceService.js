@@ -6,35 +6,17 @@ export async function getLaptops(filters = {}) {
   try {
     let query = supabase
       .from('laptops')
-      .select('*')
+      .select(`
+        *,
+        laptop_ram ( ram_id, slot_number, size_gb ),
+        laptop_storage ( storage_id, storage_type, capacity_gb )
+      `)
       .order('created_at', { ascending: false });
 
-    if (filters.status) {
-      query = query.eq('status', filters.status);
-    }
-
-    if (filters.brand) {
-      query = query.eq('brand', filters.brand);
-    }
-
-    // --- ADD THIS BLOCK ---
-    if (filters.device_condition) {
-      // Make sure your Supabase column is named 'device_condition'
-      // If it is named just 'condition', change the string below to 'condition'
-      query = query.eq('device_condition', filters.device_condition);
-    }
-    // ----------------------
-
-    if (filters.search) {
-      query = query.or(
-        `asset_id.ilike.%${filters.search}%,brand.ilike.%${filters.search}%,model.ilike.%${filters.search}%,serial_number.ilike.%${filters.search}%`
-      );
-    }
+    // ... (Keep existing filter logic for status, brand, etc.) ...
 
     const { data, error } = await query;
-
     if (error) throw error;
-
     return data || [];
   } catch (error) {
     console.error('Error fetching laptops:', error);
@@ -44,15 +26,45 @@ export async function getLaptops(filters = {}) {
 
 export async function createLaptop(laptopData) {
   try {
-    const { data, error } = await supabase
+    // 1. Separate main data from the arrays
+    const { ram_modules, storage_drives, ...mainData } = laptopData;
+
+    // 2. Sanitize main data
+    const sanitizedData = {};
+    Object.keys(mainData).forEach(key => {
+      sanitizedData[key] = (mainData[key] === '' || mainData[key] === undefined) ? null : mainData[key];
+    });
+
+    // 3. Insert Laptop
+    const { data: laptop, error: laptopError } = await supabase
       .from('laptops')
-      .insert([laptopData])
+      .insert([sanitizedData])
       .select()
       .single();
 
-    if (error) throw error;
+    if (laptopError) throw laptopError;
 
-    return { success: true, data };
+    // 4. Insert RAM Modules (if any)
+    if (ram_modules && ram_modules.length > 0) {
+      const ramData = ram_modules.map(r => ({
+        laptop_id: laptop.laptop_id,
+        slot_number: r.slot_number,
+        size_gb: r.size_gb
+      }));
+      await supabase.from('laptop_ram').insert(ramData);
+    }
+
+    // 5. Insert Storage Drives (if any)
+    if (storage_drives && storage_drives.length > 0) {
+      const storageData = storage_drives.map(s => ({
+        laptop_id: laptop.laptop_id,
+        storage_type: s.storage_type,
+        capacity_gb: s.capacity_gb
+      }));
+      await supabase.from('laptop_storage').insert(storageData);
+    }
+
+    return { success: true, data: laptop };
   } catch (error) {
     console.error('Error creating laptop:', error);
     return { success: false, error: error.message };
@@ -61,14 +73,47 @@ export async function createLaptop(laptopData) {
 
 export async function updateLaptop(laptopId, laptopData) {
   try {
+    // 1. Separate Arrays from Main Data
+    // Ensure 'storage_type' is NOT in mainData (it should be gone from Modal now)
+    const { ram_modules, storage_drives, ...mainData } = laptopData;
+
+    // 2. Sanitize Main Data (Convert "" to null)
+    const sanitizedData = {};
+    Object.keys(mainData).forEach(key => {
+      sanitizedData[key] = (mainData[key] === '' || mainData[key] === undefined) ? null : mainData[key];
+    });
+
+    // 3. Update Main Table
     const { data, error } = await supabase
       .from('laptops')
-      .update(laptopData)
+      .update(sanitizedData) // Use sanitized data
       .eq('laptop_id', laptopId)
       .select()
       .single();
 
     if (error) throw error;
+
+    // 4. Update RAM (Delete Old -> Insert New)
+    await supabase.from('laptop_ram').delete().eq('laptop_id', laptopId);
+    if (ram_modules && ram_modules.length > 0) {
+      const ramData = ram_modules.map(r => ({
+        laptop_id: laptopId,
+        slot_number: r.slot_number || 'Slot 1', // Default if empty
+        size_gb: r.size_gb || 0
+      }));
+      await supabase.from('laptop_ram').insert(ramData);
+    }
+
+    // 5. Update Storage (Delete Old -> Insert New)
+    await supabase.from('laptop_storage').delete().eq('laptop_id', laptopId);
+    if (storage_drives && storage_drives.length > 0) {
+      const storageData = storage_drives.map(s => ({
+        laptop_id: laptopId,
+        storage_type: s.storage_type || 'SSD NVMe', // Default if empty
+        capacity_gb: s.capacity_gb || 0
+      }));
+      await supabase.from('laptop_storage').insert(storageData);
+    }
 
     return { success: true, data };
   } catch (error) {
@@ -76,7 +121,6 @@ export async function updateLaptop(laptopId, laptopData) {
     return { success: false, error: error.message };
   }
 }
-
 export async function deleteLaptop(laptopId) {
   try {
     const { error } = await supabase
