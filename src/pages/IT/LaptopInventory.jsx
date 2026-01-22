@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Search, Laptop as LaptopIcon, Eye, Shield } from 'lucide-react';
 import { getLaptops } from '../../services/deviceService';
-import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; // Make sure path is correct
+import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
 import '../../styles/read-only-inventory.css';
-import '../../styles/new_modal.css'; // Import modal styles
+import '../../styles/new_modal.css';
 
 export default function LaptopInventory() {
   const [laptops, setLaptops] = useState([]);
@@ -18,18 +18,15 @@ export default function LaptopInventory() {
     search: '',
     status: '',
     brand: '',
-    device_condition: '', // Added Condition Filter
+    device_condition: '',
   });
 
   const brands = [...new Set(laptops.map((l) => l.brand).filter(Boolean))];
 
-  // Fetch brands only once when the component mounts
   useEffect(() => {
     const fetchBrands = async () => {
-      // We call getLaptops with empty object {} to get ALL laptops without filters
       const allData = await getLaptops({}); 
       if (allData) {
-        // Extract unique brands from the full list
         const uniqueBrands = [...new Set(allData.map((l) => l.brand).filter(Boolean))];
         setBrandOptions(uniqueBrands);
       }
@@ -58,7 +55,25 @@ export default function LaptopInventory() {
     setIsModalOpen(true);
   };
 
-  // --- Style Helpers ---
+  // --- Updated Condition Helpers ---
+  const getConditionColor = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return '#0284c7'; // Blue
+      case 'good_condition': return '#10b981'; // Green (FIXED: Added this case)
+      case 'second_hand': return '#d97706'; // Orange
+      default: return '#6b7280'; // Grey
+    }
+  };
+
+  const getConditionText = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'brand_new': return 'Brand New';
+      case 'good_condition': return 'Good Condition'; // (FIXED: Added this case)
+      case 'second_hand': return 'Second Hand';
+      default: return condition?.replace(/_/g, ' ') || 'Unknown'; // Fallback to readable text
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'available': return '#10b981';
@@ -66,22 +81,6 @@ export default function LaptopInventory() {
       case 'defective': return '#ef4444';
       case 'retired': return '#6b7280';
       default: return '#6b7280';
-    }
-  };
-
-  const getConditionColor = (condition) => {
-    switch (condition?.toLowerCase()) {
-      case 'brand_new': return '#0284c7'; // Blue
-      case 'second_hand': return '#d97706'; // Orange
-      default: return '#6b7280';
-    }
-  };
-
-  const getConditionText = (condition) => {
-    switch (condition?.toLowerCase()) {
-      case 'brand_new': return 'Brand New';
-      case 'second_hand': return 'Second Hand';
-      default: return 'Unknown';
     }
   };
 
@@ -138,7 +137,6 @@ export default function LaptopInventory() {
             <span className="stat-label-improved">Available</span>
           </div>
         </div>
-        {/* Added Condition Stats for quick visibility */}
         <div className="stat-card-improved" style={{ borderLeft: '4px solid #0284c7' }}>
           <div className="stat-content-improved">
             <span className="stat-value-improved" style={{ color: '#0284c7' }}>
@@ -147,12 +145,12 @@ export default function LaptopInventory() {
             <span className="stat-label-improved">Brand New</span>
           </div>
         </div>
-        <div className="stat-card-improved" style={{ borderLeft: '4px solid #d97706' }}>
+        <div className="stat-card-improved" style={{ borderLeft: '4px solid #10b981' }}>
           <div className="stat-content-improved">
-            <span className="stat-value-improved" style={{ color: '#d97706' }}>
-              {laptops.filter(l => l.device_condition === 'second_hand').length}
+            <span className="stat-value-improved" style={{ color: '#10b981' }}>
+              {laptops.filter(l => l.device_condition === 'good_condition').length}
             </span>
-            <span className="stat-label-improved">Second Hand</span>
+            <span className="stat-label-improved">Good Cond.</span>
           </div>
         </div>
       </div>
@@ -190,7 +188,6 @@ export default function LaptopInventory() {
             onChange={(e) => setFilters(prev => ({ ...prev, brand: e.target.value }))}
           >
             <option value="">All Brands</option>
-            {/* CHANGE THIS PART BELOW */}
             {brandOptions.map((brand) => (
               <option key={brand} value={brand}>
                 {brand}
@@ -198,7 +195,6 @@ export default function LaptopInventory() {
             ))}
           </select>
           
-          {/* Added Condition Filter */}
           <select
             className="filter-select-improved"
             value={filters.device_condition}
@@ -206,6 +202,7 @@ export default function LaptopInventory() {
           >
             <option value="">All Conditions</option>
             <option value="brand_new">Brand New</option>
+            <option value="good_condition">Good Condition</option>
             <option value="second_hand">Second Hand</option>
           </select>
         </div>
@@ -232,14 +229,17 @@ export default function LaptopInventory() {
                   <th className="col-brand">Brand/Model</th>
                   <th className="col-serial">Serial No.</th>
                   
-                  {/* REPLACED: Technical Specs with Condition & Action */}
+                  {/* Condition & Details */}
                   <th style={{ width: '120px' }}>Condition</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>Details</th>
                   
-                  <th className="col-procurement">Supplier</th>
+                  {/* --- MODIFIED COLUMNS --- */}
                   <th className="col-procurement">Purchase Date</th>
-                  <th className="col-warranty">Warranty</th>
-                  <th className="col-status">Status</th>
+                  <th className="col-procurement">Warranty Date</th> {/* New Column */}
+                  <th className="col-warranty">Status</th> {/* Status (Active/Expired) */}
+                  {/* ------------------------ */}
+
+                  <th className="col-status">Asset Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,7 +263,7 @@ export default function LaptopInventory() {
                         <span className="serial-number-improved">{laptop.serial_number || 'N/A'}</span>
                       </td>
 
-                      {/* --- Condition Column --- */}
+                      {/* --- Condition Column (FIXED) --- */}
                       <td>
                         <span style={{ 
                           color: getConditionColor(laptop.device_condition),
@@ -278,7 +278,7 @@ export default function LaptopInventory() {
                         </span>
                       </td>
 
-                      {/* --- View Button (Action) --- */}
+                      {/* View Button */}
                       <td style={{ textAlign: 'center' }}>
                          <button 
                             onClick={() => handleViewSpecs(laptop)}
@@ -303,13 +303,20 @@ export default function LaptopInventory() {
                           </button>
                       </td>
 
-                      <td className="procurement-cell-improved">{laptop.supplier || 'N/A'}</td>
+                      {/* --- MODIFIED CELL CONTENT --- */}
                       <td className="procurement-cell-improved">{formatDate(laptop.purchase_date)}</td>
+                      
+                      {/* New Warranty Date Cell (Replaces Supplier) */}
+                      <td className="procurement-cell-improved" style={{ fontWeight: 500, color: '#475569' }}>
+                        {formatDate(laptop.warranty_end)}
+                      </td>
+
                       <td className="warranty-cell-improved">
                         <span className="warranty-status-improved" style={{ color: warrantyInfo.color }}>
                           {warrantyInfo.status}
                         </span>
                       </td>
+                      {/* ----------------------------- */}
 
                       <td className="status-cell-improved">
                         <span
@@ -332,13 +339,11 @@ export default function LaptopInventory() {
         )}
       </div>
       
-      {/* --- Modal Injection --- */}
       <NewSpecsModal_IT 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         device={selectedLaptop}
-        // If you have an endpoint for deployment details for IT, pass it here. 
-        // For now, it will just show the device specs if deploymentDetails is null.
+        type="laptop" 
         deploymentDetails={null} 
       />
       

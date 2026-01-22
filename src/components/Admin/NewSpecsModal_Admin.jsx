@@ -93,90 +93,191 @@ const NewSpecsModal_Admin = ({
     return device.storage ? `${device.storage} GB ${device.storage_type || ''}` : 'N/A';
   };
 
-  const renderSpecsContent = () => (
-    <div className="nm-specs-section fade-in">
-      {type !== 'monitor' && (
-        <div className="nm-category-group">
-          <h4 className="nm-category-title"><Hash size={16} /> Identity & System</h4>
-          <div className="nm-specs-grid">
-            <SpecRow label="Asset ID" value={device.asset_id} />
-            <SpecRow label="Serial Number" value={device.serial_number} isPill />
-            {type === 'desktop' && (
-              <>
-                <SpecRow label="System Manufacturer" value={device.system_manufacturer} />
-                <SpecRow label="System Model" value={device.system_model} />
-                <SpecRow label="BIOS Mode" value={device.bios_mode} />
-                <SpecRow label="Architecture" value={device.system_architecture} />
-              </>
-            )}
-            {type === 'laptop' && (
-              <>
-                <SpecRow label="Brand" value={device.brand} />
-                <SpecRow label="Model" value={device.model} />
-              </>
-            )}
-            <SpecRow label="Operating System" value={device.operating_system} />
-          </div>
-        </div>
-      )}
+  const renderSpecsContent = () => {
+    if (!device) return <div className="nm-empty-state">No device details available.</div>;
 
-      {type === 'monitor' && (
-        <div className="nm-category-group">
-          <h4 className="nm-category-title"><Hash size={16} /> Identity</h4>
-          <div className="nm-specs-grid">
-            <SpecRow label="Asset ID" value={device.asset_id} />
-            <SpecRow label="Brand" value={device.brand} />
-            <SpecRow label="Model" value={device.model} />
-            <SpecRow label="Serial Number" value={device.serial_number} isPill />
-          </div>
-        </div>
-      )}
-
-      {type !== 'monitor' && (
-        <div className="nm-category-group">
-          <h4 className="nm-category-title"><Cpu size={16} /> Performance & Hardware</h4>
-          <div className="nm-specs-grid">
-            <SpecRow label="Processor (CPU)" value={device.processor || device.cpu} fullWidth />
-            <SpecRow label="Graphics Card" value={device.graphics_card} fullWidth />
-            <SpecRow label="Memory (RAM)" value={getMemoryInfo()} />
-            <SpecRow label="Storage" value={getStorageInfo()} />
-          </div>
-        </div>
-      )}
-
-      {(type === 'monitor' || type === 'laptop') && (
-        <div className="nm-category-group">
-          <h4 className="nm-category-title"><Monitor size={16} /> Display & Graphics</h4>
-          <div className="nm-specs-grid">
-            {type === 'laptop' && <SpecRow label="Screen Size" value={device.screen_size} />}
-            {type === 'monitor' && (
-              <>
-                <SpecRow label="Screen Size" value={device.size_inches ? `${device.size_inches}"` : null} />
-                <SpecRow label="Resolution" value={device.resolution} />
-                <SpecRow label="Refresh Rate" value={device.refresh_rate} />
-                <SpecRow label="Panel Type" value={device.panel_type} />
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="nm-category-group">
-        <h4 className="nm-category-title"><Wifi size={16} /> Physical & Connectivity</h4>
+    // ==================== DESKTOP SPECS ====================
+    if (type?.toLowerCase() === 'desktop') {
+      return (
         <div className="nm-specs-grid">
-          {type === 'laptop' && (
-            <>
-              <SpecRow label="Wireless" value={device.wireless_connection} />
-              <SpecRow label="Dimensions" value={device.dimensions} />
-              <SpecRow label="Weight" value={device.weight} />
-            </>
-          )}
-          {type === 'monitor' && <SpecRow label="Ports/Hubs" value={device.ports} fullWidth />}
-          <SpecRow label="Current Status" value={device.status} isStatus />
+          
+          {/* 1. Identity & Classification */}
+          <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px' }}>
+            <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Identity & Classification
+            </h4>
+          </div>
+          
+          <SpecRow label="Asset ID" value={device.asset_id} />
+          {/* Show 'Custom Build' if no serial number exists */}
+          <SpecRow label="Serial Number" value={device.serial_number || 'Custom / Assembled'} />
+          <SpecRow label="Manufacturer" value={device.system_manufacturer} />
+          <SpecRow label="Model" value={device.system_model} />
+          <SpecRow label="Condition" value={device.device_condition?.replace(/_/g, ' ')} isPill />
+          <SpecRow label="Status" value={device.status} isStatus />
+
+          {/* 2. Core Hardware */}
+          <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
+            <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Core Hardware
+            </h4>
+          </div>
+
+          <SpecRow label="Motherboard" value={device.motherboard} fullWidth />
+          <SpecRow label="Processor (CPU)" value={device.processor} fullWidth />
+          <SpecRow label="Graphics Card" value={device.graphics_card} fullWidth />
+
+          {/* Memory (RAM) - Loops through the array */}
+          <div className="nm-col-span-2">
+            <span className="nm-label">Memory (RAM)</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+              {device.desktop_memory && device.desktop_memory.length > 0 ? (
+                device.desktop_memory.map((mem, i) => (
+                  <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 10px', fontSize: '0.85rem' }}>
+                    <span style={{ fontWeight: 600, color: '#475569' }}>{mem.slot_number}:</span> {mem.size_gb} GB
+                  </div>
+                ))
+              ) : (
+                <span className="nm-value" style={{ color: '#94a3b8' }}>No memory info</span>
+              )}
+            </div>
+          </div>
+
+          {/* Storage - Loops through the array */}
+          <div className="nm-col-span-2">
+            <span className="nm-label">Storage Drives</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+              {device.desktop_storage && device.desktop_storage.length > 0 ? (
+                device.desktop_storage.map((stor, i) => (
+                  <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 10px', fontSize: '0.85rem' }}>
+                    <span style={{ fontWeight: 600, color: '#475569' }}>{stor.storage_type}:</span> {stor.capacity_gb} GB
+                  </div>
+                ))
+              ) : (
+                <span className="nm-value" style={{ color: '#94a3b8' }}>No storage info</span>
+              )}
+            </div>
+          </div>
+
+          {/* 3. System Configuration */}
+          <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
+            <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              System Configuration
+            </h4>
+          </div>
+
+          <SpecRow label="Operating System" value={device.operating_system} />
+          <SpecRow label="Architecture" value={device.system_architecture} />
+          <SpecRow label="BIOS Mode" value={device.bios_mode} />
+          <SpecRow label="Local Username" value={device.username} />
         </div>
-      </div>
-    </div>
-  );
+      );
+    }
+
+    // ==================== LAPTOP SPECS ====================
+    if (type?.toLowerCase() === 'laptop') {
+      return (
+        <div className="nm-specs-grid">
+          
+          {/* --- SECTION 1: IDENTITY --- */}
+          <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px' }}>
+            <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Identity & Classification
+            </h4>
+          </div>
+
+          <SpecRow label="Asset ID" value={device.asset_id} />
+          <SpecRow label="Brand" value={device.brand} />
+          <SpecRow label="Model" value={device.model} />
+          
+          {/* Smart Serial Number / SNID Display */}
+          <SpecRow 
+            label={device.brand?.toLowerCase().includes('acer') ? "SNID" : "Serial Number"} 
+            value={device.brand?.toLowerCase().includes('acer') && device.snid ? device.snid : device.serial_number} 
+          />
+          
+          <SpecRow label="Condition" value={device.device_condition?.replace(/_/g, ' ')} isPill />
+          <SpecRow label="Status" value={device.status} isStatus />
+
+          {/* --- SECTION 2: TECHNICAL SPECS --- */}
+          <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
+            <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Technical Specifications
+            </h4>
+          </div>
+
+          <SpecRow label="Processor (CPU)" value={device.cpu} fullWidth />
+          <SpecRow label="Graphics Card" value={device.graphics_card} fullWidth />
+          <SpecRow label="Operating System" value={device.operating_system} />
+          <SpecRow label="Screen Size" value={device.screen_size} />
+
+          {/* Dynamic RAM Display */}
+          <div className="nm-col-span-2">
+            <span className="nm-label">Memory (RAM)</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+              {device.laptop_ram && device.laptop_ram.length > 0 ? (
+                device.laptop_ram.map((mem, i) => (
+                  <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 10px', fontSize: '0.85rem' }}>
+                    <span style={{ fontWeight: 600, color: '#475569' }}>{mem.slot_number}:</span> {mem.size_gb} GB
+                  </div>
+                ))
+              ) : (
+                <span className="nm-value" style={{ color: '#94a3b8' }}>{device.memory ? `${device.memory} GB (Legacy)` : 'No memory info'}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Dynamic Storage Display */}
+          <div className="nm-col-span-2">
+            <span className="nm-label">Storage Drives</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+              {device.laptop_storage && device.laptop_storage.length > 0 ? (
+                device.laptop_storage.map((stor, i) => (
+                  <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 10px', fontSize: '0.85rem' }}>
+                    <span style={{ fontWeight: 600, color: '#475569' }}>{stor.storage_type}:</span> {stor.capacity_gb} GB
+                  </div>
+                ))
+              ) : (
+                <span className="nm-value" style={{ color: '#94a3b8' }}>{device.storage ? `${device.storage} GB (Legacy)` : 'No storage info'}</span>
+              )}
+            </div>
+          </div>
+
+          {/* --- SECTION 3: PROCUREMENT --- */}
+          <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
+            <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Procurement Details
+            </h4>
+          </div>
+
+          <SpecRow label="Supplier" value={device.supplier} />
+          <SpecRow label="Distributor" value={device.distributor} />
+          <SpecRow label="Purchase Date" value={device.purchase_date} />
+          <SpecRow label="Warranty End" value={device.warranty_end} />
+
+        </div>
+      );
+    }
+
+    // ==================== MONITOR SPECS ====================
+    if (type?.toLowerCase() === 'monitor') {
+      return (
+        <div className="nm-specs-grid">
+          <SpecRow label="Asset ID" value={device.asset_id} />
+          <SpecRow label="Brand" value={device.brand} />
+          <SpecRow label="Model" value={device.model} />
+          <SpecRow label="Size" value={`${device.size_inches || 0}"`} />
+          <SpecRow label="Resolution" value={device.resolution} />
+          <SpecRow label="Refresh Rate" value={device.refresh_rate} />
+          <SpecRow label="Panel Type" value={device.panel_type} />
+          <SpecRow label="Ports" value={device.ports} />
+          <SpecRow label="Status" value={device.status} isStatus />
+        </div>
+      );
+    }
+
+    return <div>Unknown device type</div>;
+  };
 
   const renderProcurementContent = () => (
     <div className="nm-procurement-section fade-in">

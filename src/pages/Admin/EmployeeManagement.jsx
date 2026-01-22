@@ -69,9 +69,18 @@ export default function EmployeeManagement() {
 
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
-      await deleteEmployee(deleteConfirm.employee_id);
-      setDeleteConfirm(null);
-      loadData();
+      // Capture the result from the service
+      const result = await deleteEmployee(deleteConfirm.employee_id);
+      
+      if (result.success) {
+        // Success: Close modal and reload table
+        setDeleteConfirm(null);
+        loadData();
+      } else {
+        // Failure: Close modal but show the specific error message
+        setDeleteConfirm(null);
+        alert(result.error);
+      }
     }
   };
 

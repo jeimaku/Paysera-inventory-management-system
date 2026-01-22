@@ -13,7 +13,28 @@ export async function getLaptops(filters = {}) {
       `)
       .order('created_at', { ascending: false });
 
-    // ... (Keep existing filter logic for status, brand, etc.) ...
+    // --- 1. Status Filter ---
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    // --- 2. Brand Filter ---
+    if (filters.brand) {
+      query = query.eq('brand', filters.brand);
+    }
+
+    // --- 3. Condition Filter ---
+    if (filters.device_condition) {
+      query = query.eq('device_condition', filters.device_condition);
+    }
+
+    // --- 4. Search Filter ---
+    if (filters.search) {
+      // Searches Asset ID, Brand, Model, or Serial Number
+      query = query.or(
+        `asset_id.ilike.%${filters.search}%,brand.ilike.%${filters.search}%,model.ilike.%${filters.search}%,serial_number.ilike.%${filters.search}%`
+      );
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -189,10 +210,17 @@ export async function createDesktop(desktopData) {
   try {
     const { memory, storage, ...desktop } = desktopData;
 
-    // Insert desktop
+    // --- FIX: Sanitize Data (Convert "" to null) ---
+    const sanitizedDesktop = {};
+    Object.keys(desktop).forEach(key => {
+      sanitizedDesktop[key] = (desktop[key] === '' || desktop[key] === undefined) ? null : desktop[key];
+    });
+    // -----------------------------------------------
+
+    // Insert desktop using sanitized data
     const { data: desktopResult, error: desktopError } = await supabase
       .from('desktops')
-      .insert([desktop])
+      .insert([sanitizedDesktop]) 
       .select()
       .single();
 
@@ -203,7 +231,7 @@ export async function createDesktop(desktopData) {
       const memoryData = memory.map((m) => ({
         desktop_id: desktopResult.desktop_id,
         slot_number: m.slot_number,
-        size_gb: m.size_gb,
+        size_gb: m.size_gb || 0, // Ensure numbers aren't null/empty
       }));
 
       const { error: memoryError } = await supabase
@@ -218,7 +246,7 @@ export async function createDesktop(desktopData) {
       const storageData = storage.map((s) => ({
         desktop_id: desktopResult.desktop_id,
         storage_type: s.storage_type,
-        capacity_gb: s.capacity_gb,
+        capacity_gb: s.capacity_gb || 0, // Ensure numbers aren't null/empty
       }));
 
       const { error: storageError } = await supabase
@@ -231,7 +259,7 @@ export async function createDesktop(desktopData) {
     return { success: true, data: desktopResult };
   } catch (error) {
     console.error('Error creating desktop:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message || error.details };
   }
 }
 
@@ -239,27 +267,34 @@ export async function updateDesktop(desktopId, desktopData) {
   try {
     const { memory, storage, ...desktop } = desktopData;
 
+    // --- FIX: Sanitize Data ---
+    const sanitizedDesktop = {};
+    Object.keys(desktop).forEach(key => {
+      sanitizedDesktop[key] = (desktop[key] === '' || desktop[key] === undefined) ? null : desktop[key];
+    });
+    // --------------------------
+
     // Update desktop
     const { data: desktopResult, error: desktopError } = await supabase
       .from('desktops')
-      .update(desktop)
+      .update(sanitizedDesktop)
       .eq('desktop_id', desktopId)
       .select()
       .single();
 
     if (desktopError) throw desktopError;
 
+    // ... (keep the rest of your memory/storage update logic the same) ...
+    
     // Update memory (delete old, insert new)
     if (memory) {
       await supabase.from('desktop_memory').delete().eq('desktop_id', desktopId);
-
       if (memory.length > 0) {
         const memoryData = memory.map((m) => ({
           desktop_id: desktopId,
           slot_number: m.slot_number,
-          size_gb: m.size_gb,
+          size_gb: m.size_gb || 0,
         }));
-
         await supabase.from('desktop_memory').insert(memoryData);
       }
     }
@@ -267,14 +302,12 @@ export async function updateDesktop(desktopId, desktopData) {
     // Update storage (delete old, insert new)
     if (storage) {
       await supabase.from('desktop_storage').delete().eq('desktop_id', desktopId);
-
       if (storage.length > 0) {
         const storageData = storage.map((s) => ({
           desktop_id: desktopId,
           storage_type: s.storage_type,
-          capacity_gb: s.capacity_gb,
+          capacity_gb: s.capacity_gb || 0,
         }));
-
         await supabase.from('desktop_storage').insert(storageData);
       }
     }

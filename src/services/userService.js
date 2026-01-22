@@ -57,17 +57,56 @@ export async function createUser(userData) {
   }
 }
 
-// Deactivate/Activate User
+// UPDATE THIS FUNCTION
 export async function toggleUserStatus(accountId, currentStatus) {
   try {
-    const { error } = await supabase
-      .from('accounts')
-      .update({ is_active: !currentStatus })
-      .eq('account_id', accountId);
+    // We want to FLIP the status (True -> False, False -> True)
+    const newStatus = !currentStatus;
+
+    const { error } = await supabase.rpc('toggle_user_status_secure', {
+      target_account_id: accountId,
+      new_status: newStatus
+    });
 
     if (error) throw error;
     return { success: true };
   } catch (error) {
+    console.error('Error toggling user status:', error);
     return { success: false, error: error.message };
+  }
+}
+
+// --- ADD THIS NEW FUNCTION ---
+export async function deleteUser(accountId) {
+  try {
+    const { error } = await supabase.rpc('delete_system_user', { 
+      target_user_id: accountId 
+    });
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// --- ADD HELPER FOR PASSWORD VERIFICATION ---
+export async function verifyAdminPassword(password) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !user.email) throw new Error('No active session');
+
+    // Attempt to sign in with the current email and the provided password
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: password
+    });
+
+    if (error) return false;
+    return true;
+  } catch (error) {
+    console.error('Password verification failed:', error);
+    return false;
   }
 }

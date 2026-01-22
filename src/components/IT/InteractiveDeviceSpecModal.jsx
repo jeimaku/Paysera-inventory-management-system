@@ -226,129 +226,193 @@ export default function DeviceSpecModal({ deployment, onClose }) {
                 </div>
               )}
 
-              {/* Specifications Tab */}
+              {/* --- START OF REPLACEMENT BLOCK --- */}
               {activeTab === 'specifications' && deviceSpecs && (
                 <div className="tab-content">
-                  <div className="specs-container">
-                    {/* Quick Overview */}
-                    <div className="specs-overview">
-                      <div className="overview-item">
-                        <Cpu size={16} />
-                        <span>{deviceSpecs.cpu || deviceSpecs.processor || 'Unknown CPU'}</span>
-                      </div>
-                      <div className="overview-item">
-                        <HardDrive size={16} />
-                        <span>{formatMemory(deviceSpecs.memory || (deviceSpecs.memory_modules?.reduce((sum, m) => sum + (m.size_gb || 0), 0)))}</span>
-                      </div>
-                      <div className="overview-item">
-                        <HardDrive size={16} />
-                        <span>{formatStorage(deviceSpecs.storage || (deviceSpecs.storage_devices?.reduce((sum, s) => sum + (s.capacity_gb || 0), 0)))}</span>
-                      </div>
-                    </div>
-
-                    {/* Detailed Specs */}
-                    <div className="specs-sections">
-                      {deployment.device_type === 'LAPTOP' ? (
-                        <div className="specs-section">
-                          <h4>Laptop Specifications</h4>
-                          <div className="specs-grid">
-                            <div className="spec-row">
-                              <label>Brand & Model</label>
-                              <span>{deviceSpecs.brand} {deviceSpecs.model}</span>
-                            </div>
-                            <div className="spec-row">
-                              <label>Serial Number</label>
-                              <span className="mono">{deviceSpecs.serial_number || 'N/A'}</span>
-                            </div>
-                            <div className="spec-row">
-                              <label>Operating System</label>
-                              <span>{deviceSpecs.operating_system || 'N/A'}</span>
-                            </div>
-                            <div className="spec-row">
-                              <label>Processor</label>
-                              <span>{deviceSpecs.cpu || 'N/A'}</span>
-                            </div>
-                            <div className="spec-row">
-                              <label>Memory</label>
-                              <span className="memory-value">{formatMemory(deviceSpecs.memory)}</span>
-                            </div>
-                            <div className="spec-row">
-                              <label>Storage</label>
-                              <span className="storage-value">{formatStorage(deviceSpecs.storage, deviceSpecs.storage_type)}</span>
-                            </div>
-                            {warranty && (
-                              <div className="spec-row warranty-row">
-                                <label>Warranty</label>
-                                <span className="warranty-status" style={{ color: warranty.color }}>
-                                  {warranty.icon} {warranty.status}
-                                </span>
-                              </div>
+                  <div className="specs-container" style={{ padding: '24px' }}>
+                    
+                    {/* INLINE HELPER: SpecRow with Custom Color Support */}
+                    {(() => {
+                      const SpecRow = ({ label, value, fullWidth, isPill, customColor }) => {
+                        if (!value) return null;
+                        return (
+                          <div className="spec-item" style={{ 
+                            marginBottom: '12px', 
+                            gridColumn: fullWidth ? '1 / -1' : 'auto' 
+                          }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
+                            {isPill ? (
+                              <span style={{ textTransform: 'capitalize', background: '#f1f5f9', padding: '4px 12px', borderRadius: '99px', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                                {value}
+                              </span>
+                            ) : (
+                              <span style={{ 
+                                color: customColor || '#1e293b', 
+                                fontWeight: 500, 
+                                fontSize: '0.95rem' 
+                              }}>
+                                {value}
+                              </span>
                             )}
-                            <div className="spec-row">
-                              <label>Distributor</label>
-                              <span>{deviceSpecs.distributor || 'N/A'}</span>
+                          </div>
+                        );
+                      };
+
+                      // Calculate Warranty Color
+                      const warrantyInfo = getWarrantyStatus(deviceSpecs.warranty_end);
+                      const warrantyColor = warrantyInfo.status === 'Active' ? '#10b981' : '#ef4444'; // Green or Red
+
+                      // ==================== DESKTOP RENDER ====================
+                      if (deployment.device_type === 'DESKTOP') {
+                        return (
+                          <div className="specs-grid-layout">
+                            {/* 1. Identity */}
+                            <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>Identity & Classification</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                              <SpecRow label="Asset ID" value={deviceSpecs.asset_id} />
+                              <SpecRow label="Serial Number" value={deviceSpecs.serial_number || 'Custom / Assembled'} />
+                              <SpecRow label="Manufacturer" value={deviceSpecs.system_manufacturer} />
+                              <SpecRow label="Model" value={deviceSpecs.system_model} />
+                              <SpecRow label="Condition" value={deviceSpecs.device_condition?.replace(/_/g, ' ')} isPill />
+                            </div>
+
+                            {/* 2. Core Hardware */}
+                            <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>Core Hardware</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                              <SpecRow label="Motherboard" value={deviceSpecs.motherboard} fullWidth />
+                              <SpecRow label="Processor (CPU)" value={deviceSpecs.processor} fullWidth />
+                              <SpecRow label="Graphics Card" value={deviceSpecs.graphics_card} fullWidth />
+                              
+                              {/* Dynamic RAM */}
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>Memory (RAM)</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                  {deviceSpecs.desktop_memory && deviceSpecs.desktop_memory.length > 0 ? (
+                                    deviceSpecs.desktop_memory.map((mem, i) => (
+                                      <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '6px 12px', fontSize: '0.85rem' }}>
+                                        <span style={{ fontWeight: 600, color: '#475569' }}>{mem.slot_number}:</span> {mem.size_gb} GB
+                                      </div>
+                                    ))
+                                  ) : <span style={{ color: '#94a3b8' }}>No memory info</span>}
+                                </div>
+                              </div>
+
+                              {/* Dynamic Storage */}
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>Storage Drives</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                  {deviceSpecs.desktop_storage && deviceSpecs.desktop_storage.length > 0 ? (
+                                    deviceSpecs.desktop_storage.map((stor, i) => (
+                                      <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '6px 12px', fontSize: '0.85rem' }}>
+                                        <span style={{ fontWeight: 600, color: '#475569' }}>{stor.storage_type}:</span> {stor.capacity_gb} GB
+                                      </div>
+                                    ))
+                                  ) : <span style={{ color: '#94a3b8' }}>No storage info</span>}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 3. System Config */}
+                            <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>System Configuration</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                              <SpecRow label="Operating System" value={deviceSpecs.operating_system} />
+                              <SpecRow label="Architecture" value={deviceSpecs.system_architecture} />
+                              <SpecRow label="BIOS Mode" value={deviceSpecs.bios_mode} />
+                              <SpecRow label="Local Username" value={deviceSpecs.username} />
+                            </div>
+
+                             {/* 4. Procurement (With Green/Red Warranty) */}
+                            <h4 style={{ fontSize: '1rem', color: '#1e293b', marginTop: '32px', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>Procurement Details</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                              <SpecRow label="Supplier" value={deviceSpecs.supplier} />
+                              <SpecRow label="Distributor" value={deviceSpecs.distributor} />
+                              <SpecRow label="Purchase Date" value={formatDate(deviceSpecs.purchase_date)} />
+                              <SpecRow 
+                                label="Warranty End" 
+                                value={formatDate(deviceSpecs.warranty_end)} 
+                                customColor={warrantyColor} // <--- COLOR APPLIED HERE
+                              />
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="specs-section">
-                          <h4>Desktop Specifications</h4>
-                          <div className="specs-grid">
-                            <div className="spec-row">
-                              <label>Operating System</label>
-                              <span>{deviceSpecs.operating_system || 'N/A'}</span>
+                        );
+                      }
+
+                      // ==================== LAPTOP RENDER ====================
+                      if (deployment.device_type === 'LAPTOP') {
+                        return (
+                          <div className="specs-grid-layout">
+                            {/* 1. Identity */}
+                            <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>Identity & Classification</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                              <SpecRow label="Asset ID" value={deviceSpecs.asset_id} />
+                              <SpecRow label="Brand" value={deviceSpecs.brand} />
+                              <SpecRow label="Model" value={deviceSpecs.model} />
+                              <SpecRow 
+                                label={deviceSpecs.brand?.toLowerCase().includes('acer') ? "SNID" : "Serial Number"} 
+                                value={deviceSpecs.brand?.toLowerCase().includes('acer') && deviceSpecs.snid ? deviceSpecs.snid : deviceSpecs.serial_number} 
+                              />
+                              <SpecRow label="Condition" value={deviceSpecs.device_condition?.replace(/_/g, ' ')} isPill />
                             </div>
-                            <div className="spec-row">
-                              <label>Processor</label>
-                              <span>{deviceSpecs.processor || 'N/A'}</span>
+
+                            {/* 2. Technical Specs */}
+                            <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>Technical Specifications</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                              <SpecRow label="Processor (CPU)" value={deviceSpecs.cpu} fullWidth />
+                              <SpecRow label="Graphics Card" value={deviceSpecs.graphics_card} fullWidth />
+                              <SpecRow label="Operating System" value={deviceSpecs.operating_system} />
+                              <SpecRow label="Screen Size" value={deviceSpecs.screen_size} />
+                              
+                              {/* Dynamic RAM */}
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>Memory (RAM)</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                  {deviceSpecs.laptop_ram && deviceSpecs.laptop_ram.length > 0 ? (
+                                    deviceSpecs.laptop_ram.map((mem, i) => (
+                                      <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '6px 12px', fontSize: '0.85rem' }}>
+                                        <span style={{ fontWeight: 600, color: '#475569' }}>{mem.slot_number}:</span> {mem.size_gb} GB
+                                      </div>
+                                    ))
+                                  ) : <span style={{ color: '#94a3b8' }}>{deviceSpecs.memory ? `${deviceSpecs.memory} GB` : 'No memory info'}</span>}
+                                </div>
+                              </div>
+
+                              {/* Dynamic Storage */}
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>Storage Drives</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                  {deviceSpecs.laptop_storage && deviceSpecs.laptop_storage.length > 0 ? (
+                                    deviceSpecs.laptop_storage.map((stor, i) => (
+                                      <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '6px 12px', fontSize: '0.85rem' }}>
+                                        <span style={{ fontWeight: 600, color: '#475569' }}>{stor.storage_type}:</span> {stor.capacity_gb} GB
+                                      </div>
+                                    ))
+                                  ) : <span style={{ color: '#94a3b8' }}>{deviceSpecs.storage ? `${deviceSpecs.storage} GB` : 'No storage info'}</span>}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 3. Procurement (With Green/Red Warranty) */}
+                            <h4 style={{ fontSize: '1rem', color: '#1e293b', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>Procurement Details</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                              <SpecRow label="Supplier" value={deviceSpecs.supplier} />
+                              <SpecRow label="Distributor" value={deviceSpecs.distributor} />
+                              <SpecRow label="Purchase Date" value={formatDate(deviceSpecs.purchase_date)} />
+                              <SpecRow 
+                                label="Warranty End" 
+                                value={formatDate(deviceSpecs.warranty_end)} 
+                                customColor={warrantyColor} // <--- COLOR APPLIED HERE
+                              />
                             </div>
                           </div>
-
-                          {/* Memory Modules */}
-                          {deviceSpecs.memory_modules && deviceSpecs.memory_modules.length > 0 && (
-                            <div className="component-section">
-                              <h5>Memory Configuration</h5>
-                              <div className="memory-slots">
-                                {deviceSpecs.memory_modules.map((module, index) => (
-                                  <div key={index} className="memory-slot">
-                                    <div className="slot-header">Slot {module.slot_number}</div>
-                                    <div className="slot-capacity">{formatMemory(module.size_gb)}</div>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="total-summary">
-                                Total Memory: <strong>{formatMemory(
-                                  deviceSpecs.memory_modules.reduce((sum, m) => sum + (m.size_gb || 0), 0)
-                                )}</strong>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Storage Devices */}
-                          {deviceSpecs.storage_devices && deviceSpecs.storage_devices.length > 0 && (
-                            <div className="component-section">
-                              <h5>Storage Configuration</h5>
-                              <div className="storage-devices-list">
-                                {deviceSpecs.storage_devices.map((storage, index) => (
-                                  <div key={index} className="storage-device-item">
-                                    <div className="storage-type">{storage.storage_type}</div>
-                                    <div className="storage-capacity">{formatStorage(storage.capacity_gb)}</div>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="total-summary">
-                                Total Storage: <strong>{formatStorage(
-                                  deviceSpecs.storage_devices.reduce((sum, s) => sum + (s.capacity_gb || 0), 0)
-                                )}</strong>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                        );
+                      }
+                      
+                      return <div>No specifications available for {deployment.device_type}.</div>;
+                    })()}
                   </div>
                 </div>
               )}
+              {/* --- END OF REPLACEMENT BLOCK --- */}
 
               {/* Monitors Tab */}
               {activeTab === 'monitors' && deployment.employee_monitors && deployment.employee_monitors.length > 0 && (

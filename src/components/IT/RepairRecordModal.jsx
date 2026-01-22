@@ -30,6 +30,29 @@ export default function RepairRecordModal({ isOpen, onClose, onSubmit, editingRe
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
 
+  // --- ADD THIS CODE BLOCK ---
+  // This listener triggers the search whenever the User types or changes the Device Type
+  useEffect(() => {
+    if (!isOpen) return; // Don't run if modal is closed
+
+    // Debounce: Wait 300ms after user stops typing to avoid too many API calls
+    const delayDebounceFn = setTimeout(async () => {
+      setSearching(true);
+      try {
+        // Call the service to get the list of devices
+        const results = await searchAvailableDevices(formData.device_type, deviceSearch);
+        setAvailableDevices(results);
+      } catch (error) {
+        console.error('Error searching devices:', error);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [deviceSearch, formData.device_type, isOpen]);
+  // ---------------------------
+
   // --- LOCK LOGIC ---
   const isTerminalState = editingRecord && (
     ['completed', 'warranty_sent', 'cancelled'].includes(editingRecord.status?.toLowerCase()) ||

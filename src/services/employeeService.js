@@ -213,41 +213,47 @@ export async function updateEmployee(employeeId, employeeData) {
   }
 }
 
-// Delete employee
 export async function deleteEmployee(employeeId) {
   try {
-    // First check if employee has any device deployments
+    // --- 1. NEW CHECK: System Account Existence ---
+    const { count: accountCount, error: accountError } = await supabase
+      .from('accounts')
+      .select('*', { count: 'exact', head: true })
+      .eq('employee_id', employeeId);
+
+    if (accountError) console.error('Error checking accounts:', accountError);
+
+    if (accountCount > 0) {
+      return { 
+        success: false, 
+        error: 'Cannot delete: This employee is linked to a System User account. Please delete their user access in User Management first.' 
+      };
+    }
+    // ----------------------------------------------
+
+    // 2. Existing Check: Active Device Deployments
     const { count: deploymentCount, error: countError } = await supabase
       .from('employee_devices')
       .select('*', { count: 'exact', head: true })
       .eq('employee_id', employeeId)
       .eq('status', 'in_use');
 
-    if (countError) {
-      console.error('Error checking deployments:', countError);
-    }
+    if (countError) console.error('Error checking deployments:', countError);
 
     if (deploymentCount > 0) {
       return { 
         success: false, 
-        error: `Cannot delete employee with active device deployments (${deploymentCount} active). Please return devices first.` 
+        error: `Cannot delete: Employee has ${deploymentCount} active device(s). Please return devices first.` 
       };
     }
 
+    // 3. Proceed with Delete
     const { error } = await supabase
       .from('employees')
       .delete()
       .eq('employee_id', employeeId);
 
-    if (error) {
-      console.error('RLS Error deleting employee:', error);
-      
-      if (error.code === 'PGRST116' || error.message?.includes('permission denied')) {
-        return { success: false, error: 'You do not have permission to delete employees.' };
-      }
-      
-      throw error;
-    }
+    if (error) throw error;
 
     return { success: true };
   } catch (error) {

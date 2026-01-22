@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, UserCheck, UserX, Shield, Mail, Search } from 'lucide-react';
-import { getUsers, createUser, toggleUserStatus } from '../../services/userService';
+import { Plus, UserCheck, UserX, Shield, Mail, Search, Trash2, Lock, AlertTriangle, Info } from 'lucide-react';
+import { getUsers, createUser, toggleUserStatus, deleteUser, verifyAdminPassword } from '../../services/userService';
 import UserModal from '../../components/Admin/UserModal';
 import '../../styles/admin-inventory.css'; 
 
@@ -9,6 +9,12 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // --- UNIFIED CONFIRMATION STATE ---
+  // Stores { user: object, type: 'delete' | 'toggle' }
+  const [confirmData, setConfirmData] = useState(null); 
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -32,11 +38,51 @@ export default function UserManagement() {
     }
   };
 
-  const handleToggleStatus = async (user) => {
-    if (window.confirm(`Are you sure you want to ${user.is_active ? 'deactivate' : 'activate'} this user?`)) {
-      await toggleUserStatus(user.account_id, user.is_active);
-      loadUsers();
+  // --- OPEN CONFIRMATION MODALS ---
+  const initiateToggleStatus = (user) => {
+    setConfirmData({ user, type: 'toggle' });
+    setConfirmPassword('');
+  };
+
+  const initiateDelete = (user) => {
+    setConfirmData({ user, type: 'delete' });
+    setConfirmPassword('');
+  };
+
+  // --- UNIFIED SUBMIT HANDLER ---
+  const handleConfirmSubmit = async (e) => {
+    e.preventDefault();
+    if (!confirmData) return;
+
+    setIsProcessing(true);
+
+    // 1. Verify Password
+    const isValid = await verifyAdminPassword(confirmPassword);
+    if (!isValid) {
+      alert('Incorrect password. Please try again.');
+      setIsProcessing(false);
+      return;
     }
+
+    let result;
+    
+    // 2. Perform Action based on Type
+    if (confirmData.type === 'delete') {
+      result = await deleteUser(confirmData.user.account_id);
+    } else {
+      // Toggle Status
+      result = await toggleUserStatus(confirmData.user.account_id, confirmData.user.is_active);
+    }
+    
+    // 3. Handle Result
+    if (result.success) {
+      setConfirmData(null);
+      loadUsers();
+    } else {
+      alert(`Failed to ${confirmData.type} user: ` + result.error);
+    }
+    
+    setIsProcessing(false);
   };
 
   const filteredUsers = users.filter(user => 
@@ -45,7 +91,7 @@ export default function UserManagement() {
   );
 
   return (
-    <div className="admin-container">
+    <div className="admin-inventory-container">
       <div className="admin-header-card">
         <div className="header-title-group">
           <h1>User Management</h1>
@@ -55,6 +101,20 @@ export default function UserManagement() {
           <Plus size={20} /> Add New User
         </button>
       </div>
+
+      {/* --- NEW INFO BANNER --- */}
+      <div className="info-banner">
+        <Info className="info-banner-icon" size={20} />
+        <div className="info-banner-content">
+          <h4>Why link to an Employee?</h4>
+          <p>
+            For security and accountability, every system user (Admin or IT) must be linked to a real employee profile. 
+            This ensures that all actions in the system are traceable to a specific person in your organization. 
+            If the person you want to add isn't listed, please create their profile in the <strong>Employees</strong> page first.
+          </p>
+        </div>
+      </div>
+      {/* ----------------------- */}
 
       <div className="admin-filters-bar">
         <div className="filter-input-wrapper" style={{ flex: 1 }}>
@@ -77,7 +137,7 @@ export default function UserManagement() {
               <th>Role</th>
               <th>Login Email</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -106,13 +166,30 @@ export default function UserManagement() {
                   </span>
                 </td>
                 <td>
-                  <button 
-                    className={`action-btn ${user.is_active ? 'btn-delete' : 'btn-view'}`}
-                    onClick={() => handleToggleStatus(user)}
-                    title={user.is_active ? "Deactivate User" : "Activate User"}
-                  >
-                    {user.is_active ? <UserX size={16} /> : <UserCheck size={16} />}
-                  </button>
+                  <div className="admin-actions" style={{ justifyContent: 'flex-end' }}>
+                    {/* TOGGLE BUTTON */}
+                    <button 
+                      className={`action-btn ${user.is_active ? 'btn-edit' : 'btn-view'}`}
+                      onClick={() => initiateToggleStatus(user)}
+                      title={user.is_active ? "Deactivate User" : "Activate User"}
+                      style={{ 
+                        color: user.is_active ? '#f59e0b' : '#10b981', 
+                        borderColor: user.is_active ? '#f59e0b' : '#10b981',
+                        background: user.is_active ? '#fffbeb' : '#ecfdf5' 
+                      }}
+                    >
+                      {user.is_active ? <UserX size={16} /> : <UserCheck size={16} />}
+                    </button>
+
+                    {/* DELETE BUTTON */}
+                    <button 
+                      className="action-btn btn-delete"
+                      onClick={() => initiateDelete(user)}
+                      title="Delete User Permanently"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -125,6 +202,75 @@ export default function UserManagement() {
         onClose={() => setIsModalOpen(false)} 
         onSubmit={handleCreateUser} 
       />
+
+      {/* --- UNIFIED SECURITY MODAL --- */}
+      {confirmData && (
+        <div className="modal-overlay" onClick={() => setConfirmData(null)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-icon-wrapper" style={{ 
+              background: confirmData.type === 'delete' ? '#fef2f2' : '#fffbeb',
+              color: confirmData.type === 'delete' ? '#dc2626' : '#d97706'
+            }}>
+              <AlertTriangle size={32} />
+            </div>
+
+            <h3 className="confirm-title">
+              {confirmData.type === 'delete' ? 'Delete User?' : 
+               confirmData.user.is_active ? 'Deactivate User?' : 'Activate User?'}
+            </h3>
+            
+            <p className="confirm-desc">
+              {confirmData.type === 'delete' ? (
+                <>You are about to permanently delete <strong>{confirmData.user.employees?.full_name}</strong>.<br/>This action cannot be undone.</>
+              ) : (
+                <>
+                  You are about to {confirmData.user.is_active ? 'deactivate' : 'activate'} <strong>{confirmData.user.employees?.full_name}</strong>.
+                  <br/>They {confirmData.user.is_active ? 'will lose' : 'will regain'} access to the system immediately.
+                </>
+              )}
+            </p>
+
+            <form onSubmit={handleConfirmSubmit} style={{ width: '100%', marginBottom: '20px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '8px', display: 'block', textAlign: 'left' }}>
+                Verify Admin Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                <input 
+                  type="password" 
+                  className="admin-search-input"
+                  style={{ width: '100%', paddingLeft: '36px' }}
+                  placeholder="Enter your password to confirm"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+            </form>
+
+            <div className="confirm-actions">
+              <button 
+                className="btn-cancel-modern" 
+                onClick={() => setConfirmData(null)}
+                disabled={isProcessing}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-delete-modern" 
+                onClick={handleConfirmSubmit}
+                disabled={isProcessing}
+                style={{ 
+                  background: confirmData.type === 'delete' ? '#dc2626' : '#d97706' 
+                }}
+              >
+                {isProcessing ? 'Verifying...' : 'Confirm Action'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

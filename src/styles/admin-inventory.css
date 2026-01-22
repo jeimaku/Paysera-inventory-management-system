@@ -451,3 +451,64 @@
 .form-scroll-area::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+
+/* --- Info Banner (Guidance Notice) --- */
+.info-banner {
+  background-color: #eff6ff; /* Light Blue */
+  border: 1px solid #dbeafe;
+  border-left: 4px solid #3b82f6; /* Blue Accent */
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 12px;
+  align-items: start;
+}
+
+.info-banner-icon {
+  color: #2563eb;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.info-banner-content h4 {
+  margin: 0 0 4px 0;
+  color: #1e3a8a;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.info-banner-content p {
+  margin: 0;
+  color: #1e40af;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* --- Improved User Modal Styling --- */
+.modal-section-highlight {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.modal-section-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.helper-text {
+  display: block;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 6px;
+  line-height: 1.4;
+}
