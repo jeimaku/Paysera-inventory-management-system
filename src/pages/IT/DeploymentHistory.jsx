@@ -54,25 +54,41 @@ export default function DeploymentHistory() {
     return Math.floor((end - start) / (1000 * 60 * 60 * 24));
   };
 
-  // Get last users of a device (assuming the data structure includes previous deployments)
-  const getLastUsers = (deviceId, currentEmployeeId) => {
-    // Filter deployments for this device, excluding current user
-    const deviceHistory = deployments
-      .filter(d => 
-        (d.device_asset_id === deviceId || d.device_id === deviceId) && 
-        d.employee_id !== currentEmployeeId &&
-        d.date_returned // Only include returned deployments
-      )
-      .sort((a, b) => new Date(b.date_returned) - new Date(a.date_returned))
-      .slice(0, 3); // Get last 3 users
+  // LOGIC: Get previous owners based on chronological order
+  // This ensures we only list people who returned the device BEFORE the current user got it.
+  const getPreviousOwners = (currentDeployment) => {
+    const deviceId = currentDeployment.device_asset_id || currentDeployment.device_id;
+    if (!deviceId) return 'N/A';
 
-    if (deviceHistory.length === 0) {
-      return 'No previous users';
+    const currentIssueDate = new Date(currentDeployment.date_issued);
+
+    const previousHistory = deployments
+      .filter(d => {
+        const dId = d.device_asset_id || d.device_id;
+        
+        // 1. Must match device ID
+        if (dId !== deviceId) return false;
+        
+        // 2. Exclude the exact same deployment record
+        if (d.employee_device_id === currentDeployment.employee_device_id) return false;
+
+        // 3. Must be returned to be a "previous" owner
+        if (!d.date_returned) return false;
+
+        // 4. Chronological Check: The return date must be <= current issue date
+        const returnDate = new Date(d.date_returned);
+        return returnDate <= currentIssueDate;
+      })
+      .sort((a, b) => new Date(b.date_returned) - new Date(a.date_returned)); // Sort newest return first
+
+    if (previousHistory.length === 0) {
+      return 'First owner / No history';
     }
 
-    return deviceHistory
-      .map(d => d.employees?.full_name || 'Unknown')
-      .join(', ');
+    // Get unique names and format them
+    const names = [...new Set(previousHistory.map(d => d.employees?.full_name || 'Unknown'))];
+    // Show top 2 names, truncate if more
+    return names.slice(0, 2).join(', ') + (names.length > 2 ? '...' : '');
   };
 
   const getStatusBadge = (status) => {
@@ -111,7 +127,7 @@ export default function DeploymentHistory() {
   return (
     <div className="inventory-container">
       <style>{`
-        /* Enhanced table styles for better organization */
+        /* Enhanced table styles */
         .data-table {
           width: 100%;
           border-collapse: collapse;
@@ -151,10 +167,6 @@ export default function DeploymentHistory() {
         .data-table tbody tr:hover {
           background-color: #f8fafc;
           box-shadow: inset 0 0 0 1px #e2e8f0;
-        }
-
-        .data-table tbody tr:last-child {
-          border-bottom: none;
         }
 
         .data-table td {
@@ -247,6 +259,9 @@ export default function DeploymentHistory() {
           color: #475569;
           font-size: 13px;
           line-height: 1.4;
+          white-space: nowrap; 
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .reason-text.no-reason {
@@ -392,46 +407,22 @@ export default function DeploymentHistory() {
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        /* Updated column width optimization for new columns */
+        /* Column widths */
         .data-table th:nth-child(1) { width: 180px; } /* Employee */
         .data-table th:nth-child(2) { width: 120px; } /* Device Type */
         .data-table th:nth-child(3) { width: 100px; } /* Device ID */
         .data-table th:nth-child(4) { width: 120px; } /* Date Deployed */
         .data-table th:nth-child(5) { width: 120px; } /* Date Returned */
         .data-table th:nth-child(6) { width: 100px; } /* Days Used */
-        .data-table th:nth-child(7) { width: 180px; } /* Last Users */
+        .data-table th:nth-child(7) { width: 180px; } /* Previous Owners */
         .data-table th:nth-child(8) { width: 160px; } /* Reason of Return */
         .data-table th:nth-child(9) { width: 100px; } /* Status */
         .data-table th:nth-child(10) { width: 90px; } /* Monitors */
         .data-table th:nth-child(11) { width: 120px; } /* Actions */
 
-        /* Responsive adjustments */
         @media (max-width: 1400px) {
-          .data-table {
-            font-size: 13px;
-          }
-          
-          .data-table th,
-          .data-table td {
-            padding: 12px 8px;
-          }
-          
-          .employee-cell {
-            min-width: 160px;
-            max-width: 180px;
-          }
-          
-          .last-users-cell,
-          .reason-cell {
-            min-width: 140px;
-            max-width: 160px;
-          }
-        }
-
-        @media (max-width: 1200px) {
-          .table-container {
-            overflow-x: scroll;
-          }
+          .data-table { font-size: 13px; }
+          .data-table th, .data-table td { padding: 12px 8px; }
         }
       `}</style>
 
@@ -543,7 +534,7 @@ export default function DeploymentHistory() {
                   <th>Date Deployed</th>
                   <th>Date Returned</th>
                   <th>Days Used</th>
-                  <th>Last Users</th>
+                  <th>Previous Owners</th>
                   <th>Reason of Return</th>
                   <th>Status</th>
                   <th>Monitors</th>
@@ -553,10 +544,10 @@ export default function DeploymentHistory() {
               <tbody>
                 {deployments.map((deployment) => {
                   const daysUsed = getDaysDeployed(deployment.date_issued, deployment.date_returned);
-                  const lastUsers = getLastUsers(
-                    deployment.device_asset_id || deployment.device_id, 
-                    deployment.employee_id
-                  );
+                  
+                  // Calculate chronological previous owners
+                  const previousOwners = getPreviousOwners(deployment);
+                  const reason = deployment.return_reason;
                   
                   return (
                     <tr key={deployment.employee_device_id}>
@@ -601,24 +592,32 @@ export default function DeploymentHistory() {
                           {daysUsed} days
                         </span>
                       </td>
+
+                      {/* PREVIOUS OWNERS COLUMN */}
                       <td className="last-users-cell">
                         <div className="last-users-header">
                           <Users size={12} />
-                          Previous Users
+                          History
                         </div>
-                        <div className={`last-users-list ${lastUsers === 'No previous users' ? 'no-users' : ''}`}>
-                          {lastUsers}
+                        <div className={`last-users-list ${previousOwners.includes('First owner') ? 'no-users' : ''}`}>
+                          {previousOwners}
                         </div>
                       </td>
+
+                      {/* REASON OF RETURN COLUMN */}
                       <td className="reason-cell">
                         <div className="reason-header">
                           <MessageSquare size={12} />
                           Return Reason
                         </div>
-                        <div className={`reason-text ${!deployment.return_reason ? 'no-reason' : ''}`}>
-                          {deployment.return_reason || (deployment.status === 'in_use' ? 'Still active' : 'No reason provided')}
+                        <div 
+                          className={`reason-text ${!reason ? 'no-reason' : ''}`}
+                          title={reason || "No return reason provided"}
+                        >
+                          {reason || (deployment.status === 'in_use' ? 'Still active' : 'No reason provided')}
                         </div>
                       </td>
+
                       <td>{getStatusBadge(deployment.status)}</td>
                       <td>
                         {deployment.employee_monitors?.length > 0 ? (

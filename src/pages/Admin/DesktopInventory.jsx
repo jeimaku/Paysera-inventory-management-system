@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, HardDrive, Eye, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, HardDrive, Eye, AlertTriangle, Printer } from 'lucide-react'; // <--- Imported Printer
 import DesktopModal from '../../components/Admin/DesktopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getDesktops, createDesktop, updateDesktop, deleteDesktop } from '../../services/deviceService';
-import '../../styles/admin-inventory.css'; // <--- NEW CSS FILE
+import { getDeviceUsageHistory } from '../../services/deploymentService'; // <--- Imported to get current user details
+import '../../styles/admin-inventory.css';
 import '../../styles/new_modal.css';
 
 export default function DesktopInventory() {
@@ -53,6 +54,121 @@ export default function DesktopInventory() {
       await deleteDesktop(deleteConfirm.desktop_id);
       setDeleteConfirm(null);
       loadDesktops();
+    }
+  };
+
+  // --- NEW PRINT FUNCTIONALITY (DESKTOP) ---
+  const handlePrint = async (desktop) => {
+    try {
+      // 1. Fetch current deployment details to get the accurate employee info
+      const history = await getDeviceUsageHistory('DESKTOP', desktop.desktop_id);
+      // Find the active deployment (status 'in_use')
+      const activeDeployment = history.find(h => h.status === 'in_use');
+
+      // 2. Prepare Data
+      const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
+      const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
+      const warrantyDate = desktop.warranty_end ? new Date(desktop.warranty_end).toLocaleDateString() : 'No Warranty Date';
+      
+      // Desktop Specs
+      const specs = `CPU: ${desktop.processor || 'Unknown'} | GPU: ${desktop.graphics_card || 'Integrated Graphics'}`;
+
+      // 3. Open Print Window
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Device Info Sheet - ${desktop.asset_id}</title>
+            <style>
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; }
+              .header { border-bottom: 2px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
+              .header h1 { margin: 0; color: #1e293b; font-size: 24px; }
+              .header p { margin: 5px 0 0; color: #64748b; }
+              
+              .section { margin-bottom: 30px; }
+              .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
+              
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+              .field { margin-bottom: 15px; }
+              .label { font-size: 12px; color: #64748b; display: block; margin-bottom: 4px; }
+              .value { font-size: 16px; font-weight: 500; color: #0f172a; }
+              
+              .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; }
+              
+              .footer { margin-top: 50px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Desktop Information Sheet</h1>
+              <p>Asset ID: <strong>${desktop.asset_id}</strong></p>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Current Assignment</div>
+              <div class="grid">
+                <div class="field">
+                  <span class="label">Assigned Employee</span>
+                  <span class="value">${employeeName}</span>
+                </div>
+                <div class="field">
+                  <span class="label">Department</span>
+                  <span class="value">${department}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">System Specifications</div>
+              <div class="grid">
+                <div class="field">
+                  <span class="label">Processor</span>
+                  <span class="value">${desktop.processor || 'N/A'}</span>
+                </div>
+                <div class="field">
+                  <span class="label">Graphics</span>
+                  <span class="value">${desktop.graphics_card || 'Integrated'}</span>
+                </div>
+                <div class="field">
+                  <span class="label">Serial Number</span>
+                  <span class="value">${desktop.serial_number || 'N/A'}</span>
+                </div>
+                <div class="field">
+                  <span class="label">Supplier</span>
+                  <span class="value">${desktop.supplier || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Status & Warranty</div>
+              <div class="grid">
+                <div class="field">
+                  <span class="label">Current Status</span>
+                  <span class="value"><span class="badge">${desktop.status?.toUpperCase()}</span></span>
+                </div>
+                <div class="field">
+                  <span class="label">Warranty Expiry</span>
+                  <span class="value" style="color: ${desktop.warranty_end ? '#000' : '#94a3b8'}">${warrantyDate}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="footer">
+              Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+            </div>
+
+            <script>
+              window.onload = function() { window.print(); }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (error) {
+      console.error("Error generating print:", error);
+      alert("Failed to generate print preview. Please try again.");
     }
   };
 
@@ -129,13 +245,39 @@ export default function DesktopInventory() {
                   </td>
                   <td>
                     <div className="admin-actions">
-                      <button className="action-btn btn-view" onClick={() => { setViewSpecsDevice(desktop); setSpecsModalOpen(true); }}>
+                      {/* VIEW BUTTON */}
+                      <button 
+                        className="action-btn btn-view" 
+                        onClick={() => { setViewSpecsDevice(desktop); setSpecsModalOpen(true); }}
+                        title="View Specs"
+                      >
                         <Eye size={16} />
                       </button>
-                      <button className="action-btn btn-edit" onClick={() => { setSelectedDesktop(desktop); setIsModalOpen(true); }}>
+
+                      {/* PRINT BUTTON */}
+                      <button 
+                        className="action-btn btn-print" 
+                        onClick={() => handlePrint(desktop)} 
+                        title="Print Info Sheet"
+                      >
+                        <Printer size={16} />
+                      </button>
+
+                      {/* EDIT BUTTON */}
+                      <button 
+                        className="action-btn btn-edit" 
+                        onClick={() => { setSelectedDesktop(desktop); setIsModalOpen(true); }}
+                        title="Edit"
+                      >
                         <Edit2 size={16} />
                       </button>
-                      <button className="action-btn btn-delete" onClick={() => setDeleteConfirm(desktop)}>
+
+                      {/* DELETE BUTTON */}
+                      <button 
+                        className="action-btn btn-delete" 
+                        onClick={() => setDeleteConfirm(desktop)}
+                        title="Delete"
+                      >
                         <Trash2 size={16} />
                       </button>
                     </div>

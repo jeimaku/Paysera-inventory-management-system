@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Search, Laptop as LaptopIcon, Eye, Shield } from 'lucide-react';
+import { Search, Laptop as LaptopIcon, Eye, Shield, Printer } from 'lucide-react';
 import { getLaptops } from '../../services/deviceService';
+import { getDeviceUsageHistory } from '../../services/deploymentService'; // <--- Import for print logic
 import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
 import '../../styles/read-only-inventory.css';
 import '../../styles/new_modal.css';
@@ -55,22 +56,96 @@ export default function LaptopInventory() {
     setIsModalOpen(true);
   };
 
-  // --- Updated Condition Helpers ---
+  // --- PRINT FUNCTIONALITY ---
+  const handlePrint = async (laptop) => {
+    try {
+      // 1. Fetch current deployment details
+      const history = await getDeviceUsageHistory('LAPTOP', laptop.laptop_id);
+      const activeDeployment = history.find(h => h.status === 'in_use');
+
+      // 2. Prepare Data
+      const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
+      const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
+      const warrantyDate = laptop.warranty_end ? new Date(laptop.warranty_end).toLocaleDateString() : 'No Warranty Date';
+      const specs = `${laptop.cpu || 'Unknown CPU'} / ${laptop.memory || '0'}GB RAM / ${laptop.storage || 'Unknown'} Storage`;
+
+      // 3. Open Print Window
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Device Info Sheet - ${laptop.asset_id}</title>
+            <style>
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; }
+              .header { border-bottom: 2px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
+              .header h1 { margin: 0; color: #1e293b; font-size: 24px; }
+              .header p { margin: 5px 0 0; color: #64748b; }
+              .section { margin-bottom: 30px; }
+              .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+              .field { margin-bottom: 15px; }
+              .label { font-size: 12px; color: #64748b; display: block; margin-bottom: 4px; }
+              .value { font-size: 16px; font-weight: 500; color: #0f172a; }
+              .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; }
+              .footer { margin-top: 50px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Laptop Information Sheet</h1>
+              <p>Asset ID: <strong>${laptop.asset_id}</strong></p>
+            </div>
+            <div class="section">
+              <div class="section-title">Current Assignment</div>
+              <div class="grid">
+                <div class="field"><span class="label">Assigned Employee</span><span class="value">${employeeName}</span></div>
+                <div class="field"><span class="label">Department</span><span class="value">${department}</span></div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">Device Specifications</div>
+              <div class="grid">
+                <div class="field"><span class="label">Model</span><span class="value">${laptop.brand} ${laptop.model}</span></div>
+                <div class="field"><span class="label">Serial Number</span><span class="value">${laptop.serial_number || laptop.snid || 'N/A'}</span></div>
+                <div class="field" style="grid-column: span 2;"><span class="label">Technical Specs</span><span class="value">${specs}</span></div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">Status & Warranty</div>
+              <div class="grid">
+                <div class="field"><span class="label">Current Status</span><span class="value"><span class="badge">${laptop.status?.toUpperCase()}</span></span></div>
+                <div class="field"><span class="label">Warranty Expiry</span><span class="value">${warrantyDate}</span></div>
+              </div>
+            </div>
+            <div class="footer">Printed on ${new Date().toLocaleDateString()}</div>
+            <script>window.onload = function() { window.print(); }</script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (error) {
+      console.error("Error generating print:", error);
+      alert("Failed to generate print preview.");
+    }
+  };
+
+  // --- Condition Helpers ---
   const getConditionColor = (condition) => {
     switch (condition?.toLowerCase()) {
-      case 'brand_new': return '#0284c7'; // Blue
-      case 'good_condition': return '#10b981'; // Green (FIXED: Added this case)
-      case 'second_hand': return '#d97706'; // Orange
-      default: return '#6b7280'; // Grey
+      case 'brand_new': return '#0284c7';
+      case 'good_condition': return '#10b981';
+      case 'second_hand': return '#d97706';
+      default: return '#6b7280';
     }
   };
 
   const getConditionText = (condition) => {
     switch (condition?.toLowerCase()) {
       case 'brand_new': return 'Brand New';
-      case 'good_condition': return 'Good Condition'; // (FIXED: Added this case)
+      case 'good_condition': return 'Good Condition';
       case 'second_hand': return 'Second Hand';
-      default: return condition?.replace(/_/g, ' ') || 'Unknown'; // Fallback to readable text
+      default: return condition?.replace(/_/g, ' ') || 'Unknown';
     }
   };
 
@@ -228,18 +303,12 @@ export default function LaptopInventory() {
                   <th className="col-asset">Asset ID</th>
                   <th className="col-brand">Brand/Model</th>
                   <th className="col-serial">Serial No.</th>
-                  
-                  {/* Condition & Details */}
                   <th style={{ width: '120px' }}>Condition</th>
-                  <th style={{ width: '100px', textAlign: 'center' }}>Details</th>
-                  
-                  {/* --- MODIFIED COLUMNS --- */}
                   <th className="col-procurement">Purchase Date</th>
-                  <th className="col-procurement">Warranty Date</th> {/* New Column */}
-                  <th className="col-warranty">Status</th> {/* Status (Active/Expired) */}
-                  {/* ------------------------ */}
-
+                  <th className="col-procurement">Warranty Date</th>
+                  <th className="col-warranty">Status</th>
                   <th className="col-status">Asset Status</th>
+                  <th style={{ width: '140px', textAlign: 'right', paddingRight: '24px' }}>Actions</th> {/* NEW COLUMN */}
                 </tr>
               </thead>
               <tbody>
@@ -263,7 +332,6 @@ export default function LaptopInventory() {
                         <span className="serial-number-improved">{laptop.serial_number || 'N/A'}</span>
                       </td>
 
-                      {/* --- Condition Column (FIXED) --- */}
                       <td>
                         <span style={{ 
                           color: getConditionColor(laptop.device_condition),
@@ -278,35 +346,8 @@ export default function LaptopInventory() {
                         </span>
                       </td>
 
-                      {/* View Button */}
-                      <td style={{ textAlign: 'center' }}>
-                         <button 
-                            onClick={() => handleViewSpecs(laptop)}
-                            style={{ 
-                              border: 'none',
-                              background: '#8b5cf615', 
-                              color: '#8b5cf6',
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.8rem',
-                              fontWeight: '500',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = '#8b5cf625'}
-                            onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf615'}
-                          >
-                            <Eye size={14} /> View
-                          </button>
-                      </td>
-
-                      {/* --- MODIFIED CELL CONTENT --- */}
                       <td className="procurement-cell-improved">{formatDate(laptop.purchase_date)}</td>
                       
-                      {/* New Warranty Date Cell (Replaces Supplier) */}
                       <td className="procurement-cell-improved" style={{ fontWeight: 500, color: '#475569' }}>
                         {formatDate(laptop.warranty_end)}
                       </td>
@@ -316,7 +357,6 @@ export default function LaptopInventory() {
                           {warrantyInfo.status}
                         </span>
                       </td>
-                      {/* ----------------------------- */}
 
                       <td className="status-cell-improved">
                         <span
@@ -329,6 +369,55 @@ export default function LaptopInventory() {
                         >
                           {laptop.status}
                         </span>
+                      </td>
+
+                      {/* --- ACTIONS COLUMN (VIEW & PRINT) --- */}
+                      <td style={{ textAlign: 'right', paddingRight: '16px' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button 
+                            onClick={() => handleViewSpecs(laptop)}
+                            title="View Details"
+                            style={{ 
+                              border: 'none',
+                              background: '#f1f5f9', 
+                              color: '#64748b',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#334155'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+                          >
+                            <Eye size={16} />
+                          </button>
+
+                          <button 
+                            onClick={() => handlePrint(laptop)}
+                            title="Print Info Sheet"
+                            style={{ 
+                              border: 'none',
+                              background: '#e0e7ff', 
+                              color: '#4f46e5',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#c7d2fe'}
+                            onMouseOut={(e) => e.currentTarget.style.background = '#e0e7ff'}
+                          >
+                            <Printer size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

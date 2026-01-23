@@ -209,6 +209,10 @@
 .btn-view { background: #f0f9ff; color: #0284c7; border-color: #bae6fd; }
 .btn-view:hover { background: #e0f2fe; }
 
+/* NEW: Print Button Style */
+.btn-print { background: #eef2ff; color: #4f46e5; border-color: #c7d2fe; }
+.btn-print:hover { background: #e0e7ff; }
+
 .btn-edit { background: #fdf4ff; color: #a21caf; border-color: #f0abfc; }
 .btn-edit:hover { background: #fae8ff; }
 

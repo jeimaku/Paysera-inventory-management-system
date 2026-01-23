@@ -662,3 +662,79 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* ==========================================================================
+   NEW: Action Buttons Styling (Print, View, Edit, Delete)
+   ========================================================================== */
+
+/* Container for action buttons */
+.admin-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Base button style */
+.action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* View Button */
+.btn-view {
+  background: #f0f9ff;
+  color: #0284c7;
+  border-color: #bae6fd;
+}
+
+.btn-view:hover {
+  background: #e0f2fe;
+  color: #0369a1;
+  transform: translateY(-1px);
+}
+
+/* Print Button */
+.btn-print {
+  background: #eef2ff;
+  color: #4f46e5;
+  border-color: #c7d2fe;
+}
+
+.btn-print:hover {
+  background: #e0e7ff;
+  color: #4338ca;
+  transform: translateY(-1px);
+}
+
+/* Edit Button */
+.btn-edit {
+  background: #fdf4ff;
+  color: #a21caf;
+  border-color: #f0abfc;
+}
+
+.btn-edit:hover {
+  background: #fae8ff;
+  color: #86198f;
+  transform: translateY(-1px);
+}
+
+/* Delete Button */
+.btn-delete {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.btn-delete:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  transform: translateY(-1px);
+}

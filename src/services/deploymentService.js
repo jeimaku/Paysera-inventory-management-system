@@ -175,6 +175,7 @@ export async function getDeploymentHistory(filters = {}) {
         device_id,
         date_issued,
         date_returned,
+        return_reason, 
         status,
         created_at,
         employees (
@@ -329,7 +330,7 @@ export async function returnDevice(employeeDeviceId, reason = '') {
       .update({ 
         status: 'returned', 
         date_returned: new Date().toISOString(),
-        return_reason: reason // <--- NEW FIELD
+        return_reason: reason 
       })
       .eq('employee_device_id', employeeDeviceId);
 

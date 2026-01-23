@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Search, HardDrive, Eye, Shield } from 'lucide-react';
+import { Search, HardDrive, Eye, Shield, Printer } from 'lucide-react';
 import { getDesktops } from '../../services/deviceService';
+import { getDeviceUsageHistory } from '../../services/deploymentService'; // <--- Import
 import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
 import '../../styles/new_modal.css'; 
 import '../../styles/read-only-inventory.css';
 
 export default function DesktopInventory() {
   const [desktops, setDesktops] = useState([]);
-  const [brandOptions, setBrandOptions] = useState([]); // Added for consistency
+  const [brandOptions, setBrandOptions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modal State
@@ -17,11 +18,10 @@ export default function DesktopInventory() {
   const [filters, setFilters] = useState({
     search: '',
     status: '',
-    brand: '', // Added Brand filter
+    brand: '', 
     device_condition: '',
   });
 
-  // Fetch unique brands for the filter (Consistent with Laptop)
   useEffect(() => {
     const fetchBrands = async () => {
       const allData = await getDesktops({}); 
@@ -40,15 +40,10 @@ export default function DesktopInventory() {
   const loadDesktops = async () => {
     setLoading(true);
     try {
-      // Note: Ensure your getDesktops service handles the 'brand' filter if you want it to work server-side.
-      // If client-side filtering is needed for brands on desktops, let me know.
       const data = await getDesktops(filters);
-      
-      // If the API doesn't filter by system_manufacturer (brand) yet, we can filter here:
       const filteredData = filters.brand 
         ? data.filter(d => d.system_manufacturer === filters.brand)
         : data;
-
       setDesktops(filteredData);
     } catch (error) {
       console.error('Error loading desktops:', error);
@@ -62,7 +57,77 @@ export default function DesktopInventory() {
     setIsModalOpen(true);
   };
 
-  // --- Helpers ---
+  // --- PRINT FUNCTIONALITY ---
+  const handlePrint = async (desktop) => {
+    try {
+      const history = await getDeviceUsageHistory('DESKTOP', desktop.desktop_id);
+      const activeDeployment = history.find(h => h.status === 'in_use');
+
+      const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
+      const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
+      const warrantyDate = desktop.warranty_end ? new Date(desktop.warranty_end).toLocaleDateString() : 'No Warranty Date';
+      const specs = `CPU: ${desktop.processor || 'Unknown'} | GPU: ${desktop.graphics_card || 'Integrated'}`;
+
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Device Info Sheet - ${desktop.asset_id}</title>
+            <style>
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; }
+              .header { border-bottom: 2px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
+              .header h1 { margin: 0; color: #1e293b; font-size: 24px; }
+              .section { margin-bottom: 30px; }
+              .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+              .field { margin-bottom: 15px; }
+              .label { font-size: 12px; color: #64748b; display: block; margin-bottom: 4px; }
+              .value { font-size: 16px; font-weight: 500; color: #0f172a; }
+              .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; }
+              .footer { margin-top: 50px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Desktop Information Sheet</h1>
+              <p>Asset ID: <strong>${desktop.asset_id}</strong></p>
+            </div>
+            <div class="section">
+              <div class="section-title">Current Assignment</div>
+              <div class="grid">
+                <div class="field"><span class="label">Assigned Employee</span><span class="value">${employeeName}</span></div>
+                <div class="field"><span class="label">Department</span><span class="value">${department}</span></div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">System Specifications</div>
+              <div class="grid">
+                <div class="field"><span class="label">Processor</span><span class="value">${desktop.processor || 'N/A'}</span></div>
+                <div class="field"><span class="label">Graphics</span><span class="value">${desktop.graphics_card || 'Integrated'}</span></div>
+                <div class="field"><span class="label">Serial Number</span><span class="value">${desktop.serial_number || 'N/A'}</span></div>
+                <div class="field"><span class="label">Supplier</span><span class="value">${desktop.supplier || 'N/A'}</span></div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">Status & Warranty</div>
+              <div class="grid">
+                <div class="field"><span class="label">Current Status</span><span class="value"><span class="badge">${desktop.status?.toUpperCase()}</span></span></div>
+                <div class="field"><span class="label">Warranty Expiry</span><span class="value">${warrantyDate}</span></div>
+              </div>
+            </div>
+            <div class="footer">Printed on ${new Date().toLocaleDateString()}</div>
+            <script>window.onload = function() { window.print(); }</script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (error) {
+      console.error("Error generating print:", error);
+      alert("Failed to generate print preview.");
+    }
+  };
+
   const getConditionColor = (condition) => {
     switch (condition?.toLowerCase()) {
       case 'brand_new': return '#0284c7';
@@ -91,15 +156,12 @@ export default function DesktopInventory() {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+      month: 'short', day: 'numeric', year: 'numeric',
     });
   };
 
   const getWarrantyStatus = (warrantyEnd) => {
     if (!warrantyEnd) return { status: 'Unknown', color: '#6b7280' };
-    
     const endDate = new Date(warrantyEnd);
     const today = new Date();
     const daysLeft = Math.floor((endDate - today) / (1000 * 60 * 60 * 24));
@@ -169,9 +231,7 @@ export default function DesktopInventory() {
               type="text"
               placeholder="Search by asset ID, manufacturer, or model..."
               value={filters.search}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, search: e.target.value }))
-              }
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
             />
           </div>
         </div>
@@ -180,9 +240,7 @@ export default function DesktopInventory() {
           <select
             className="filter-select-improved"
             value={filters.status}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, status: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
           >
             <option value="">All Status</option>
             <option value="available">Available</option>
@@ -190,13 +248,10 @@ export default function DesktopInventory() {
             <option value="defective">Defective</option>
           </select>
 
-          {/* Added Brand Filter for Consistency */}
           <select
             className="filter-select-improved"
             value={filters.brand}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, brand: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, brand: e.target.value }))}
           >
             <option value="">All Manufacturers</option>
             {brandOptions.map((brand) => (
@@ -209,9 +264,7 @@ export default function DesktopInventory() {
           <select
             className="filter-select-improved"
             value={filters.device_condition}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, device_condition: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, device_condition: e.target.value }))}
           >
             <option value="">All Conditions</option>
             <option value="brand_new">Brand New</option>
@@ -239,15 +292,12 @@ export default function DesktopInventory() {
                   <th className="col-asset">Asset ID</th>
                   <th className="col-brand">Brand/Model</th>
                   <th className="col-serial">Serial No.</th>
-                  
-                  {/* Layout Consistent with Laptop Inventory */}
                   <th style={{ width: '120px' }}>Condition</th>
-                  <th style={{ width: '100px', textAlign: 'center' }}>Details</th>
-                  
                   <th className="col-procurement">Supplier</th>
                   <th className="col-procurement">Purchase Date</th>
                   <th className="col-warranty">Warranty</th>
                   <th className="col-status">Status</th>
+                  <th style={{ width: '140px', textAlign: 'right', paddingRight: '24px' }}>Actions</th> {/* NEW COLUMN */}
                 </tr>
               </thead>
               <tbody>
@@ -255,12 +305,9 @@ export default function DesktopInventory() {
                   const warrantyInfo = getWarrantyStatus(desktop.warranty_end);
                   return (
                     <tr key={desktop.desktop_id} className="table-row-improved">
-                      {/* Asset ID */}
                       <td className="asset-cell-improved">
                         <span className="asset-id-improved">{desktop.asset_id}</span>
                       </td>
-
-                      {/* Brand & Model (Mapped from System Manufacturer & Model) */}
                       <td className="brand-cell-improved">
                         <div className="brand-info">
                           <strong className="brand-name-improved">
@@ -271,15 +318,11 @@ export default function DesktopInventory() {
                           </span>
                         </div>
                       </td>
-
-                      {/* Serial Number */}
                       <td className="serial-cell-improved">
                         <span className="serial-number-improved">
                           {desktop.serial_number || 'N/A'}
                         </span>
                       </td>
-
-                      {/* Condition Badge */}
                       <td>
                         <span style={{ 
                           color: getConditionColor(desktop.device_condition),
@@ -293,33 +336,6 @@ export default function DesktopInventory() {
                           {getConditionText(desktop.device_condition)}
                         </span>
                       </td>
-
-                      {/* View Button */}
-                      <td style={{ textAlign: 'center' }}>
-                         <button 
-                            onClick={() => handleViewSpecs(desktop)}
-                            style={{ 
-                              border: 'none',
-                              background: '#8b5cf615', 
-                              color: '#8b5cf6',
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.8rem',
-                              fontWeight: '500',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = '#8b5cf625'}
-                            onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf615'}
-                          >
-                            <Eye size={14} /> View
-                          </button>
-                      </td>
-
-                      {/* Procurement Columns (Restored for Consistency) */}
                       <td className="procurement-cell-improved">{desktop.supplier || 'N/A'}</td>
                       <td className="procurement-cell-improved">{formatDate(desktop.purchase_date)}</td>
                       <td className="warranty-cell-improved">
@@ -327,8 +343,6 @@ export default function DesktopInventory() {
                           {warrantyInfo.status}
                         </span>
                       </td>
-
-                      {/* Status */}
                       <td className="status-cell-improved">
                         <span
                           className="status-badge-improved"
@@ -340,6 +354,55 @@ export default function DesktopInventory() {
                         >
                           {desktop.status}
                         </span>
+                      </td>
+
+                      {/* --- ACTIONS COLUMN --- */}
+                      <td style={{ textAlign: 'right', paddingRight: '16px' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button 
+                            onClick={() => handleViewSpecs(desktop)}
+                            title="View Details"
+                            style={{ 
+                              border: 'none',
+                              background: '#f1f5f9', 
+                              color: '#64748b',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#334155'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+                          >
+                            <Eye size={16} />
+                          </button>
+
+                          <button 
+                            onClick={() => handlePrint(desktop)}
+                            title="Print Info Sheet"
+                            style={{ 
+                              border: 'none',
+                              background: '#e0e7ff', 
+                              color: '#4f46e5',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#c7d2fe'}
+                            onMouseOut={(e) => e.currentTarget.style.background = '#e0e7ff'}
+                          >
+                            <Printer size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Search, Monitor as MonitorIcon, Eye, Shield } from 'lucide-react';
+import { Search, Monitor as MonitorIcon, Eye, Shield, Printer } from 'lucide-react';
 import { getMonitors } from '../../services/deviceService';
+import { getDeviceUsageHistory } from '../../services/deploymentService'; // <--- Import
 import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
 import '../../styles/new_modal.css'; 
 import '../../styles/read-only-inventory.css';
@@ -17,10 +18,9 @@ export default function MonitorInventory() {
     search: '',
     status: '',
     brand: '',
-    device_condition: '', // Added Condition
+    device_condition: '',
   });
 
-  // Get unique brands for filter
   const brands = [...new Set(monitors.map((m) => m.brand).filter(Boolean))];
 
   useEffect(() => {
@@ -44,7 +44,81 @@ export default function MonitorInventory() {
     setIsModalOpen(true);
   };
 
-  // --- Helpers ---
+  // --- PRINT FUNCTIONALITY ---
+  const handlePrint = async (monitor) => {
+    try {
+      const history = await getDeviceUsageHistory('MONITOR', monitor.monitor_id);
+      const activeDeployment = history.find(h => h.status === 'in_use');
+
+      const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
+      const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
+      const warrantyDate = monitor.warranty_end ? new Date(monitor.warranty_end).toLocaleDateString() : 'No Warranty Date';
+      
+      const sizeInfo = monitor.size_inches ? `${monitor.size_inches}" Display` : 'Unknown Size';
+      const resInfo = monitor.resolution ? `(${monitor.resolution})` : '';
+      const typeInfo = monitor.screen_type || '';
+      const refreshInfo = monitor.refresh_rate ? `${monitor.refresh_rate}` : '';
+      const specs = `${sizeInfo} ${resInfo} | ${typeInfo} ${refreshInfo}`.trim().replace('|  ', '');
+
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Device Info Sheet - ${monitor.asset_id}</title>
+            <style>
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; }
+              .header { border-bottom: 2px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
+              .header h1 { margin: 0; color: #1e293b; font-size: 24px; }
+              .section { margin-bottom: 30px; }
+              .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+              .field { margin-bottom: 15px; }
+              .label { font-size: 12px; color: #64748b; display: block; margin-bottom: 4px; }
+              .value { font-size: 16px; font-weight: 500; color: #0f172a; }
+              .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; }
+              .footer { margin-top: 50px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Monitor Information Sheet</h1>
+              <p>Asset ID: <strong>${monitor.asset_id}</strong></p>
+            </div>
+            <div class="section">
+              <div class="section-title">Current Assignment</div>
+              <div class="grid">
+                <div class="field"><span class="label">Assigned Employee</span><span class="value">${employeeName}</span></div>
+                <div class="field"><span class="label">Department</span><span class="value">${department}</span></div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">Display Specifications</div>
+              <div class="grid">
+                <div class="field"><span class="label">Model</span><span class="value">${monitor.brand} ${monitor.model}</span></div>
+                <div class="field"><span class="label">Serial Number</span><span class="value">${monitor.serial_number || 'N/A'}</span></div>
+                <div class="field" style="grid-column: span 2;"><span class="label">Technical Specs</span><span class="value">${specs}</span></div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-title">Status & Warranty</div>
+              <div class="grid">
+                <div class="field"><span class="label">Current Status</span><span class="value"><span class="badge">${monitor.status?.toUpperCase()}</span></span></div>
+                <div class="field"><span class="label">Warranty Expiry</span><span class="value">${warrantyDate}</span></div>
+              </div>
+            </div>
+            <div class="footer">Printed on ${new Date().toLocaleDateString()}</div>
+            <script>window.onload = function() { window.print(); }</script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (error) {
+      console.error("Error generating print:", error);
+      alert("Failed to generate print preview.");
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'available': return '#10b981';
@@ -73,15 +147,12 @@ export default function MonitorInventory() {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+      month: 'short', day: 'numeric', year: 'numeric',
     });
   };
 
   const getWarrantyStatus = (warrantyEnd) => {
     if (!warrantyEnd) return { status: 'Unknown', color: '#6b7280' };
-    
     const endDate = new Date(warrantyEnd);
     const today = new Date();
     const daysLeft = Math.floor((endDate - today) / (1000 * 60 * 60 * 24));
@@ -114,9 +185,7 @@ export default function MonitorInventory() {
       {/* Stats Section */}
       <div className="inventory-stats-improved">
         <div className="stat-card-improved primary">
-          <div className="stat-icon-improved">
-            <MonitorIcon size={20} />
-          </div>
+          <div className="stat-icon-improved"><MonitorIcon size={20} /></div>
           <div className="stat-content-improved">
             <span className="stat-value-improved">{monitors.length}</span>
             <span className="stat-label-improved">Total Monitors</span>
@@ -129,7 +198,6 @@ export default function MonitorInventory() {
           </div>
         </div>
         
-        {/* Condition Stats */}
         <div className="stat-card-improved" style={{ borderLeft: '4px solid #0284c7' }}>
           <div className="stat-content-improved">
             <span className="stat-value-improved" style={{ color: '#0284c7' }}>
@@ -156,9 +224,7 @@ export default function MonitorInventory() {
               type="text"
               placeholder="Search by asset ID, brand, model, or serial number..."
               value={filters.search}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, search: e.target.value }))
-              }
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
             />
           </div>
         </div>
@@ -167,9 +233,7 @@ export default function MonitorInventory() {
           <select
             className="filter-select-improved"
             value={filters.status}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, status: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
           >
             <option value="">All Status</option>
             <option value="available">Available</option>
@@ -180,9 +244,7 @@ export default function MonitorInventory() {
           <select
             className="filter-select-improved"
             value={filters.brand}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, brand: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, brand: e.target.value }))}
           >
             <option value="">All Brands</option>
             {brands.map((brand) => (
@@ -195,9 +257,7 @@ export default function MonitorInventory() {
           <select
             className="filter-select-improved"
             value={filters.device_condition}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, device_condition: e.target.value }))
-            }
+            onChange={(e) => setFilters((prev) => ({ ...prev, device_condition: e.target.value }))}
           >
             <option value="">All Conditions</option>
             <option value="brand_new">Brand New</option>
@@ -225,15 +285,12 @@ export default function MonitorInventory() {
                   <th className="col-asset">Asset ID</th>
                   <th className="col-brand">Brand/Model</th>
                   <th className="col-serial">Serial No.</th>
-                  
-                  {/* Standardized Layout */}
                   <th style={{ width: '120px' }}>Condition</th>
-                  <th style={{ width: '100px', textAlign: 'center' }}>Details</th>
-                  
                   <th className="col-procurement">Supplier</th>
                   <th className="col-procurement">Purchase Date</th>
                   <th className="col-warranty">Warranty</th>
                   <th className="col-status">Status</th>
+                  <th style={{ width: '140px', textAlign: 'right', paddingRight: '24px' }}>Actions</th> {/* NEW COLUMN */}
                 </tr>
               </thead>
               <tbody>
@@ -244,8 +301,6 @@ export default function MonitorInventory() {
                       <td className="asset-cell-improved">
                         <span className="asset-id-improved">{monitor.asset_id}</span>
                       </td>
-                      
-                      {/* Merged Brand & Model */}
                       <td className="brand-cell-improved">
                         <div className="brand-info">
                           <strong className="brand-name-improved">{monitor.brand}</strong>
@@ -254,14 +309,11 @@ export default function MonitorInventory() {
                           </span>
                         </div>
                       </td>
-                      
                       <td className="serial-cell-improved">
                         <span className="serial-number-improved">
                           {monitor.serial_number || 'N/A'}
                         </span>
                       </td>
-
-                      {/* Condition Badge */}
                       <td>
                         <span style={{ 
                           color: getConditionColor(monitor.device_condition),
@@ -275,45 +327,13 @@ export default function MonitorInventory() {
                           {getConditionText(monitor.device_condition)}
                         </span>
                       </td>
-
-                      {/* View Button */}
-                      <td style={{ textAlign: 'center' }}>
-                         <button 
-                            onClick={() => handleViewSpecs(monitor)}
-                            style={{ 
-                              border: 'none',
-                              background: '#8b5cf615', 
-                              color: '#8b5cf6',
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.8rem',
-                              fontWeight: '500',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = '#8b5cf625'}
-                            onMouseOut={(e) => e.currentTarget.style.background = '#8b5cf615'}
-                          >
-                            <Eye size={14} /> View
-                          </button>
-                      </td>
-
-                      {/* Procurement Columns */}
-                      <td className="procurement-cell-improved">
-                        {monitor.supplier || 'N/A'}
-                      </td>
-                      <td className="procurement-cell-improved">
-                        {formatDate(monitor.purchase_date)}
-                      </td>
+                      <td className="procurement-cell-improved">{monitor.supplier || 'N/A'}</td>
+                      <td className="procurement-cell-improved">{formatDate(monitor.purchase_date)}</td>
                       <td className="warranty-cell-improved">
                         <span className="warranty-status-improved" style={{ color: warrantyInfo.color }}>
                           {warrantyInfo.status}
                         </span>
                       </td>
-
                       <td className="status-cell-improved">
                         <span
                           className="status-badge-improved"
@@ -326,6 +346,55 @@ export default function MonitorInventory() {
                           {monitor.status}
                         </span>
                       </td>
+
+                      {/* --- ACTIONS COLUMN --- */}
+                      <td style={{ textAlign: 'right', paddingRight: '16px' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button 
+                            onClick={() => handleViewSpecs(monitor)}
+                            title="View Details"
+                            style={{ 
+                              border: 'none',
+                              background: '#f1f5f9', 
+                              color: '#64748b',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#334155'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+                          >
+                            <Eye size={16} />
+                          </button>
+
+                          <button 
+                            onClick={() => handlePrint(monitor)}
+                            title="Print Info Sheet"
+                            style={{ 
+                              border: 'none',
+                              background: '#e0e7ff', 
+                              color: '#4f46e5',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#c7d2fe'}
+                            onMouseOut={(e) => e.currentTarget.style.background = '#e0e7ff'}
+                          >
+                            <Printer size={16} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -335,7 +404,6 @@ export default function MonitorInventory() {
         )}
       </div>
       
-      {/* Modal Injection */}
       <NewSpecsModal_IT 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
