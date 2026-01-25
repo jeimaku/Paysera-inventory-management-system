@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import ITSidebar from './ITSidebar';
-import '../../styles/sidebar.css';
+import '../../styles/it-sidebar.css';
 
 export default function ITLayout() {
   return (

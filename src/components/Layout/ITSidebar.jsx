@@ -13,11 +13,11 @@ import {
   RotateCcw,
   LogOut,
   Menu,
-  X,
+  ChevronLeft, // Added for mobile close visual
   Wrench,
 } from 'lucide-react';
 import { supabase } from '../../supabase/client';
-import '../../styles/sidebar.css';
+import '../../styles/it-sidebar.css';
 
 export default function ITSidebar() {
   const navigate = useNavigate();
@@ -94,7 +94,7 @@ export default function ITSidebar() {
       items: [
         {
           title: 'Repair History',
-          icon: Wrench, // You'll need to import Wrench from lucide-react
+          icon: Wrench,
           path: '/it/repairs',
           exact: true,
         },
@@ -104,7 +104,17 @@ export default function ITSidebar() {
 
   const handleNavigation = (path) => {
     navigate(path);
-    setIsMobileOpen(false);
+    // Close sidebar on mobile when a link is clicked
+    if (window.innerWidth <= 1024) {
+      setIsMobileOpen(false);
+    }
+  };
+
+  const isActive = (path, exact = false) => {
+    if (exact) {
+      return location.pathname === path;
+    }
+    return location.pathname.startsWith(path);
   };
 
   const handleLogout = async () => {
@@ -112,56 +122,50 @@ export default function ITSidebar() {
     navigate('/');
   };
 
-  const isActive = (path, exact) => {
-    if (exact) {
-      return location.pathname === path;
+  // --- NEW: Unified Toggle Handler ---
+  const handleToggle = () => {
+    if (window.innerWidth <= 1024) {
+      setIsMobileOpen(false); // Close on mobile
+    } else {
+      setIsCollapsed(!isCollapsed); // Collapse on desktop
     }
-    return location.pathname === path;
   };
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <button
-        className="mobile-menu-btn"
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-      >
-        {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
-
       {/* Mobile Overlay */}
-      {isMobileOpen && (
-        <div
-          className="mobile-overlay"
-          onClick={() => setIsMobileOpen(false)}
-        />
+      <div 
+        className={`mobile-overlay ${isMobileOpen ? 'show' : ''}`}
+        onClick={() => setIsMobileOpen(false)}
+      />
+
+      {/* Mobile Floating Button - Hides when sidebar is open */}
+      {!isMobileOpen && (
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setIsMobileOpen(true)}
+        >
+          <Menu size={24} />
+        </button>
       )}
 
-      {/* Sidebar */}
-      <aside
-        className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${
-          isMobileOpen ? 'mobile-open' : ''
-        }`}
-      >
-        {/* Logo Section */}
+      <aside className={`sidebar it-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
+        
+        {/* Sidebar Header */}
         <div className="sidebar-header">
-          <div className="logo">
-            <div className="logo-icon">
-              <Laptop size={24} />
-            </div>
-            {!isCollapsed && (
-              <div className="logo-text">
-                <h3>Paysera IT</h3>
-                <p>Control Panel</p>
+          {!isCollapsed && (
+            <div className="logo">
+              <div className="logo-icon">
+                <ClipboardList size={24} />
               </div>
-            )}
-          </div>
-          <button
-            className="collapse-btn desktop-only"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            title={isCollapsed ? 'Expand' : 'Collapse'}
-          >
-            <Menu size={20} />
+              <span className="logo-text">IT Portal</span>
+            </div>
+          )}
+          
+          {/* Internal Toggle/Close Button */}
+          <button className="toggle-btn" onClick={handleToggle}>
+             {/* Show ChevronLeft (Back arrow) on mobile to indicate closing, otherwise Menu */}
+             {window.innerWidth <= 1024 ? <ChevronLeft size={20} /> : <Menu size={20} />}
           </button>
         </div>
 

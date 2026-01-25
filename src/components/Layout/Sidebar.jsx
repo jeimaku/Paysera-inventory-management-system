@@ -11,13 +11,13 @@ import {
   Database,
   LogOut,
   Menu,
-  X,
+  ChevronLeft, // Added ChevronLeft for better "Close" visual on mobile
   UserCog,
   Wrench,
   UserPlus,
 } from 'lucide-react';
 import { supabase } from '../../supabase/client';
-import '../../styles/sidebar.css';
+import '../../styles/admin-sidebar.css';
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -45,13 +45,11 @@ export default function Sidebar() {
           icon: Users,
           path: '/admin/employees',
         },
-        // --- ADD THIS BLOCK ---
         {
           title: 'System Users',
           icon: UserPlus,
           path: '/admin/users',
         },
-        // ----------------------
         {
           title: 'Employee Devices',
           icon: UserCog,
@@ -94,21 +92,21 @@ export default function Sidebar() {
         },
       ],
     },
-    // {
-    //   section: 'Settings',
-    //   items: [
-    //     {
-    //       title: 'Database',
-    //       icon: Database,
-    //       path: '/admin/database',
-    //     },
-    //   ],
-    // },
   ];
 
   const handleNavigation = (path) => {
     navigate(path);
-    setIsMobileOpen(false);
+    // Close sidebar on mobile when a link is clicked
+    if (window.innerWidth <= 1024) {
+      setIsMobileOpen(false);
+    }
+  };
+
+  const isActive = (path, exact = false) => {
+    if (exact) {
+      return location.pathname === path;
+    }
+    return location.pathname.startsWith(path);
   };
 
   const handleLogout = async () => {
@@ -116,56 +114,57 @@ export default function Sidebar() {
     navigate('/');
   };
 
-  const isActive = (path, exact) => {
-    if (exact) {
-      return location.pathname === path;
+  // --- NEW: Unified Toggle Handler ---
+  const handleToggle = () => {
+    if (window.innerWidth <= 1024) {
+      // On mobile, this button closes the sidebar
+      setIsMobileOpen(false);
+    } else {
+      // On desktop, this button collapses/expands the sidebar
+      setIsCollapsed(!isCollapsed);
     }
-    return location.pathname.startsWith(path);
   };
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <button
-        className="mobile-menu-btn"
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-      >
-        {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
+      {/* Mobile Overlay - Closes sidebar when clicked */}
+      <div 
+        className={`mobile-overlay ${isMobileOpen ? 'show' : ''}`}
+        onClick={() => setIsMobileOpen(false)}
+      />
 
-      {/* Mobile Overlay */}
-      {isMobileOpen && (
-        <div
-          className="mobile-overlay"
-          onClick={() => setIsMobileOpen(false)}
-        />
+      {/* Mobile Floating Button 
+         LOGIC CHANGE: Only render this button if the sidebar is NOT open.
+         Once opened, this button disappears.
+      */}
+      {!isMobileOpen && (
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setIsMobileOpen(true)}
+        >
+          <Menu size={24} />
+        </button>
       )}
 
-      {/* Sidebar */}
-      <aside
-        className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${
-          isMobileOpen ? 'mobile-open' : ''
-        }`}
-      >
-        {/* Logo Section */}
+      <aside className={`sidebar admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
+        
+        {/* Sidebar Header */}
         <div className="sidebar-header">
-          <div className="logo">
-            <div className="logo-icon">
-              <Laptop size={24} />
-            </div>
-            {!isCollapsed && (
-              <div className="logo-text">
-                <h3>Paysera</h3>
-                <p>Inventory System</p>
+          {!isCollapsed && (
+            <div className="logo">
+              <div className="logo-icon">
+                <Laptop size={24} />
               </div>
-            )}
-          </div>
-          <button
-            className="collapse-btn desktop-only"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            title={isCollapsed ? 'Expand' : 'Collapse'}
-          >
-            <Menu size={20} />
+              <span className="logo-text">Admin Panel</span>
+            </div>
+          )}
+          {/* Internal Toggle Button 
+             - Acts as "Collapse" on Desktop
+             - Acts as "Close" on Mobile
+          */}
+          <button className="toggle-btn" onClick={handleToggle}>
+            {/* Show ChevronLeft (Back arrow) on mobile to indicate closing, otherwise Menu */}
+            {window.innerWidth <= 1024 ? <ChevronLeft size={20} /> : <Menu size={20} />}
           </button>
         </div>
 
