@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase/client';
 import { getUserRole } from '../../auth/getUserRole';
+import { sessionManager } from '../../auth/SessionManager';
 import { useNavigate } from 'react-router-dom';
 
 export default function LoginForm() {
@@ -10,86 +11,90 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (sessionManager.isValid()) {
+       const role = sessionManager.getCurrentRole();
+       const routes = { 'ADMIN': '/admin', 'IT': '/it', 'EMPLOYEE': '/employee' };
+       if (routes[role]) navigate(routes[role], { replace: true });
+    }
+  }, [navigate]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const { data, error: authError } =
-      await supabase.auth.signInWithPassword({
-        email,
+    try {
+      // 1. Supabase Auth
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.toLowerCase().trim(),
         password,
       });
 
-    if (authError) {
-      setError('Invalid login credentials');
-      setLoading(false);
-      return;
+      if (authError) throw authError;
+
+      // 2. Get User Role
+      const role = await getUserRole(data.user.email);
+      if (!role) throw new Error('Role not found for user');
+
+      // 3. Initialize Session Manager
+      const sessionResult = sessionManager.initializeSession(data.user.email, role);
+      if (!sessionResult.success) throw new Error(sessionResult.error);
+
+      console.log(`✅ Login success: ${role}`);
+
+      // 4. Navigate (Delay prevents race conditions)
+      setTimeout(() => {
+        const routes = { 'ADMIN': '/admin', 'IT': '/it', 'EMPLOYEE': '/employee' };
+        navigate(routes[role] || '/admin', { replace: true });
+      }, 500);
+      
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed');
+      sessionManager.clearSession(); // Clean up if failed
+      await supabase.auth.signOut();
+      setLoading(false); 
     }
-
-    const role = await getUserRole(data.user.email);
-
-    if (!role) {
-      setError('Account role not found');
-      setLoading(false);
-      return;
-    }
-
-    // 🔐 ROLE-BASED REDIRECT
-    if (role === 'ADMIN') navigate('/admin');
-    else if (role === 'IT') navigate('/it');
-    else navigate('/employee');
-
-    setLoading(false);
   };
 
   return (
     <form className="login-card" onSubmit={handleLogin}>
-      <div className="login-icon"></div>
-      
-      <h2>Inventory Management System</h2>
+      {/* Icon removed as requested */}
+      <h2>Inventory System</h2>
 
       <div className="form-group">
-        <label htmlFor="email">Email Address</label>
+        <label>Email Address</label>
         <input
-          id="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your email"
           required
-          autoComplete="email"
+          disabled={loading}
+          placeholder="Enter your email"
         />
       </div>
 
       <div className="form-group">
-        <label htmlFor="password">Password</label>
+        <label>Password</label>
         <input
-          id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Enter your password"
           required
-          autoComplete="current-password"
+          disabled={loading}
+          placeholder="Enter your password"
         />
       </div>
 
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+      {error && <div className="error-message">{error}</div>}
 
-      <button 
-        type="submit" 
-        className={`login-button ${loading ? 'loading' : ''}`}
-        disabled={loading}
-      >
+      <button type="submit" className={`login-button ${loading ? 'loading' : ''}`} disabled={loading}>
         {loading ? (
           <>
-            <span className="loading-spinner"></span>
-            <span className="loading-text">Signing in...</span>
+            <div className="loading-spinner"></div>
+            <span>Signing in...</span>
           </>
         ) : (
           'Sign In'

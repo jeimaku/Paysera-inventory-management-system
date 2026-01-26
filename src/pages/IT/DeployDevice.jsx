@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Package, User, Laptop, Monitor, Check } from 'lucide-react';
+import { Package, User, Laptop, Monitor, Check, Users, HardDrive, Building2, Zap } from 'lucide-react';
 import {
   getEmployeesForDeployment,
   getAvailableDevices,
   getAvailableMonitors,
   deployDevice
 } from '../../services/deploymentService';
-import '../../styles/deployment.css';
+import '../../styles/it-deployment.css';
 
 export default function DeployDevice() {
   const [employees, setEmployees] = useState([]);
@@ -108,119 +108,223 @@ export default function DeployDevice() {
   const selectedEmployee = employees.find(emp => emp.employee_id === deploymentForm.employeeId);
   const selectedDevice = devices.find(device => device.device_id === deploymentForm.deviceId);
 
+  // Calculate statistics
+  const availableStats = {
+    employees: employees.length,
+    laptops: devices.filter(d => d.device_type === 'LAPTOP').length,
+    desktops: devices.filter(d => d.device_type === 'DESKTOP').length,
+    monitors: monitors.length
+  };
+
   if (loading) {
     return (
-      <div className="inventory-container">
-        <div className="loading">Loading deployment data...</div>
+      <div className="it-deployment-container">
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <span>Loading deployment data...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="inventory-container">
-      <header className="inventory-header">
-        <div className="header-title">
-          <Package size={32} className="header-icon" />
-          <div>
-            <h1>Deploy Device</h1>
-            <p className="subtitle">Assign devices to employees</p>
-          </div>
+    <div className="it-deployment-container">
+      
+      {/* Header Card - Matches Admin Design */}
+      <div className="it-header-card">
+        <div className="header-title-group">
+          <h1>Deploy Device</h1>
+          <div className="header-meta">Assign devices to employees quickly and efficiently</div>
         </div>
-      </header>
+        <div className="header-badge">
+          <Zap size={16} />
+          <span>IT Operations</span>
+        </div>
+      </div>
 
-      <div className="deployment-form-card">
-        <div className="deployment-steps">
+      {/* Info Banner - IT-specific guidance */}
+      <div className="it-info-banner">
+        <Building2 className="info-banner-icon" size={20} />
+        <div className="info-banner-content">
+          <h4>IT Role: Device Deployment & Assignment</h4>
+          <p>
+            Use this interface to assign laptops, desktops, and monitors to active employees. 
+            Complete all steps to ensure proper device tracking and inventory management.
+            <strong> Administrative oversight</strong> is available through the admin portal for deployment management.
+          </p>
+        </div>
+      </div>
+
+      {/* Statistics Cards - Green themed */}
+      <div className="it-stats-grid">
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <Users size={20} />
+            <span>Active Employees</span>
+          </div>
+          <div className="stat-value">{availableStats.employees}</div>
+        </div>
+        
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <Laptop size={20} />
+            <span>Available Laptops</span>
+          </div>
+          <div className="stat-value laptops">{availableStats.laptops}</div>
+        </div>
+
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <HardDrive size={20} />
+            <span>Available Desktops</span>
+          </div>
+          <div className="stat-value desktops">{availableStats.desktops}</div>
+        </div>
+
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <Monitor size={20} />
+            <span>Available Monitors</span>
+          </div>
+          <div className="stat-value monitors">{availableStats.monitors}</div>
+        </div>
+      </div>
+
+      {/* Deployment Form - Redesigned to match admin style */}
+      <div className="it-deployment-card">
+        <div className="deployment-header">
+          <h3>Device Assignment Workflow</h3>
+          <p>Follow the steps below to deploy a device to an employee</p>
+        </div>
+
+        <div className="deployment-workflow">
           
           {/* Step 1: Select Employee */}
-          <div className="deployment-step">
-            <div className="step-header">
-              <User size={20} />
-              <h3>Step 1: Select Employee</h3>
+          <div className="workflow-step">
+            <div className="step-indicator">
+              <div className="step-number active">1</div>
+              <div className="step-line"></div>
             </div>
-            <select 
-              value={deploymentForm.employeeId}
-              onChange={(e) => handleFormChange('employeeId', e.target.value)}
-              className="form-select"
-            >
-              <option value="">Choose an employee...</option>
-              {employees.map(employee => (
-                <option key={employee.employee_id} value={employee.employee_id}>
-                  {employee.full_name} ({employee.employee_code}) - {employee.departments?.department_name}
-                </option>
-              ))}
-            </select>
+            <div className="step-content">
+              <div className="step-header">
+                <User size={20} />
+                <h4>Select Employee</h4>
+              </div>
+              <select 
+                value={deploymentForm.employeeId}
+                onChange={(e) => handleFormChange('employeeId', e.target.value)}
+                className="it-form-select"
+              >
+                <option value="">Choose an employee...</option>
+                {employees.map(employee => (
+                  <option key={employee.employee_id} value={employee.employee_id}>
+                    {employee.full_name} ({employee.employee_code}) - {employee.departments?.department_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Step 2: Select Device Type */}
-          <div className="deployment-step">
-            <div className="step-header">
-              <Laptop size={20} />
-              <h3>Step 2: Select Device Type</h3>
+          <div className="workflow-step">
+            <div className="step-indicator">
+              <div className={`step-number ${deploymentForm.employeeId ? 'active' : ''}`}>2</div>
+              <div className="step-line"></div>
             </div>
-            <div className="device-type-options">
-              <label className="device-type-option">
-                <input 
-                  type="radio" 
-                  value="LAPTOP" 
-                  checked={deploymentForm.deviceType === 'LAPTOP'}
-                  onChange={(e) => handleFormChange('deviceType', e.target.value)}
-                />
-                <span>Laptop</span>
-              </label>
-              <label className="device-type-option">
-                <input 
-                  type="radio" 
-                  value="DESKTOP" 
-                  checked={deploymentForm.deviceType === 'DESKTOP'}
-                  onChange={(e) => handleFormChange('deviceType', e.target.value)}
-                />
-                <span>Desktop</span>
-              </label>
+            <div className="step-content">
+              <div className="step-header">
+                <Package size={20} />
+                <h4>Select Device Type</h4>
+              </div>
+              <div className="device-type-grid">
+                <label className={`device-type-card ${deploymentForm.deviceType === 'LAPTOP' ? 'selected' : ''}`}>
+                  <input 
+                    type="radio" 
+                    value="LAPTOP" 
+                    checked={deploymentForm.deviceType === 'LAPTOP'}
+                    onChange={(e) => handleFormChange('deviceType', e.target.value)}
+                  />
+                  <Laptop size={24} />
+                  <span>Laptop</span>
+                  <div className="device-count">{devices.filter(d => d.device_type === 'LAPTOP').length} available</div>
+                </label>
+                <label className={`device-type-card ${deploymentForm.deviceType === 'DESKTOP' ? 'selected' : ''}`}>
+                  <input 
+                    type="radio" 
+                    value="DESKTOP" 
+                    checked={deploymentForm.deviceType === 'DESKTOP'}
+                    onChange={(e) => handleFormChange('deviceType', e.target.value)}
+                  />
+                  <HardDrive size={24} />
+                  <span>Desktop</span>
+                  <div className="device-count">{devices.filter(d => d.device_type === 'DESKTOP').length} available</div>
+                </label>
+              </div>
             </div>
           </div>
 
           {/* Step 3: Select Device */}
-          <div className="deployment-step">
-            <div className="step-header">
-              <Package size={20} />
-              <h3>Step 3: Select Device</h3>
+          <div className="workflow-step">
+            <div className="step-indicator">
+              <div className={`step-number ${deploymentForm.deviceType ? 'active' : ''}`}>3</div>
+              <div className="step-line"></div>
             </div>
-            <select 
-              value={deploymentForm.deviceId}
-              onChange={(e) => handleFormChange('deviceId', e.target.value)}
-              className="form-select"
-              disabled={!deploymentForm.deviceType}
-            >
-              <option value="">Choose a {deploymentForm.deviceType.toLowerCase()}...</option>
-              {devices.map(device => (
-                <option key={device.device_id} value={device.device_id}>
-                  {device.display_name}
-                </option>
-              ))}
-            </select>
+            <div className="step-content">
+              <div className="step-header">
+                <Package size={20} />
+                <h4>Select Specific Device</h4>
+              </div>
+              <select 
+                value={deploymentForm.deviceId}
+                onChange={(e) => handleFormChange('deviceId', e.target.value)}
+                className="it-form-select"
+                disabled={!deploymentForm.deviceType}
+              >
+                <option value="">Choose a {deploymentForm.deviceType.toLowerCase()}...</option>
+                {devices.map(device => (
+                  <option key={device.device_id} value={device.device_id}>
+                    {device.display_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Step 4: Select Monitors (Optional) */}
-          <div className="deployment-step">
-            <div className="step-header">
-              <Monitor size={20} />
-              <h3>Step 4: Select Monitors (Optional)</h3>
+          {/* Step 4: Select Monitors */}
+          <div className="workflow-step">
+            <div className="step-indicator">
+              <div className={`step-number ${deploymentForm.deviceId ? 'active' : ''}`}>4</div>
             </div>
-            <div className="monitors-grid">
-              {monitors.length === 0 ? (
-                <p className="no-data">No available monitors</p>
-              ) : (
-                monitors.map(monitor => (
-                  <label key={monitor.monitor_id} className="monitor-option">
-                    <input 
-                      type="checkbox"
-                      checked={deploymentForm.monitorIds.includes(monitor.monitor_id)}
-                      onChange={() => handleMonitorToggle(monitor.monitor_id)}
-                    />
-                    <span>{monitor.asset_id} - {monitor.brand} {monitor.model}</span>
-                  </label>
-                ))
-              )}
+            <div className="step-content">
+              <div className="step-header">
+                <Monitor size={20} />
+                <h4>Select Monitors (Optional)</h4>
+              </div>
+              <div className="monitors-selection">
+                {monitors.length === 0 ? (
+                  <div className="no-monitors">
+                    <Monitor size={48} className="no-monitors-icon" />
+                    <p>No monitors available</p>
+                  </div>
+                ) : (
+                  <div className="monitors-grid">
+                    {monitors.map(monitor => (
+                      <label key={monitor.monitor_id} className={`monitor-card ${deploymentForm.monitorIds.includes(monitor.monitor_id) ? 'selected' : ''}`}>
+                        <input 
+                          type="checkbox"
+                          checked={deploymentForm.monitorIds.includes(monitor.monitor_id)}
+                          onChange={() => handleMonitorToggle(monitor.monitor_id)}
+                        />
+                        <Monitor size={20} />
+                        <div className="monitor-details">
+                          <div className="monitor-id">{monitor.asset_id}</div>
+                          <div className="monitor-specs">{monitor.brand} {monitor.model}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -228,22 +332,34 @@ export default function DeployDevice() {
 
         {/* Deployment Summary */}
         {(selectedEmployee || selectedDevice || deploymentForm.monitorIds.length > 0) && (
-          <div className="deployment-summary">
-            <h3>Deployment Summary</h3>
-            <div className="summary-details">
+          <div className="it-deployment-summary">
+            <h4>Deployment Summary</h4>
+            <div className="summary-grid">
               {selectedEmployee && (
                 <div className="summary-item">
-                  <strong>Employee:</strong> {selectedEmployee.full_name} ({selectedEmployee.employee_code})
+                  <Users size={16} />
+                  <div>
+                    <strong>{selectedEmployee.full_name}</strong>
+                    <span>{selectedEmployee.employee_code} • {selectedEmployee.departments?.department_name}</span>
+                  </div>
                 </div>
               )}
               {selectedDevice && (
                 <div className="summary-item">
-                  <strong>Device:</strong> {selectedDevice.display_name}
+                  {deploymentForm.deviceType === 'LAPTOP' ? <Laptop size={16} /> : <HardDrive size={16} />}
+                  <div>
+                    <strong>{selectedDevice.display_name}</strong>
+                    <span>{deploymentForm.deviceType}</span>
+                  </div>
                 </div>
               )}
               {deploymentForm.monitorIds.length > 0 && (
                 <div className="summary-item">
-                  <strong>Monitors:</strong> {deploymentForm.monitorIds.length} selected
+                  <Monitor size={16} />
+                  <div>
+                    <strong>{deploymentForm.monitorIds.length} Monitor{deploymentForm.monitorIds.length > 1 ? 's' : ''}</strong>
+                    <span>Additional displays</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -253,16 +369,19 @@ export default function DeployDevice() {
         {/* Deploy Button */}
         <div className="deployment-actions">
           <button 
-            className="btn-primary btn-deploy"
+            className={`it-deploy-btn ${!deploymentForm.employeeId || !deploymentForm.deviceId || deploying ? 'disabled' : ''}`}
             onClick={handleDeploy}
             disabled={!deploymentForm.employeeId || !deploymentForm.deviceId || deploying}
           >
             {deploying ? (
-              'Deploying...'
+              <>
+                <div className="btn-spinner"></div>
+                <span>Deploying...</span>
+              </>
             ) : (
               <>
-                <Check size={18} />
-                Deploy Device
+                <Check size={20} />
+                <span>Deploy Device</span>
               </>
             )}
           </button>

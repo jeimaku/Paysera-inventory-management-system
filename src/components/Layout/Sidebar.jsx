@@ -8,15 +8,15 @@ import {
   HardDrive,
   Building2,
   UserCheck,
-  Database,
   LogOut,
   Menu,
-  ChevronLeft, // Added ChevronLeft for better "Close" visual on mobile
+  ChevronLeft,
   UserCog,
   Wrench,
   UserPlus,
 } from 'lucide-react';
 import { supabase } from '../../supabase/client';
+import { sessionManager } from '../../auth/SessionManager';
 import '../../styles/admin-sidebar.css';
 
 export default function Sidebar() {
@@ -24,6 +24,7 @@ export default function Sidebar() {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const menuItems = [
     {
@@ -109,34 +110,58 @@ export default function Sidebar() {
     return location.pathname.startsWith(path);
   };
 
+  // Enhanced logout function with session cleanup
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    if (isLoggingOut) return;
+    
+    try {
+      setIsLoggingOut(true);
+      
+      const sessionInfo = sessionManager.getSessionInfo();
+      console.log('🔓 Admin initiating logout:', sessionInfo.email);
+
+      // 1. Sign out from Supabase FIRST (Server-side)
+      // We do this before clearing local storage so Supabase client has the token to send the request
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Supabase logout warning:', error.message);
+        // Continue to clear local session anyway
+      }
+
+      // 2. Clear local session data (Client-side)
+      sessionManager.clearSession();
+      console.log('✅ Admin local session cleared');
+      
+      // 3. Navigate to login
+      navigate('/login', { replace: true });
+
+    } catch (error) {
+      console.error('❌ Admin logout critical error:', error);
+      // Failsafe: Force clear and redirect
+      sessionManager.clearSession();
+      navigate('/login', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
-  // --- NEW: Unified Toggle Handler ---
+  // Unified Toggle Handler
   const handleToggle = () => {
     if (window.innerWidth <= 1024) {
-      // On mobile, this button closes the sidebar
       setIsMobileOpen(false);
     } else {
-      // On desktop, this button collapses/expands the sidebar
       setIsCollapsed(!isCollapsed);
     }
   };
 
   return (
     <>
-      {/* Mobile Overlay - Closes sidebar when clicked */}
       <div 
         className={`mobile-overlay ${isMobileOpen ? 'show' : ''}`}
         onClick={() => setIsMobileOpen(false)}
       />
 
-      {/* Mobile Floating Button 
-         LOGIC CHANGE: Only render this button if the sidebar is NOT open.
-         Once opened, this button disappears.
-      */}
       {!isMobileOpen && (
         <button
           className="mobile-menu-btn"
@@ -148,27 +173,20 @@ export default function Sidebar() {
 
       <aside className={`sidebar admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
         
-        {/* Sidebar Header */}
         <div className="sidebar-header">
           {!isCollapsed && (
             <div className="logo">
               <div className="logo-icon">
                 <Laptop size={24} />
               </div>
-              <span className="logo-text">Admin Panel</span>
+              <span className="logo-text">Paysera Admin Panel</span>
             </div>
           )}
-          {/* Internal Toggle Button 
-             - Acts as "Collapse" on Desktop
-             - Acts as "Close" on Mobile
-          */}
           <button className="toggle-btn" onClick={handleToggle}>
-            {/* Show ChevronLeft (Back arrow) on mobile to indicate closing, otherwise Menu */}
             {window.innerWidth <= 1024 ? <ChevronLeft size={20} /> : <Menu size={20} />}
           </button>
         </div>
 
-        {/* Navigation Menu */}
         <nav className="sidebar-nav">
           {menuItems.map((section, sectionIndex) => (
             <div key={sectionIndex} className="nav-section">
@@ -185,6 +203,7 @@ export default function Sidebar() {
                     className={`nav-item ${active ? 'active' : ''}`}
                     onClick={() => handleNavigation(item.path)}
                     title={isCollapsed ? item.title : ''}
+                    disabled={isLoggingOut}
                   >
                     <Icon size={20} className="nav-icon" />
                     {!isCollapsed && (
@@ -197,11 +216,22 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        {/* Logout Button */}
         <div className="sidebar-footer">
-          <button className="nav-item logout-item" onClick={handleLogout}>
-            <LogOut size={20} className="nav-icon" />
-            {!isCollapsed && <span className="nav-label">Logout</span>}
+          <button 
+            className={`nav-item logout-item ${isLoggingOut ? 'logging-out' : ''}`} 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            title={isCollapsed ? (isLoggingOut ? 'Logging out...' : 'Logout') : ''}
+          >
+            <LogOut 
+              size={20} 
+              className={`nav-icon ${isLoggingOut ? 'spinning' : ''}`} 
+            />
+            {!isCollapsed && (
+              <span className="nav-label">
+                {isLoggingOut ? 'Logging out...' : 'Logout'}
+              </span>
+            )}
           </button>
         </div>
       </aside>

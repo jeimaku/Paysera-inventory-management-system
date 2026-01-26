@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
-import { RotateCcw, Eye, Calendar, User, Package, Monitor as MonitorIcon, Filter, Search, ArrowUpDown } from 'lucide-react';
+import { 
+  RotateCcw, Eye, Calendar, User, Search, Download, Archive,
+  Laptop, HardDrive, Monitor, Building2, Zap, Clock,
+  TrendingUp, Package, Filter
+} from 'lucide-react';
 import InteractiveDeviceSpecModal from '../../components/IT/InteractiveDeviceSpecModal';
-import { getReturnedDevices } from '../../services/returnedDevicesService';
-import '../../styles/inventory.css';
+import { getReturnedDevices, getReturnedDevicesStats } from '../../services/returnedDevicesService';
+
+// Import the new IT-themed CSS
+import '../../styles/it-returned-devices.css';
 import '../../styles/interactive-modal.css';
 
 export default function ReturnedDevices() {
@@ -11,6 +17,7 @@ export default function ReturnedDevices() {
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [stats, setStats] = useState(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -25,6 +32,7 @@ export default function ReturnedDevices() {
 
   useEffect(() => {
     loadReturnedDevices();
+    loadStats();
   }, []);
 
   useEffect(() => {
@@ -50,6 +58,15 @@ export default function ReturnedDevices() {
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const statsData = await getReturnedDevicesStats();
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
+
   const applyFiltersAndSort = () => {
     let filtered = [...returnedDevices];
 
@@ -60,7 +77,7 @@ export default function ReturnedDevices() {
         device.employees?.full_name?.toLowerCase().includes(searchLower) ||
         device.employees?.employee_code?.toLowerCase().includes(searchLower) ||
         device.device_asset_id?.toLowerCase().includes(searchLower) ||
-        device.device_id?.toString().includes(searchLower)
+        device.return_reason?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -127,6 +144,34 @@ export default function ReturnedDevices() {
     setIsModalOpen(true);
   };
 
+  const handleExportReturned = () => {
+    // Create CSV export for returned devices
+    const csvData = [
+      ['Employee', 'Employee Code', 'Department', 'Device Type', 'Asset ID', 'Date Issued', 'Date Returned', 'Days Used', 'Return Reason', 'Monitors'],
+      ...filteredDevices.map(d => [
+        d.employees?.full_name || 'Unknown',
+        d.employees?.employee_code || 'N/A',
+        d.employees?.departments?.department_name || 'N/A',
+        d.device_type,
+        d.device_asset_id || 'Unknown',
+        d.date_issued,
+        d.date_returned,
+        getDaysUsed(d.date_issued, d.date_returned),
+        d.return_reason || 'N/A',
+        d.employee_monitors?.length || 0
+      ])
+    ];
+
+    const csvContent = csvData.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `returned-devices-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -157,10 +202,6 @@ export default function ReturnedDevices() {
     return `${Math.floor(daysAgo / 365)} years ago`;
   };
 
-  const getDeviceTypeIcon = (type) => {
-    return type === 'LAPTOP' ? <Package size={14} /> : <MonitorIcon size={14} />;
-  };
-
   const clearFilters = () => {
     setFilters({
       search: '',
@@ -174,449 +215,148 @@ export default function ReturnedDevices() {
 
   if (loading) {
     return (
-      <div className="inventory-container">
-        <div className="loading">Loading returned devices...</div>
+      <div className="it-returned-container">
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <span>Loading returned devices...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="inventory-container">
-      <style>{`
-        /* Enhanced table styles for better organization */
-        .data-table {
-          width: 100%;
-          border-collapse: collapse;
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .data-table thead {
-          background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-          border-bottom: 2px solid #e2e8f0;
-        }
-
-        .data-table th {
-          padding: 16px 14px;
-          text-align: left;
-          font-weight: 600;
-          font-size: 13px;
-          color: #475569;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          border-right: 1px solid #e2e8f0;
-          white-space: nowrap;
-          position: relative;
-        }
-
-        .data-table th:last-child {
-          border-right: none;
-        }
-
-        .data-table tbody tr {
-          border-bottom: 1px solid #f1f5f9;
-          transition: all 0.2s ease;
-        }
-
-        .data-table tbody tr:hover {
-          background-color: #f8fafc;
-          box-shadow: inset 0 0 0 1px #e2e8f0;
-        }
-
-        .data-table tbody tr:last-child {
-          border-bottom: none;
-        }
-
-        .data-table td {
-          padding: 16px 14px;
-          vertical-align: top;
-          font-size: 14px;
-          color: #334155;
-          border-right: 1px solid #f1f5f9;
-          line-height: 1.5;
-        }
-
-        .data-table td:last-child {
-          border-right: none;
-        }
-
-        /* Employee cell styling */
-        .employee-cell {
-          min-width: 200px;
-          max-width: 220px;
-        }
-
-        .employee-cell strong {
-          color: #1e293b;
-          font-weight: 600;
-          display: block;
-          margin-bottom: 4px;
-          font-size: 14px;
-        }
-
-        .employee-cell small {
-          color: #64748b;
-          font-size: 12px;
-          display: block;
-          line-height: 1.4;
-          margin-bottom: 2px;
-        }
-
-        .department-text {
-          color: #7c3aed !important;
-          font-weight: 500 !important;
-          font-size: 11px !important;
-        }
-
-        /* Device type badge */
-        .device-type-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 12px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          min-width: 90px;
-          justify-content: center;
-        }
-
-        .device-type-badge.laptop {
-          background: #dbeafe;
-          color: #1e40af;
-        }
-
-        .device-type-badge.desktop {
-          background: #fef3c7;
-          color: #d97706;
-        }
-
-        /* Asset ID styling */
-        .asset-id {
-          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-          font-size: 13px;
-          font-weight: 600;
-          color: #1e293b;
-          background: #f1f5f9;
-          padding: 6px 10px;
-          border-radius: 4px;
-          display: inline-block;
-          min-width: 80px;
-          text-align: center;
-        }
-
-        /* Deployment period styling */
-        .date-range {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          min-width: 140px;
-        }
-
-        .date-cell {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          color: #475569;
-          font-size: 12px;
-        }
-
-        .date-cell svg {
-          color: #94a3b8;
-          flex-shrink: 0;
-        }
-
-        .date-separator {
-          color: #94a3b8;
-          font-size: 12px;
-          text-align: center;
-          padding: 2px 0;
-        }
-
-        /* Return info styling */
-        .return-info {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          min-width: 120px;
-        }
-
-        .return-period {
-          color: #059669 !important;
-          font-weight: 500 !important;
-          font-size: 11px !important;
-          background: #d1fae5;
-          padding: 2px 6px;
-          border-radius: 10px;
-          text-align: center;
-          display: inline-block;
-        }
-
-        .text-muted {
-          color: #94a3b8 !important;
-          font-style: italic;
-        }
-
-        /* Days badge with different colors for usage periods */
-        .days-badge {
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: 600;
-          text-align: center;
-          min-width: 70px;
-        }
-
-        .days-badge.short-term {
-          background: #dbeafe;
-          color: #1e40af;
-        }
-
-        .days-badge.medium-term {
-          background: #fef3c7;
-          color: #d97706;
-        }
-
-        .days-badge.long-term {
-          background: #fee2e2;
-          color: #dc2626;
-        }
-
-        /* Monitor count for returned devices */
-        .monitor-count {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 500;
-        }
-
-        .monitor-count.returned {
-          background: #d1fae5;
-          color: #059669;
-        }
-
-        /* Action button styling */
-        .btn-view {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 12px;
-          background: #3b82f6;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-        }
-
-        .btn-view:hover {
-          background: #2563eb;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
-        }
-
-        /* Table container improvements */
-        .table-container {
-          overflow: hidden;
-          border-radius: 12px;
-          border: 1px solid #e2e8f0;
-        }
-
-        .inventory-table-card {
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Column width optimization */
-        .data-table th:nth-child(1) { width: 220px; } /* Former Employee */
-        .data-table th:nth-child(2) { width: 120px; } /* Device Type */
-        .data-table th:nth-child(3) { width: 100px; } /* Device ID */
-        .data-table th:nth-child(4) { width: 160px; } /* Deployment Period */
-        .data-table th:nth-child(5) { width: 140px; } /* Date Returned */
-        .data-table th:nth-child(6) { width: 100px; } /* Days Used */
-        .data-table th:nth-child(7) { width: 100px; } /* Monitors */
-        .data-table th:nth-child(8) { width: 120px; } /* Actions */
-
-        /* Results summary styling */
-        .results-summary {
-          text-align: center;
-          padding: 16px;
-          color: #64748b;
-          font-size: 14px;
-          background: #f8fafc;
-          border-top: 1px solid #e2e8f0;
-          border-radius: 0 0 12px 12px;
-        }
-
-        .filter-indicator {
-          color: #059669;
-          font-weight: 500;
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 1400px) {
-          .data-table {
-            font-size: 13px;
-          }
-          
-          .data-table th,
-          .data-table td {
-            padding: 12px 10px;
-          }
-
-          .date-range {
-            min-width: 120px;
-          }
-
-          .return-info {
-            min-width: 100px;
-          }
-        }
-      `}</style>
-
-      <header className="inventory-header">
-        <div className="header-title">
-          <RotateCcw size={32} className="header-icon" />
-          <div>
-            <h1>Returned Devices</h1>
-            <p className="subtitle">Devices that have been returned and are available for reassignment</p>
-          </div>
+    <div className="it-returned-container">
+      
+      {/* Header Card - Matches other IT pages */}
+      <div className="it-header-card">
+        <div className="header-title-group">
+          <h1>Returned Devices</h1>
+          <div className="header-meta">Manage and track all devices returned to inventory</div>
         </div>
-      </header>
-
-      <div className="inventory-stats">
-        <div className="stat-item">
-          <span className="stat-label">Total Returned</span>
-          <span className="stat-value">{returnedDevices.length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Laptops</span>
-          <span className="stat-value stat-available">
-            {returnedDevices.filter(d => d.device_type === 'LAPTOP').length}
-          </span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Desktops</span>
-          <span className="stat-value stat-maintenance">
-            {returnedDevices.filter(d => d.device_type === 'DESKTOP').length}
-          </span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Avg. Usage Days</span>
-          <span className="stat-value">
-            {returnedDevices.length > 0 
-              ? Math.round(returnedDevices.reduce((sum, d) => 
-                  sum + getDaysUsed(d.date_issued, d.date_returned), 0) / returnedDevices.length
-                )
-              : 0
-            }
-          </span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">This Month</span>
-          <span className="stat-value stat-issued">
-            {returnedDevices.filter(d => {
-              if (!d.date_returned) return false;
-              const returnDate = new Date(d.date_returned);
-              const now = new Date();
-              return returnDate.getMonth() === now.getMonth() && 
-                     returnDate.getFullYear() === now.getFullYear();
-            }).length}
-          </span>
+        <div className="header-badge">
+          <Zap size={16} />
+          <span>IT Operations</span>
         </div>
       </div>
 
-      <div className="inventory-controls">
-        <div className="search-box">
-          <Search size={18} />
+      {/* Info Banner - IT-specific guidance */}
+      <div className="it-info-banner">
+        <Building2 className="info-banner-icon" size={20} />
+        <div className="info-banner-content">
+          <h4>IT Role: Returned Device Management</h4>
+          <p>
+            Track all devices returned to inventory and manage their readiness for reassignment. 
+            Review return reasons, device usage patterns, and prepare devices for future deployments.
+            <strong> Analytics</strong> help identify trends and optimize device lifecycle management.
+          </p>
+        </div>
+      </div>
+
+      {/* Statistics Cards - Green themed */}
+      <div className="it-stats-grid">
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <Archive size={20} />
+            <span>Total Returned</span>
+          </div>
+          <div className="stat-value">{stats?.totalReturned || 0}</div>
+        </div>
+        
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <Laptop size={20} />
+            <span>Laptops Returned</span>
+          </div>
+          <div className="stat-value laptops">{stats?.totalLaptops || 0}</div>
+        </div>
+
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <HardDrive size={20} />
+            <span>Desktops Returned</span>
+          </div>
+          <div className="stat-value desktops">{stats?.totalDesktops || 0}</div>
+        </div>
+
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <TrendingUp size={20} />
+            <span>Avg Usage Days</span>
+          </div>
+          <div className="stat-value usage">{stats?.averageUsageDays || 0}</div>
+        </div>
+      </div>
+
+      {/* Filters and Export Bar */}
+      <div className="it-filters-bar">
+        <div className="filter-input-wrapper">
+          <Search className="filter-icon" size={18} />
           <input
             type="text"
-            placeholder="Search by employee name, device ID, or employee code..."
+            className="it-search-input"
+            placeholder="Search employee, asset ID, or return reason..."
             value={filters.search}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, search: e.target.value }))
-            }
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
         </div>
+        
+        <select 
+          className="it-filter-select" 
+          value={filters.deviceType} 
+          onChange={(e) => setFilters({ ...filters, deviceType: e.target.value })}
+        >
+          <option value="">All Device Types</option>
+          <option value="LAPTOP">Laptops</option>
+          <option value="DESKTOP">Desktops</option>
+        </select>
 
-        <div className="filters">
-          <select
-            value={filters.deviceType}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, deviceType: e.target.value }))
-            }
-          >
-            <option value="">All Device Types</option>
-            <option value="LAPTOP">Laptops</option>
-            <option value="DESKTOP">Desktops</option>
-          </select>
+        <select 
+          className="it-filter-select" 
+          value={filters.department} 
+          onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+        >
+          <option value="">All Departments</option>
+          {availableDepartments.map(dept => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
 
-          <select
-            value={filters.department}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, department: e.target.value }))
-            }
-          >
-            <option value="">All Departments</option>
-            {availableDepartments.map(dept => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
+        <select 
+          className="it-filter-select" 
+          value={filters.returnPeriod} 
+          onChange={(e) => setFilters({ ...filters, returnPeriod: e.target.value })}
+        >
+          <option value="">All Time</option>
+          <option value="7">Last 7 Days</option>
+          <option value="30">Last 30 Days</option>
+          <option value="90">Last 90 Days</option>
+          <option value="365">Last Year</option>
+        </select>
 
-          <select
-            value={filters.returnPeriod}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, returnPeriod: e.target.value }))
-            }
-          >
-            <option value="">All Time</option>
-            <option value="7">Last 7 Days</option>
-            <option value="30">Last 30 Days</option>
-            <option value="90">Last 90 Days</option>
-            <option value="365">Last Year</option>
-          </select>
+        <button 
+          className="it-clear-btn"
+          onClick={clearFilters}
+          title="Clear all filters"
+        >
+          <Filter size={16} />
+          <span>Clear</span>
+        </button>
 
-          <select
-            value={`${filters.sortBy}-${filters.sortOrder}`}
-            onChange={(e) => {
-              const [sortBy, sortOrder] = e.target.value.split('-');
-              setFilters((prev) => ({ ...prev, sortBy, sortOrder }));
-            }}
-          >
-            <option value="date_returned-desc">Return Date (Newest)</option>
-            <option value="date_returned-asc">Return Date (Oldest)</option>
-            <option value="employee_name-asc">Employee Name (A-Z)</option>
-            <option value="employee_name-desc">Employee Name (Z-A)</option>
-            <option value="device_type-asc">Device Type (A-Z)</option>
-            <option value="days_used-desc">Most Used</option>
-            <option value="days_used-asc">Least Used</option>
-          </select>
-
-          <button className="btn-secondary" onClick={clearFilters}>
-            <Filter size={16} />
-            Clear Filters
-          </button>
-        </div>
+        <button 
+          className="it-export-btn"
+          onClick={handleExportReturned}
+          title="Export to CSV"
+        >
+          <Download size={16} />
+          <span>Export</span>
+        </button>
       </div>
 
-      <div className="inventory-table-card">
+      {/* Data Table - Green themed */}
+      <div className="it-table-wrapper">
         {filteredDevices.length === 0 ? (
-          <div className="no-data-state">
-            <RotateCcw size={64} className="no-data-icon" />
+          <div className="it-empty-state">
+            <Archive size={64} className="empty-icon" />
             <h3>No Returned Devices</h3>
             <p>
               {returnedDevices.length === 0 
@@ -625,132 +365,130 @@ export default function ReturnedDevices() {
               }
             </p>
             {returnedDevices.length > 0 && (
-              <button className="btn-primary" onClick={clearFilters}>
-                Clear Filters
+              <button className="it-clear-btn-large" onClick={clearFilters}>
+                <Filter size={18} />
+                Clear All Filters
               </button>
             )}
           </div>
         ) : (
-          <div className="table-container">
-            <table className="data-table">
+          <>
+            <table className="it-table">
               <thead>
                 <tr>
                   <th>Former Employee</th>
-                  <th>Device Type</th>
-                  <th>Device ID</th>
-                  <th>Deployment Period</th>
-                  <th>Date Returned</th>
-                  <th>Reason</th> {/* <--- ADD THIS */}
-                  <th>Days Used</th>
+                  <th>Device Information</th>
+                  <th>Usage Period</th>
+                  <th>Return Details</th>
                   <th>Monitors</th>
-                  <th>Actions</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredDevices.map((device) => {
                   const daysUsed = getDaysUsed(device.date_issued, device.date_returned);
+                  const monitors = device.employee_monitors || [];
                   
                   return (
                     <tr key={device.employee_device_id}>
-                      <td className="employee-cell">
-                        <div>
-                          <strong>{device.employees?.full_name || 'Unknown Employee'}</strong>
-                          <small>{device.employees?.employee_code || 'N/A'}</small>
-                          <small className="department-text">
-                            {device.employees?.departments?.department_name || 'No Department'}
-                          </small>
+                      <td>
+                        <div className="employee-profile">
+                          <div className="employee-avatar">
+                            <User size={18} />
+                          </div>
+                          <div>
+                            <div className="employee-name">{device.employees?.full_name || 'Unknown Employee'}</div>
+                            <div className="employee-details">
+                              {device.employees?.employee_code || 'N/A'} • {device.employees?.departments?.department_name || 'No Department'}
+                            </div>
+                          </div>
                         </div>
                       </td>
+                      
                       <td>
-                        <span className={`device-type-badge ${device.device_type.toLowerCase()}`}>
-                          {getDeviceTypeIcon(device.device_type)}
-                          {device.device_type}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="asset-id">{device.device_asset_id || device.device_id}</span>
-                      </td>
-                      <td>
-                        <div className="date-range">
-                          <div className="date-cell">
-                            <Calendar size={12} />
-                            <span>{formatDate(device.date_issued)}</span>
+                        <div className="device-info">
+                          <div className="device-type-icon">
+                            {device.device_type === 'LAPTOP' ? 
+                              <Laptop size={16} /> : 
+                              <HardDrive size={16} />
+                            }
                           </div>
-                          <div className="date-separator">→</div>
-                          <div className="date-cell">
+                          <div>
+                            <div className="device-id">{device.device_asset_id || 'Unknown ID'}</div>
+                            <div className="device-details">{device.device_type}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="usage-period">
+                          <div className="date-range">
+                            <span className="date-start">{formatDate(device.date_issued)}</span>
+                            <span className="date-arrow">→</span>
+                            <span className="date-end">{formatDate(device.date_returned)}</span>
+                          </div>
+                          <div className={`usage-duration ${daysUsed > 365 ? 'long-term' : daysUsed > 180 ? 'medium-term' : 'short-term'}`}>
+                            <Clock size={12} />
+                            <span>{daysUsed} days</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td>
+                        <div className="return-details">
+                          <div className="return-date">
                             <Calendar size={12} />
                             <span>{formatDate(device.date_returned)}</span>
                           </div>
+                          <div className="return-period">{getReturnPeriodText(device.date_returned)}</div>
+                          {device.return_reason && (
+                            <div className="return-reason" title={device.return_reason}>
+                              {device.return_reason}
+                            </div>
+                          )}
                         </div>
                       </td>
+
                       <td>
-                        <div className="return-info">
-                          <div className="date-cell">
-                            <Calendar size={14} />
-                            <span>{formatDate(device.date_returned)}</span>
+                        {monitors.length > 0 ? (
+                          <div className="monitors-info">
+                            <Monitor size={14} />
+                            <span>{monitors.length} returned</span>
                           </div>
-                          <small className="return-period">
-                            {getReturnPeriodText(device.date_returned)}
-                          </small>
-                        </div>
-                      </td>
-                      {/* --- ADD THIS NEW BLOCK FOR REASON --- */}
-                      <td style={{ maxWidth: '200px' }}>
-                        <div title={device.return_reason} style={{ 
-                          whiteSpace: 'nowrap', 
-                          overflow: 'hidden', 
-                          textOverflow: 'ellipsis',
-                          color: '#475569',
-                          fontSize: '0.85rem'
-                        }}>
-                          {device.return_reason || '-'}
-                        </div>
-                      </td>
-                      {/* ------------------------------------- */}
-                      <td>
-                        <span className={`days-badge ${daysUsed > 365 ? 'long-term' : daysUsed > 180 ? 'medium-term' : 'short-term'}`}>
-                          {daysUsed} days
-                        </span>
-                      </td>
-                      <td>
-                        {device.employee_monitors?.length > 0 ? (
-                          <span className="monitor-count returned">
-                            <MonitorIcon size={14} />
-                            {device.employee_monitors.length} returned
-                          </span>
                         ) : (
-                          <span className="text-muted">None</span>
+                          <span className="no-monitors">None</span>
                         )}
                       </td>
+
                       <td>
-                        <button
-                          className="btn-view"
-                          onClick={() => handleViewSpecs(device)}
-                          title="View Device Specifications"
-                        >
-                          <Eye size={16} />
-                          View Specs
-                        </button>
+                        <div className="action-buttons">
+                          <button 
+                            className="action-btn btn-view" 
+                            onClick={() => handleViewSpecs(device)}
+                            title="View Device Specifications"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
-        )}
-        
-        {/* Results Summary */}
-        {filteredDevices.length > 0 && (
-          <div className="results-summary">
-            Showing {filteredDevices.length} of {returnedDevices.length} returned devices
-            {Object.values(filters).some(f => f && f !== 'date_returned' && f !== 'desc') && (
-              <span className="filter-indicator"> (filtered)</span>
-            )}
-          </div>
+
+            {/* Results Summary */}
+            <div className="results-summary">
+              <span>Showing {filteredDevices.length} of {returnedDevices.length} returned devices</span>
+              {Object.values(filters).some(f => f && f !== 'date_returned' && f !== 'desc') && (
+                <span className="filter-indicator">(filtered)</span>
+              )}
+            </div>
+          </>
         )}
       </div>
 
+      {/* Device Specifications Modal */}
       {isModalOpen && (
         <InteractiveDeviceSpecModal
           deployment={selectedDevice}

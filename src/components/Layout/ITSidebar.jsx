@@ -8,15 +8,15 @@ import {
   Monitor,
   HardDrive,
   ClipboardList,
-  Calendar,
   History,
   RotateCcw,
   LogOut,
   Menu,
-  ChevronLeft, // Added for mobile close visual
+  ChevronLeft,
   Wrench,
 } from 'lucide-react';
 import { supabase } from '../../supabase/client';
+import { sessionManager } from '../../auth/SessionManager';
 import '../../styles/it-sidebar.css';
 
 export default function ITSidebar() {
@@ -24,6 +24,7 @@ export default function ITSidebar() {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const menuItems = [
     {
@@ -104,7 +105,6 @@ export default function ITSidebar() {
 
   const handleNavigation = (path) => {
     navigate(path);
-    // Close sidebar on mobile when a link is clicked
     if (window.innerWidth <= 1024) {
       setIsMobileOpen(false);
     }
@@ -117,29 +117,54 @@ export default function ITSidebar() {
     return location.pathname.startsWith(path);
   };
 
+  // Enhanced logout function with session cleanup
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    if (isLoggingOut) return;
+
+    try {
+      setIsLoggingOut(true);
+      
+      const sessionInfo = sessionManager.getSessionInfo();
+      console.log('🔓 IT User initiating logout:', sessionInfo.email);
+
+      // 1. Sign out from Supabase FIRST
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Supabase logout warning:', error.message);
+      }
+
+      // 2. Clear local session data
+      sessionManager.clearSession();
+      console.log('✅ IT User local session cleared');
+      
+      // 3. Navigate to login
+      navigate('/login', { replace: true });
+
+    } catch (error) {
+      console.error('❌ IT User logout critical error:', error);
+      sessionManager.clearSession();
+      navigate('/login', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
-  // --- NEW: Unified Toggle Handler ---
   const handleToggle = () => {
     if (window.innerWidth <= 1024) {
-      setIsMobileOpen(false); // Close on mobile
+      setIsMobileOpen(false);
     } else {
-      setIsCollapsed(!isCollapsed); // Collapse on desktop
+      setIsCollapsed(!isCollapsed);
     }
   };
 
   return (
     <>
-      {/* Mobile Overlay */}
       <div 
         className={`mobile-overlay ${isMobileOpen ? 'show' : ''}`}
         onClick={() => setIsMobileOpen(false)}
       />
 
-      {/* Mobile Floating Button - Hides when sidebar is open */}
       {!isMobileOpen && (
         <button
           className="mobile-menu-btn"
@@ -151,25 +176,21 @@ export default function ITSidebar() {
 
       <aside className={`sidebar it-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
         
-        {/* Sidebar Header */}
         <div className="sidebar-header">
           {!isCollapsed && (
             <div className="logo">
               <div className="logo-icon">
                 <ClipboardList size={24} />
               </div>
-              <span className="logo-text">IT Portal</span>
+              <span className="logo-text">Paysera IT Portal</span>
             </div>
           )}
           
-          {/* Internal Toggle/Close Button */}
           <button className="toggle-btn" onClick={handleToggle}>
-             {/* Show ChevronLeft (Back arrow) on mobile to indicate closing, otherwise Menu */}
              {window.innerWidth <= 1024 ? <ChevronLeft size={20} /> : <Menu size={20} />}
           </button>
         </div>
 
-        {/* Navigation Menu */}
         <nav className="sidebar-nav">
           {menuItems.map((section, sectionIndex) => (
             <div key={sectionIndex} className="nav-section">
@@ -186,6 +207,7 @@ export default function ITSidebar() {
                     className={`nav-item ${active ? 'active' : ''}`}
                     onClick={() => handleNavigation(item.path)}
                     title={isCollapsed ? item.title : ''}
+                    disabled={isLoggingOut}
                   >
                     <Icon size={20} className="nav-icon" />
                     {!isCollapsed && (
@@ -198,11 +220,22 @@ export default function ITSidebar() {
           ))}
         </nav>
 
-        {/* Logout Button */}
         <div className="sidebar-footer">
-          <button className="nav-item logout-item" onClick={handleLogout}>
-            <LogOut size={20} className="nav-icon" />
-            {!isCollapsed && <span className="nav-label">Logout</span>}
+          <button 
+            className={`nav-item logout-item ${isLoggingOut ? 'logging-out' : ''}`} 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            title={isCollapsed ? (isLoggingOut ? 'Logging out...' : 'Logout') : ''}
+          >
+            <LogOut 
+              size={20} 
+              className={`nav-icon ${isLoggingOut ? 'spinning' : ''}`} 
+            />
+            {!isCollapsed && (
+              <span className="nav-label">
+                {isLoggingOut ? 'Logging out...' : 'Logout'}
+              </span>
+            )}
           </button>
         </div>
       </aside>

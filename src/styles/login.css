@@ -1,26 +1,88 @@
 /* Enhanced Login Page Styles */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
+/* Main Page Layout with "Water Wave" Gradient Effect */
+.login-page {
+  min-height: 100vh;
+  width: 100vw;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  
+  /* Water Wave Gradient Scheme:
+     Light Green -> Teal -> Sky Blue -> White Blue
+     Replaced Deep Blue with #d4eaff (White Blue) for an airy feel.
+  */
+  background: linear-gradient(
+    -45deg, 
+    #69f0ae, /* Light Green */
+    #7dd4b8, /* Teal */
+    #5eb3ff, /* Sky Blue */
+    #d4eaff  /* White Blue */
+  );
+  
+  /* Large background size is key to the "wave" effect */
+  background-size: 400% 400%;
+  
+  /* Smooth flowing animation */
+  animation: waterWave 15s ease-in-out infinite;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Animation moves the gradient diagonally to mimic flowing water */
+@keyframes waterWave {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.login-left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 60px 40px 40px;
+  position: relative;
+  z-index: 2;
+}
+
+.login-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 40px 40px 20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Glassmorphism Login Form Card */
 .login-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.85);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   width: 580px;
-  height: 620px;
-  padding: 56px 48px;
+  min-height: 500px; 
+  padding: 64px 48px;
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.6); /* Slightly more visible border for contrast */
   box-shadow: 
-    0 32px 80px rgba(0, 0, 0, 0.12),
-    0 8px 32px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    0 32px 80px rgba(0, 50, 150, 0.1), 
+    0 8px 32px rgba(0, 50, 150, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   text-align: center;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   animation: slideInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Subtle background pattern */
 .login-card::before {
   content: '';
   position: absolute;
@@ -28,9 +90,12 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
-    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(10, 10, 166, 0.05) 0%, transparent 50%);
+  /* Subtle internal sheen */
+  background: linear-gradient(
+    135deg, 
+    rgba(255, 255, 255, 0.4) 0%, 
+    rgba(255, 255, 255, 0) 100%
+  );
   pointer-events: none;
   z-index: 1;
 }
@@ -53,54 +118,14 @@
   }
 }
 
-.login-icon {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 24px;
-  display: block;
-  background: linear-gradient(135deg, #0a0aa6 0%, #4c46ff 100%);
-  border-radius: 20px;
-  position: relative;
-  box-shadow: 
-    0 8px 24px rgba(10, 10, 166, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  animation: iconFloat 4s ease-in-out infinite;
-}
-
-.login-icon::after {
-  content: '🔐';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 28px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-}
-
-@keyframes iconFloat {
-  0%, 100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-4px) rotate(1deg);
-  }
-  50% {
-    transform: translateY(-8px) rotate(0deg);
-  }
-  75% {
-    transform: translateY(-4px) rotate(-1deg);
-  }
-}
-
+/* Headers */
 .login-card h2 {
   font-family: 'Poppins', sans-serif;
-  font-size: 28px;
-  font-weight: 600;
-  margin-bottom: 36px;
-  color: #1a1a2e;
-  letter-spacing: -0.5px;
-  line-height: 1.3;
-  background: linear-gradient(135deg, #1a1a2e 0%, #0a0aa6 100%);
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 48px;
+  /* Text gradient: Dark Blue to Cyan for readability against light card */
+  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -118,6 +143,7 @@
   }
 }
 
+/* Form Elements */
 .login-card label {
   display: block;
   font-family: 'Poppins', sans-serif;
@@ -156,13 +182,12 @@
   margin-bottom: 0;
   border-radius: 14px;
   border: 2px solid #e8e8f0;
-  background: rgba(248, 248, 252, 0.8);
+  background: rgba(248, 248, 252, 0.7);
   font-family: 'Poppins', sans-serif;
   font-size: 15px;
   font-weight: 400;
   color: #2d2d42;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .login-card input::placeholder {
@@ -172,26 +197,28 @@
 
 .login-card input:focus {
   outline: none;
-  border-color: #0a0aa6;
+  border-color: #00d4ff;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 
-    0 0 0 4px rgba(10, 10, 166, 0.08),
-    0 8px 24px rgba(10, 10, 166, 0.12);
+    0 0 0 4px rgba(0, 212, 255, 0.15),
+    0 8px 24px rgba(0, 212, 255, 0.1);
   transform: translateY(-2px);
 }
 
-.login-card input:focus + label {
-  color: #0a0aa6;
+.form-group:focus-within label {
+  color: #00d4ff;
 }
 
-/* Enhanced button design */
+/* Button */
 .login-button {
   width: 100%;
   padding: 18px;
-  margin-top: 20px;
+  margin-top: 24px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, #0a0aa6 0%, #4c46ff 50%, #7c3aed 100%);
+  /* Button gradient including the Light Green touch */
+  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 50%, #69f0ae 100%);
+  background-size: 200% auto;
   color: white;
   font-family: 'Poppins', sans-serif;
   font-size: 16px;
@@ -199,9 +226,9 @@
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
   box-shadow: 
-    0 12px 32px rgba(10, 10, 166, 0.25),
+    0 12px 32px rgba(10, 10, 166, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   animation: buttonSlide 1s ease-out 0.4s both;
@@ -218,156 +245,83 @@
   }
 }
 
-.login-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.6s;
-}
-
-.login-button:hover::before {
-  left: 100%;
-}
-
 .login-button:hover {
-  background: linear-gradient(135deg, #0808d4 0%, #5d4eff 50%, #8b42f0 100%);
+  background-position: right center;
   transform: translateY(-3px);
   box-shadow: 
-    0 16px 40px rgba(10, 10, 166, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 16px 40px rgba(10, 10, 166, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .login-button:active {
   transform: translateY(-1px);
-  box-shadow: 
-    0 8px 24px rgba(10, 10, 166, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .login-button:disabled {
-  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  background: #9ca3af;
   cursor: not-allowed;
   transform: none;
-  box-shadow: 0 4px 16px rgba(107, 114, 128, 0.25);
-  color: rgba(255, 255, 255, 0.9);
+  box-shadow: none;
 }
 
-/* Loading state improvements */
 .login-button.loading {
-  pointer-events: none;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 16px;
-  min-height: 54px;
-}
-
-.login-button.loading::before {
-  display: none;
+  gap: 12px;
 }
 
 .loading-spinner {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-top: 2px solid white;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  flex-shrink: 0;
 }
 
-.loading-text {
-  font-weight: 600;
-  font-size: 15px;
-  color: white;
-  opacity: 1;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-/* Error message styling */
 .error-message {
-  color: #ef4444;
-  font-family: 'Poppins', sans-serif;
+  color: #dc2626;
   font-size: 14px;
   font-weight: 500;
-  margin-top: 8px;
-  padding: 12px 16px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(220, 38, 38, 0.1);
   border-radius: 10px;
-  animation: errorShake 0.6s ease-in-out;
+  animation: errorShake 0.5s ease-in-out;
 }
 
 @keyframes errorShake {
   0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-  20%, 40%, 60%, 80% { transform: translateX(4px); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Layout remains the same */
-.login-page {
-  min-height: 100vh;
-  width: 100vw;
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  background: linear-gradient(135deg, #5eb3ff 0%, #7dd4b8 100%);
-  overflow: hidden;
-}
-
-.login-left {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 60px 40px 40px;
-}
-
-.login-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 40px 40px 40px 20px;
-}
-
+/* Logo */
 .paysera-logo {
   width: 100%;
   max-width: 600px;
-  opacity: 0.95;
-  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.1));
-  animation: logoFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.15));
+  animation: logoFloat 6s ease-in-out infinite;
 }
 
 @keyframes logoFloat {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
 }
 
-/* Enhanced responsive design */
+/* Responsive */
 @media (max-width: 1200px) {
   .login-page {
     grid-template-columns: 1fr;
-    background: linear-gradient(135deg, #5eb3ff 0%, #7dd4b8 100%);
   }
-  
   .login-right {
     display: none;
   }
-  
   .login-card {
     width: 90%;
     max-width: 480px;
@@ -376,47 +330,9 @@
 
 @media (max-width: 480px) {
   .login-card {
-    padding: 40px 32px;
-    border-radius: 20px;
-    height: auto;
-    min-height: 580px;
+    padding: 40px 24px;
   }
-  
-  .login-icon {
-    width: 64px;
-    height: 64px;
-  }
-  
   .login-card h2 {
-    font-size: 24px;
-    margin-bottom: 32px;
-  }
-  
-  .login-card input {
-    padding: 14px 16px;
-  }
-  
-  .login-button {
-    padding: 16px;
-    font-size: 15px;
-  }
-}
-
-/* Focus states for accessibility */
-.login-card input:focus,
-.login-button:focus {
-  outline: 2px solid #0a0aa6;
-  outline-offset: 2px;
-}
-
-/* Smooth scrolling for mobile */
-@media (max-height: 700px) and (max-width: 480px) {
-  .login-left {
-    align-items: flex-start;
-    padding-top: 20px;
-  }
-  
-  .login-card {
-    margin-top: 20px;
+    font-size: 26px;
   }
 }

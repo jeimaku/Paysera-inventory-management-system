@@ -1,28 +1,35 @@
 import { useState, useEffect } from 'react';
 import { 
-  Users, Package, RotateCcw, Calendar, Monitor, Eye, Search, HardDrive 
+  Users, Package, RotateCcw, Calendar, Monitor, Eye, Search, HardDrive, 
+  Laptop, Building2, Zap, AlertTriangle, User
 } from 'lucide-react';
 import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 
-// IMPORT THE NEW DEDICATED CSS
-import '../../styles/employee-devices.css'; 
+// Import the new IT-themed CSS
+import '../../styles/it-employee-devices.css';
 import '../../styles/new_modal.css';
 
 export default function EmployeeDevices() {
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [returning, setReturning] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   
   // Specs Modal State
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
   const [viewSpecsType, setViewSpecsType] = useState('');
-  const [selectedDeployment, setSelectedDeployment] = useState(null); // <--- ADD THIS
+  const [selectedDeployment, setSelectedDeployment] = useState(null);
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('');
+  const [filters, setFilters] = useState({
+    search: '',
+    deviceType: '',
+    department: '',
+  });
+
+  const departments = [...new Set(deployments.map(d => d.employees?.departments?.department_name).filter(Boolean))];
 
   useEffect(() => {
     loadDeployments();
@@ -40,48 +47,37 @@ export default function EmployeeDevices() {
     }
   };
 
-  const handleReturnDevice = async (employeeDeviceId, employeeName, deviceInfo) => {
-    // 1. Use 'prompt' instead of 'confirm' to capture the text input
-    const reason = prompt(
-      `Returning device from ${employeeName}.\n\nDevice: ${deviceInfo}\n\nPlease enter the REASON for return:`
-    );
+  const handleReturnClick = (deployment) => {
+    setDeleteConfirm(deployment);
+  };
 
-    // 2. Handle Cancel or Empty Input
-    if (reason === null) return; // User clicked Cancel
-    if (reason.trim() === "") {
-      alert("Return cancelled: You must provide a reason for transparency.");
-      return;
-    }
-
-    setReturning(employeeDeviceId);
-    try {
-      // 3. Pass the 'reason' variable to your service
-      const result = await returnDevice(employeeDeviceId, reason);
-      
-      if (result.success) {
-        loadDeployments();
-      } else {
-        alert('Failed to return device: ' + (result.error || 'Unknown error'));
+  const handleReturnConfirm = async () => {
+    if (deleteConfirm) {
+      setReturning(deleteConfirm.employee_device_id);
+      try {
+        const result = await returnDevice(deleteConfirm.employee_device_id, 'IT Managed Return');
+        if (result.success) {
+          setDeleteConfirm(null);
+          loadDeployments();
+        } else {
+          alert(`Failed to return device: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error returning device:', error);
+      } finally {
+        setReturning(null);
       }
-    } catch (error) {
-      console.error('Error returning device:', error);
-    } finally {
-      setReturning(null);
     }
   };
-  
+
   const handleViewSpecs = async (deployment) => {
     try {
-      // 1. Fetch full technical specs (RAM, CPU, etc.)
       const fullDeviceData = await getDetailedDeviceSpecs(deployment.device_type, deployment.device_id);
       
       if (fullDeviceData) {
         setViewSpecsDevice(fullDeviceData);
         setViewSpecsType(deployment.device_type.toLowerCase());
-        
-        // 2. SAVE THE DEPLOYMENT DETAILS (Employee info, Date Issued)
-        setSelectedDeployment(deployment); // <--- ADD THIS LINE
-        
+        setSelectedDeployment(deployment);
         setIsSpecModalOpen(true);
       }
     } catch (error) {
@@ -89,167 +85,244 @@ export default function EmployeeDevices() {
     }
   };
 
-  // Filter Logic
-  const filteredDeployments = deployments.filter(d => {
-    const matchesSearch = 
-      d.employees?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.device_asset_id?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType ? d.device_type === filterType : true;
-    return matchesSearch && matchesType;
+  // Calculate days deployed
+  const getDaysDeployed = (dateIssued) => {
+    if (!dateIssued) return 0;
+    const issued = new Date(dateIssued);
+    const today = new Date();
+    const diffTime = today.getTime() - issued.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  // Filter deployments
+  const filteredDeployments = deployments.filter(deployment => {
+    const matchesSearch = !filters.search || 
+      deployment.employees?.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      deployment.employees?.employee_code?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      deployment.device_asset_id?.toLowerCase().includes(filters.search.toLowerCase());
+    
+    const matchesDeviceType = !filters.deviceType || deployment.device_type === filters.deviceType;
+    const matchesDepartment = !filters.department || deployment.employees?.departments?.department_name === filters.department;
+    
+    return matchesSearch && matchesDeviceType && matchesDepartment;
   });
 
+  // Get deployment statistics
+  const stats = {
+    total: deployments.length,
+    laptops: deployments.filter(d => d.device_type === 'LAPTOP').length,
+    desktops: deployments.filter(d => d.device_type === 'DESKTOP').length,
+    departments: departments.length
+  };
+
+  if (loading) {
+    return (
+      <div className="it-employee-devices-container">
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <span>Loading active deployments...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="ed-container">
+    <div className="it-employee-devices-container">
       
-      {/* 1. HEADER */}
-      <div className="ed-header">
-        <div className="ed-title">
-          <div className="ed-header-icon">
-            <Users size={24} />
-          </div>
+      {/* Header Card - Matches Deploy Device Design */}
+      <div className="it-header-card">
+        <div className="header-title-group">
           <h1>Employee Devices</h1>
+          <div className="header-meta">Monitor and manage active device deployments</div>
+        </div>
+        <div className="header-badge">
+          <Zap size={16} />
+          <span>IT Operations</span>
         </div>
       </div>
 
-      {/* 2. CONTROLS */}
-      <div className="ed-controls">
-        <div className="ed-search-box">
-          <Search size={18} className="ed-search-icon" />
-          <input 
-            type="text" 
-            className="ed-search-input"
-            placeholder="Search employee or asset ID..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+      {/* Info Banner - IT-specific guidance */}
+      <div className="it-info-banner">
+        <Building2 className="info-banner-icon" size={20} />
+        <div className="info-banner-content">
+          <h4>IT Role: Active Deployment Management</h4>
+          <p>
+            Monitor all active device deployments and manage returns when needed. 
+            Use the device specifications view to access detailed technical information.
+            <strong> Device returns</strong> are tracked for inventory management and audit purposes.
+          </p>
+        </div>
+      </div>
+
+      {/* Statistics Cards - Green themed */}
+      <div className="it-stats-grid">
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <Users size={20} />
+            <span>Active Deployments</span>
+          </div>
+          <div className="stat-value">{stats.total}</div>
+        </div>
+        
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <Laptop size={20} />
+            <span>Deployed Laptops</span>
+          </div>
+          <div className="stat-value laptops">{stats.laptops}</div>
+        </div>
+
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <HardDrive size={20} />
+            <span>Deployed Desktops</span>
+          </div>
+          <div className="stat-value desktops">{stats.desktops}</div>
+        </div>
+
+        <div className="it-stat-card">
+          <div className="stat-header">
+            <Building2 size={20} />
+            <span>Active Departments</span>
+          </div>
+          <div className="stat-value departments">{stats.departments}</div>
+        </div>
+      </div>
+
+      {/* Filters Bar - Matches Deploy Device Design */}
+      <div className="it-filters-bar">
+        <div className="filter-input-wrapper">
+          <Search className="filter-icon" size={18} />
+          <input
+            type="text"
+            className="it-search-input"
+            placeholder="Search employee name, code, or device ID..."
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
         </div>
         
         <select 
-          className="ed-filter-select"
-          value={filterType} 
-          onChange={(e) => setFilterType(e.target.value)}
+          className="it-filter-select" 
+          value={filters.deviceType} 
+          onChange={(e) => setFilters({ ...filters, deviceType: e.target.value })}
         >
           <option value="">All Device Types</option>
           <option value="LAPTOP">Laptops</option>
           <option value="DESKTOP">Desktops</option>
         </select>
+
+        <select 
+          className="it-filter-select" 
+          value={filters.department} 
+          onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+        >
+          <option value="">All Departments</option>
+          {departments.map(dept => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
       </div>
 
-      {/* 3. TABLE */}
-      <div className="ed-table-wrapper">
-        <table className="ed-table">
+      {/* Data Table - Green themed */}
+      <div className="it-table-wrapper">
+        <table className="it-table">
           <thead>
             <tr>
-              <th style={{ width: '25%' }}>Employee Profile</th>
-              <th style={{ width: '20%' }}>Assigned Device</th>
-              <th style={{ width: '25%' }}>Monitors/Peripherals</th>
-              <th style={{ width: '15%' }}>Deployment Date</th>
-              <th style={{ width: '15%', textAlign: 'center' }}>Actions</th>
+              <th>Employee Profile</th>
+              <th>Device Information</th>
+              <th>Deployment Details</th>
+              <th>Duration</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr><td colSpan="5" className="ed-empty">Loading active devices...</td></tr>
-            ) : filteredDeployments.length === 0 ? (
-              <tr><td colSpan="5" className="ed-empty">No active devices found.</td></tr>
+            {filteredDeployments.length === 0 ? (
+              <tr><td colSpan="5" className="it-empty-state">No active deployments found.</td></tr>
             ) : (
-              filteredDeployments.map((deployment) => (
-                <tr key={deployment.employee_device_id}>
-                  
-                  {/* Employee Column */}
-                  <td>
-                    <div className="ed-emp-flex">
-                      <div className="ed-avatar">
-                        {deployment.employees?.full_name?.charAt(0) || 'U'}
-                      </div>
-                      <div>
-                        <span className="ed-emp-name">
-                          {deployment.employees?.full_name || 'Unknown'}
-                        </span>
-                        <span className="ed-emp-dept">
-                          {deployment.employees?.departments?.department_name || 'No Dept'}
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Device Column - Single Row Layout */}
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      {/* 1. Device Type Badge */}
-                      <span className={`ed-badge ${deployment.device_type === 'LAPTOP' ? 'ed-badge-laptop' : 'ed-badge-desktop'}`}>
-                        {deployment.device_type}
-                      </span>
-
-                      {/* 2. Asset ID */}
-                      <span className="ed-asset-id">
-                        {deployment.device_asset_id}
-                      </span>
-
-                      {/* 3. Divider */}
-                      <span style={{ color: '#e2e8f0' }}>|</span>
-
-                      {/* 4. Icon + Brand/Model */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.85rem' }}>
-                        {deployment.device_type === 'LAPTOP' ? <Package size={14} /> : <HardDrive size={14} />}
-                        <span style={{ fontWeight: '500' }}>
-                          {deployment.device_brand} {deployment.device_model}
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Peripherals Column */}
-                  <td>
-                    {deployment.employee_monitors?.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        {deployment.employee_monitors.map((m, idx) => (
-                          <div key={idx} className="ed-monitor-tag">
-                            <Monitor size={12} /> 
-                            <span>{m.monitors.asset_id}</span>
+              filteredDeployments.map((deployment) => {
+                const daysDeployed = getDaysDeployed(deployment.date_issued);
+                const monitors = deployment.employee_monitors || [];
+                
+                return (
+                  <tr key={deployment.employee_device_id}>
+                    <td>
+                      <div className="employee-profile">
+                        <div className="employee-avatar">
+                          <User size={18} />
+                        </div>
+                        <div>
+                          <div className="employee-name">{deployment.employees?.full_name}</div>
+                          <div className="employee-details">
+                            {deployment.employees?.employee_code} • {deployment.employees?.departments?.department_name}
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    ) : (
-                      <span style={{ color: '#cbd5e1', fontStyle: 'italic', fontSize: '0.85rem' }}>None</span>
-                    )}
-                  </td>
+                    </td>
+                    
+                    <td>
+                      <div className="device-info">
+                        <div className="device-type-icon">
+                          {deployment.device_type === 'LAPTOP' ? 
+                            <Laptop size={16} /> : 
+                            <HardDrive size={16} />
+                          }
+                        </div>
+                        <div>
+                          <div className="device-id">{deployment.device_asset_id || 'Unknown'}</div>
+                          <div className="device-details">
+                            {deployment.device_type}
+                            {monitors.length > 0 && (
+                              <span> • {monitors.length} Monitor{monitors.length > 1 ? 's' : ''}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
 
-                  {/* Date Column */}
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
-                      <Calendar size={14} />
-                      {new Date(deployment.date_issued).toLocaleDateString()}
-                    </div>
-                  </td>
+                    <td>
+                      <div className="deployment-info">
+                        <div className="deployment-date">
+                          <Calendar size={14} />
+                          {new Date(deployment.date_issued).toLocaleDateString()}
+                        </div>
+                        <div className="deployment-source">Deployed by IT</div>
+                      </div>
+                    </td>
 
-                  {/* Actions Column */}
-                  <td>
-                    <div className="ed-actions">
-                      <button 
-                        className="ed-btn-icon ed-btn-view"
-                        onClick={() => handleViewSpecs(deployment)}
-                        title="View Specs"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      
-                      <button 
-                        className="ed-btn-icon ed-btn-return"
-                        onClick={() => handleReturnDevice(
-                          deployment.employee_device_id,
-                          deployment.employees?.full_name,
-                          `${deployment.device_type} (${deployment.device_asset_id})`
-                        )}
-                        disabled={returning === deployment.employee_device_id}
-                        title="Return Device"
-                      >
-                        {returning === deployment.employee_device_id ? '...' : <RotateCcw size={16} />}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    <td>
+                      <span className={`duration-badge ${daysDeployed > 180 ? 'long-term' : 'recent'}`}>
+                        {daysDeployed} days
+                      </span>
+                    </td>
+
+                    <td>
+                      <div className="action-buttons">
+                        <button 
+                          className="action-btn btn-view" 
+                          onClick={() => handleViewSpecs(deployment)}
+                          title="View Device Specs"
+                        >
+                          <Eye size={16} />
+                        </button>
+
+                        <button 
+                          className="action-btn btn-return" 
+                          onClick={() => handleReturnClick(deployment)}
+                          disabled={returning === deployment.employee_device_id}
+                          title="Return Device"
+                        >
+                          {returning === deployment.employee_device_id ? (
+                            <div className="btn-spinner"></div>
+                          ) : (
+                            <RotateCcw size={16} />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -261,11 +334,58 @@ export default function EmployeeDevices() {
         onClose={() => setIsSpecModalOpen(false)}
         device={viewSpecsDevice}
         type={viewSpecsType}
-        // --- ADD THESE PROPS ---
-        showDeployment={true}             // Tells modal to show the "Deployment" tab
-        deploymentDetails={selectedDeployment} // Passes the employee/date info
-        // -----------------------
+        showDeployment={true}
+        deploymentDetails={selectedDeployment}
       />
+
+      {/* Return Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="it-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Warning Icon */}
+            <div className="confirm-icon-wrapper">
+              <AlertTriangle size={32} />
+            </div>
+
+            {/* Text Content */}
+            <h3 className="confirm-title">Return Device?</h3>
+            <p className="confirm-desc">
+              You are about to return the device from <strong>{deleteConfirm.employees?.full_name}</strong>.
+              <br />This will make the device available for reassignment and cannot be undone.
+            </p>
+
+            {/* Device Info */}
+            <div className="confirm-device-info">
+              <div className="device-summary">
+                {deleteConfirm.device_type === 'LAPTOP' ? 
+                  <Laptop size={16} /> : 
+                  <HardDrive size={16} />
+                }
+                <span>{deleteConfirm.device_asset_id} ({deleteConfirm.device_type})</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="confirm-actions">
+              <button 
+                className="btn-cancel-modern" 
+                onClick={() => setDeleteConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-confirm-modern" 
+                onClick={handleReturnConfirm}
+                disabled={returning}
+              >
+                {returning ? 'Returning...' : 'Return Device'}
+              </button>
+            </div>
+
+          </div> 
+        </div>
+      )}
     </div>
   );
 }

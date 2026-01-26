@@ -1,0 +1,154 @@
+/* Enhanced Logout Styles for Sidebars */
+/* Add these styles to your existing admin-sidebar.css and it-sidebar.css files */
+
+/* Logout Loading States */
+.nav-item.logout-item.logging-out {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.nav-item.logout-item:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Spinning animation for logout icon */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.nav-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* Enhanced logout button hover states */
+.nav-item.logout-item:hover:not(:disabled) {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
+
+.nav-item.logout-item:hover:not(:disabled) .nav-icon {
+  color: #dc3545;
+}
+
+/* Logout button active state */
+.nav-item.logout-item:active:not(:disabled) {
+  background-color: rgba(220, 53, 69, 0.2);
+}
+
+/* Collapsed sidebar tooltip styles */
+.sidebar.collapsed .nav-item[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #333;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  z-index: 1000;
+  margin-left: 0.5rem;
+  pointer-events: none;
+}
+
+.sidebar.collapsed .nav-item[title]:hover::before {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #333;
+  z-index: 1000;
+}
+
+/* Enhanced disabled state for navigation items during logout */
+.sidebar nav .nav-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Loading state visual feedback */
+.nav-item.logging-out {
+  position: relative;
+}
+
+.nav-item.logging-out::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Responsive enhancements for logout */
+@media (max-width: 768px) {
+  .nav-item.logout-item {
+    padding: 1rem;
+  }
+  
+  .nav-item.logout-item .nav-label {
+    font-size: 0.9rem;
+  }
+}
+
+/* Dark theme support for logout states */
+@media (prefers-color-scheme: dark) {
+  .nav-item.logout-item:hover:not(:disabled) {
+    background-color: rgba(220, 53, 69, 0.15);
+  }
+  
+  .sidebar.collapsed .nav-item[title]:hover::after {
+    background: #1f2937;
+    color: #f9fafb;
+  }
+  
+  .sidebar.collapsed .nav-item[title]:hover::before {
+    border-right-color: #1f2937;
+  }
+}
+
+/* Focus states for accessibility */
+.nav-item.logout-item:focus:not(:disabled) {
+  outline: 2px solid #dc3545;
+  outline-offset: 2px;
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .nav-item.logout-item {
+    border: 1px solid transparent;
+  }
+  
+  .nav-item.logout-item:hover:not(:disabled),
+  .nav-item.logout-item:focus:not(:disabled) {
+    border-color: #dc3545;
+    background-color: #fff;
+    color: #dc3545;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .nav-icon.spinning {
+    animation: none;
+  }
+  
+  .nav-item.logging-out::after {
+    animation: none;
+  }
+}

@@ -29,11 +29,15 @@ export async function getEmployeesForDeployment() {
     return [];
   }
 }
+
 // Get available devices for deployment (not currently issued)
 export async function getAvailableDevices(deviceType) {
   try {
     const tableName = deviceType === 'LAPTOP' ? 'laptops' : 'desktops';
     const idField = deviceType === 'LAPTOP' ? 'laptop_id' : 'desktop_id';
+    
+    console.log(`🔍 Fetching ${deviceType} devices from table: ${tableName}`);
+    console.log(`🔍 Looking for devices with status: 'available'`);
     
     const { data, error } = await supabase
       .from(tableName)
@@ -41,24 +45,48 @@ export async function getAvailableDevices(deviceType) {
       .eq('status', 'available')
       .order('asset_id');
 
-    if (error) throw error;
+    if (error) {
+      console.error(`❌ Error fetching ${deviceType} devices:`, error);
+      throw error;
+    }
+    
+    console.log(`✅ Found ${data?.length || 0} available ${deviceType} devices:`, data);
+    
+    // If no devices found, let's also check what devices exist with any status
+    if (!data || data.length === 0) {
+      console.log(`🔍 No available ${deviceType} found. Checking all devices in ${tableName}...`);
+      const { data: allDevices, error: allError } = await supabase
+        .from(tableName)
+        .select('asset_id, status')
+        .order('asset_id');
+      
+      if (!allError) {
+        console.log(`📋 All ${deviceType} devices in database:`, allDevices);
+      }
+    }
     
     // Format data consistently
-    return data?.map(device => {
+    const formattedDevices = data?.map(device => {
       // Determine the display label based on device type
       const displayLabel = deviceType === 'LAPTOP' 
         ? `${device.brand || 'Unknown'} ${device.model || 'Unknown'}`
         : `${device.operating_system || 'No OS'} (${device.processor || 'Unknown CPU'})`;
 
-      return {
+      const formatted = {
         ...device,
         device_id: device[idField],
         device_type: deviceType,
         display_name: `${device.asset_id} - ${displayLabel}`
       };
+      
+      console.log(`📦 Formatted ${deviceType}:`, formatted);
+      return formatted;
     }) || [];
+    
+    console.log(`✅ Returning ${formattedDevices.length} formatted ${deviceType} devices`);
+    return formattedDevices;
   } catch (error) {
-    console.error('Error fetching available devices:', error);
+    console.error(`❌ Error in getAvailableDevices for ${deviceType}:`, error);
     return [];
   }
 }
