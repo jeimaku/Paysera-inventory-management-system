@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   X, HardDrive, Monitor, Server, Laptop, 
-  Cpu, Activity, User, Clock, Wifi, Hash, Box, Layers
+  Cpu, Wifi, Hash, Layers, ShoppingCart, DollarSign, User, Clock
 } from 'lucide-react';
 import '../../styles/new_modal.css';
 
@@ -11,7 +11,8 @@ const NewSpecsModal_Admin = ({
   device, 
   type, 
   showDeployment = false, 
-  deploymentDetails = null 
+  deploymentDetails = null,
+  showProcurement = false
 }) => {
   const [activeTab, setActiveTab] = useState('specs');
 
@@ -25,6 +26,14 @@ const NewSpecsModal_Admin = ({
       month: 'long',
       day: 'numeric',
     });
+  };
+
+  const formatCurrency = (amount) => {
+    if (!amount) return 'N/A';
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP'
+    }).format(amount);
   };
 
   const getHeaderIcon = () => {
@@ -43,7 +52,6 @@ const NewSpecsModal_Admin = ({
 
   // --- Data Formatting Helpers ---
   const getMemoryInfo = () => {
-    // Check for nested desktop_memory array or flat memory field
     const modules = device.desktop_memory || device.memory_modules || [];
     if (modules.length > 0) {
       const total = modules.reduce((acc, m) => acc + (m.size_gb || 0), 0);
@@ -53,7 +61,6 @@ const NewSpecsModal_Admin = ({
   };
 
   const getStorageInfo = () => {
-    // Check for nested desktop_storage array or flat storage field
     const drives = device.desktop_storage || device.storage_devices || [];
     if (drives.length > 0) {
       return drives.map(d => `${d.capacity_gb}GB ${d.storage_type}`).join(' + ');
@@ -65,7 +72,7 @@ const NewSpecsModal_Admin = ({
   const renderSpecsContent = () => (
     <div className="nm-specs-section fade-in">
       
-      {/* 1. IDENTITY & SYSTEM (Desktops & Laptops) */}
+      {/* 1. IDENTITY & SYSTEM */}
       {type !== 'monitor' && (
         <div className="nm-category-group">
           <h4 className="nm-category-title"><Hash size={16} /> Identity & System</h4>
@@ -112,7 +119,7 @@ const NewSpecsModal_Admin = ({
         </div>
       )}
 
-      {/* 2. PERFORMANCE & HARDWARE (Desktops & Laptops) */}
+      {/* 2. PERFORMANCE & HARDWARE */}
       {type !== 'monitor' && (
         <div className="nm-category-group">
           <h4 className="nm-category-title"><Cpu size={16} /> Performance & Hardware</h4>
@@ -125,7 +132,7 @@ const NewSpecsModal_Admin = ({
         </div>
       )}
 
-      {/* 3. DISPLAY & GRAPHICS (Monitors & Laptops) */}
+      {/* 3. DISPLAY & GRAPHICS */}
       {(type === 'monitor' || type === 'laptop') && (
         <div className="nm-category-group">
           <h4 className="nm-category-title"><Monitor size={16} /> Display & Graphics</h4>
@@ -149,7 +156,7 @@ const NewSpecsModal_Admin = ({
         </div>
       )}
 
-      {/* 4. PHYSICAL & CONNECTIVITY (All) */}
+      {/* 4. PHYSICAL & CONNECTIVITY */}
       <div className="nm-category-group">
         <h4 className="nm-category-title"><Wifi size={16} /> Physical & Connectivity</h4>
         <div className="nm-specs-grid">
@@ -168,6 +175,47 @@ const NewSpecsModal_Admin = ({
         </div>
       </div>
 
+    </div>
+  );
+
+  const renderProcurementContent = () => (
+    <div className="nm-procurement-section fade-in">
+      <div className="nm-category-group">
+        <h4 className="nm-category-title"><ShoppingCart size={16} /> Key Procurement Details</h4>
+        <div className="nm-specs-grid">
+          {/* Key Fields requested */}
+          <SpecRow label="Supplier/Vendor" value={device.supplier || device.vendor} />
+          <SpecRow label="Date of Purchase" value={formatDate(device.purchase_date || device.date_purchased)} />
+          <SpecRow label="Warranty End Date" value={formatDate(device.warranty_end || device.warranty_expiry)} />
+          
+          {/* Additional details if available */}
+          <SpecRow label="Purchase Order No." value={device.purchase_order_number || device.po_number} />
+          <SpecRow label="Unit Cost" value={formatCurrency(device.unit_cost || device.cost)} />
+          <SpecRow label="Distributor" value={device.distributor} />
+        </div>
+      </div>
+
+      {/* Optional Financial Details */}
+      {(device.budget_code || device.invoice_number) && (
+        <div className="nm-category-group">
+          <h4 className="nm-category-title"><DollarSign size={16} /> Financial Records</h4>
+          <div className="nm-specs-grid">
+            <SpecRow label="Budget Code" value={device.budget_code} />
+            <SpecRow label="Invoice Number" value={device.invoice_number} />
+            <SpecRow label="Receipt Number" value={device.receipt_number} />
+          </div>
+        </div>
+      )}
+
+      {/* Procurement Notes */}
+      {(device.procurement_notes || device.remarks) && (
+        <div className="nm-category-group">
+          <h4 className="nm-category-title"><Layers size={16} /> Notes & Remarks</h4>
+          <div className="nm-specs-grid">
+            <SpecRow label="Procurement Notes" value={device.procurement_notes || device.remarks} fullWidth />
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -219,6 +267,26 @@ const NewSpecsModal_Admin = ({
     );
   };
 
+  // Determine available tabs
+  const getAvailableTabs = () => {
+    const tabs = [
+      { id: 'specs', label: 'Specifications', content: renderSpecsContent }
+    ];
+
+    if (showProcurement) {
+      tabs.push({ id: 'procurement', label: 'Procurement', content: renderProcurementContent });
+    }
+
+    if (showDeployment && deploymentDetails) {
+      tabs.push({ id: 'deployment', label: 'Deployment', content: renderDeploymentContent });
+    }
+
+    return tabs;
+  };
+
+  const availableTabs = getAvailableTabs();
+  const currentTab = availableTabs.find(tab => tab.id === activeTab) || availableTabs[0];
+
   return (
     <div className="nm-overlay" onClick={onClose}>
       <div className="nm-container" onClick={(e) => e.stopPropagation()}>
@@ -246,20 +314,17 @@ const NewSpecsModal_Admin = ({
             </button>
           </div>
           
-          {showDeployment ? (
+          {availableTabs.length > 1 ? (
             <div className="nm-tabs-container">
-              <button 
-                className={`nm-tab ${activeTab === 'specs' ? 'active' : ''}`}
-                onClick={() => setActiveTab('specs')}
-              >
-                Specifications
-              </button>
-              <button 
-                className={`nm-tab ${activeTab === 'deployment' ? 'active' : ''}`}
-                onClick={() => setActiveTab('deployment')}
-              >
-                Deployment
-              </button>
+              {availableTabs.map(tab => (
+                <button 
+                  key={tab.id}
+                  className={`nm-tab ${activeTab === tab.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           ) : (
             <div className="nm-header-bottom-spacer"></div> 
@@ -268,7 +333,7 @@ const NewSpecsModal_Admin = ({
 
         {/* Scrollable Content Body */}
         <div className="nm-body">
-          {activeTab === 'specs' ? renderSpecsContent() : renderDeploymentContent()}
+          {currentTab.content()}
         </div>
 
         {/* Footer */}
@@ -294,7 +359,19 @@ const SpecRow = ({ label, value, fullWidth, isPill, isStatus }) => {
   }
   
   if (isStatus) {
-    const color = value.toLowerCase() === 'available' ? '#10B981' : '#3B82F6';
+    const getStatusColor = (status) => {
+      switch (status?.toLowerCase()) {
+        case 'available': return '#10B981';
+        case 'issued': return '#3B82F6';
+        case 'defective': return '#EF4444';
+        case 'paid': return '#10B981';
+        case 'pending': return '#F59E0B';
+        case 'overdue': return '#EF4444';
+        default: return '#6B7280';
+      }
+    };
+    
+    const color = getStatusColor(value);
     content = (
       <span className="nm-value" style={{ color: color, fontWeight: 'bold', textTransform: 'uppercase' }}>
         {value}

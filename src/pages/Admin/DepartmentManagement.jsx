@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, Building2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Building2, Users } from 'lucide-react';
 import DepartmentModal from '../../components/Admin/DepartmentModal';
 import {
   getDepartments,
@@ -7,7 +7,8 @@ import {
   updateDepartment,
   deleteDepartment,
 } from '../../services/organizationService';
-import '../../styles/inventory.css';
+import '../../styles/admin-inventory.css'; // Shared Theme
+import '../../styles/new_modal.css';
 
 export default function DepartmentManagement() {
   const [departments, setDepartments] = useState([]);
@@ -51,136 +52,97 @@ export default function DepartmentManagement() {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deleteConfirm) return;
-
-    const result = await deleteDepartment(deleteConfirm.department_id);
-
-    if (result.success) {
-      setDepartments((prev) =>
-        prev.filter((dept) => dept.department_id !== deleteConfirm.department_id)
-      );
+    if (deleteConfirm) {
+      await deleteDepartment(deleteConfirm.department_id);
       setDeleteConfirm(null);
-    } else {
-      alert('Failed to delete department: ' + result.error);
+      loadDepartments();
     }
   };
 
   const handleModalSubmit = async (formData) => {
-    let result;
-
-    if (selectedDepartment) {
-      result = await updateDepartment(selectedDepartment.department_id, formData);
-    } else {
-      result = await createDepartment(formData);
-    }
-
-    if (result.success) {
+    try {
+      if (selectedDepartment) {
+        await updateDepartment(selectedDepartment.department_id, formData);
+      } else {
+        await createDepartment(formData);
+      }
       setIsModalOpen(false);
       loadDepartments();
-    } else {
-      alert('Error: ' + result.error);
+    } catch (error) {
+      console.error('Error saving department:', error);
     }
   };
 
   return (
-    <div className="inventory-container">
-      <header className="inventory-header">
-        <div className="header-title">
-          <Building2 size={32} className="header-icon" />
-          <div>
-            <h1>Department Management</h1>
-            <p className="subtitle">Manage company departments and organizational structure</p>
-          </div>
+    <div className="admin-inventory-container">
+      
+      <div className="admin-header-card">
+        <div className="header-title-group">
+          <h1>Departments</h1>
+          <div className="header-meta">Organize company structure and teams</div>
         </div>
-      </header>
-
-      <div className="inventory-stats">
-        <div className="stat-item">
-          <span className="stat-label">Total Departments</span>
-          <span className="stat-value">{departments.length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Active Departments</span>
-          <span className="stat-value stat-available">{departments.length}</span>
-        </div>
+        <button className="btn-add-device" onClick={handleAddDepartment}>
+          <Plus size={20} /> New Department
+        </button>
       </div>
 
-      <div className="inventory-controls">
-        <div className="search-box">
-          <Search size={18} />
+      <div className="admin-filters-bar">
+        <div className="filter-input-wrapper">
+          <Search className="filter-icon" size={18} />
           <input
             type="text"
+            className="admin-search-input"
             placeholder="Search departments..."
             value={filters.search}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, search: e.target.value }))
-            }
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
-        </div>
-
-        <div className="filters">
-          <button className="btn-add" onClick={handleAddDepartment}>
-            <Plus size={18} />
-            Add Department
-          </button>
         </div>
       </div>
 
-      <div className="inventory-table-card">
-        {loading ? (
-          <div className="loading">Loading departments...</div>
-        ) : (
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Department Name</th>
-                  <th>Employee Count</th>
-                  <th>Actions</th>
+      <div className="admin-table-wrapper">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Department Name</th>
+              <th>Workforce</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan="3" className="admin-empty-state">Loading...</td></tr>
+            ) : departments.length === 0 ? (
+              <tr><td colSpan="3" className="admin-empty-state">No departments found.</td></tr>
+            ) : (
+              departments.map((dept) => (
+                <tr key={dept.department_id}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Building2 size={18} className="text-gray-400" />
+                      <span className="col-main-text">{dept.department_name}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className="admin-badge badge-deployed" style={{ display: 'inline-flex', gap: '6px' }}>
+                      <Users size={14} />
+                      {dept.employee_count || 0} Employees
+                    </span>
+                  </td>
+                  <td>
+                    <div className="admin-actions">
+                      <button className="action-btn btn-edit" onClick={() => handleEditDepartment(dept)}>
+                        <Edit2 size={16} />
+                      </button>
+                      <button className="action-btn btn-delete" onClick={() => handleDeleteClick(dept)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {departments.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="no-data">
-                      No departments found
-                    </td>
-                  </tr>
-                ) : (
-                  departments.map((department) => (
-                    <tr key={department.department_id}>
-                      <td className="asset-id">{department.department_id}</td>
-                      <td className="department-name">
-                        <strong>{department.department_name}</strong>
-                      </td>
-                      <td>{department.employee_count || 0}</td>
-                      <td>
-                        <div className="action-buttons">
-                          <button
-                            className="btn-icon btn-edit"
-                            onClick={() => handleEditDepartment(department)}
-                            title="Edit"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            className="btn-icon btn-delete"
-                            onClick={() => handleDeleteClick(department)}
-                            title="Delete"
-                            disabled={department.employee_count > 0}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       <DepartmentModal
@@ -194,29 +156,16 @@ export default function DepartmentManagement() {
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Delete Department</h3>
-            <p>
-              Are you sure you want to delete{' '}
-              <strong>"{deleteConfirm.department_name}"</strong>?
-            </p>
+            <p>Are you sure you want to delete <strong>"{deleteConfirm.department_name}"</strong>?</p>
             {deleteConfirm.employee_count > 0 ? (
-              <p className="warning-text">
-                This department has {deleteConfirm.employee_count} employee(s). 
-                You cannot delete a department with active employees.
+              <p className="warning-text" style={{color: '#ef4444', fontSize: '0.9rem', marginTop: '8px'}}>
+                ⚠️ Cannot delete: This department has {deleteConfirm.employee_count} active employees.
               </p>
-            ) : (
-              <p className="warning-text">This action cannot be undone.</p>
-            )}
+            ) : null}
             <div className="modal-actions">
-              <button
-                className="btn-secondary"
-                onClick={() => setDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
+              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
               {deleteConfirm.employee_count === 0 && (
-                <button className="btn-danger" onClick={handleDeleteConfirm}>
-                  Delete
-                </button>
+                <button className="btn-danger" onClick={handleDeleteConfirm}>Delete</button>
               )}
             </div>
           </div>

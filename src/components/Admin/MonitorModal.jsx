@@ -9,7 +9,7 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
     model: '',
     model_code: '',
     serial_number: '',
-    device_condition: 'brand_new', // <--- ADD THIS LINE
+    device_condition: 'brand_new',
     // Specs
     size_inches: '',
     resolution: '',
@@ -57,7 +57,7 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
         model: '',
         model_code: '',
         serial_number: '',
-        device_condition: 'brand_new', // <--- ADD THIS LINE
+        device_condition: 'brand_new',
         status: 'available',
         size_inches: '',
         resolution: '',
@@ -72,30 +72,15 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
         supplier: '',
       });
     }
-    setErrors({});
-  }, [monitor, isOpen]);
+  }, [monitor]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
-  };
-
-  const validate = () => {
-    const newErrors = {};
-    if (!formData.asset_id.trim()) newErrors.asset_id = 'Asset ID is required';
-    if (!formData.brand.trim()) newErrors.brand = 'Brand is required';
-    if (!formData.model.trim()) newErrors.model = 'Model is required';
-    return newErrors;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const newErrors = validate();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
     onSubmit(formData);
   };
 
@@ -103,72 +88,38 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+      <div 
+        className="modal-content modal-large" 
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}
+      >
+        <div className="modal-header" style={{ flexShrink: 0 }}>
           <h2>{monitor ? 'Edit Monitor' : 'Add New Monitor'}</h2>
           <button className="modal-close" onClick={onClose}>
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          {/* 1. Device Identity */}
-          <div className="subsection">
-            <div className="subsection-header">
-              <h3>Device Identity</h3>
+        <form onSubmit={handleSubmit} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+          
+          {/* SCROLLABLE BODY */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+            
+            <div className="form-section">
+              <h3 className="section-title">Device Information</h3>
             </div>
+
             <div className="form-row">
               <div className="form-group">
-                <label>Asset ID <span className="required">*</span></label>
+                <label>Asset ID</label>
                 <input
                   type="text"
                   name="asset_id"
                   value={formData.asset_id}
                   onChange={handleChange}
-                  placeholder="MON-001"
-                  className={errors.asset_id ? 'error' : ''}
-                />
-                {errors.asset_id && <span className="error-message">{errors.asset_id}</span>}
-              </div>
-              <div className="form-group">
-                <label>Brand <span className="required">*</span></label>
-                <input
-                  type="text"
-                  name="brand"
-                  value={formData.brand}
-                  onChange={handleChange}
-                  placeholder="SAMSUNG"
-                  className={errors.brand ? 'error' : ''}
-                />
-                {errors.brand && <span className="error-message">{errors.brand}</span>}
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Model <span className="required">*</span></label>
-                <input
-                  type="text"
-                  name="model"
-                  value={formData.model}
-                  onChange={handleChange}
-                  placeholder="Odyssey G7"
-                  className={errors.model ? 'error' : ''}
-                />
-                {errors.model && <span className="error-message">{errors.model}</span>}
-              </div>
-              <div className="form-group">
-                <label>Model Code</label>
-                <input
-                  type="text"
-                  name="model_code"
-                  value={formData.model_code}
-                  onChange={handleChange}
+                  required
                 />
               </div>
-            </div>
-
-            <div className="form-row">
               <div className="form-group">
                 <label>Serial Number</label>
                 <input
@@ -178,41 +129,58 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
                   onChange={handleChange}
                 />
               </div>
+            </div>
 
-              {/* --- INSERT THIS BLOCK --- */}
+            <div className="form-row">
               <div className="form-group">
-                <label>Device Condition <span className="required">*</span></label>
-                <select 
-                  name="device_condition" 
-                  value={formData.device_condition} 
+                <label>Brand</label>
+                <input
+                  type="text"
+                  name="brand"
+                  value={formData.brand}
                   onChange={handleChange}
-                  style={{
-                    backgroundColor: formData.device_condition === 'brand_new' ? '#f0f9ff' : '#fef3c7',
-                    borderColor: formData.device_condition === 'brand_new' ? '#0284c7' : '#d97706'
-                  }}
+                  placeholder="LG, Samsung, Dell"
+                />
+              </div>
+              <div className="form-group">
+                <label>Model</label>
+                <input
+                  type="text"
+                  name="model"
+                  value={formData.model}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Condition</label>
+                <select
+                  name="device_condition"
+                  value={formData.device_condition}
+                  onChange={handleChange}
                 >
                   <option value="brand_new">Brand New</option>
-                  <option value="second_hand">Second Hand</option>
+                  <option value="good_condition">Good Condition</option>
+                  <option value="minor_issues">Minor Issues</option>
                 </select>
               </div>
-              {/* ------------------------- */}
-
               <div className="form-group">
                 <label>Status</label>
                 <select name="status" value={formData.status} onChange={handleChange}>
                   <option value="available">Available</option>
-                  <option value="issued">Issued</option>
-                  <option value="defective">Defective</option>
+                  <option value="deployed">Deployed</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="retired">Retired</option>
                 </select>
               </div>
             </div>
-          </div>
 
-          {/* 2. Technical Specifications */}
-          <div className="subsection">
-            <div className="subsection-header">
-              <h3>Technical Specifications</h3>
+            <div className="form-section">
+              <h3 className="section-title">Display Specs</h3>
             </div>
+
             <div className="form-row">
               <div className="form-group">
                 <label>Size (Inches)</label>
@@ -221,7 +189,7 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
                   name="size_inches"
                   value={formData.size_inches}
                   onChange={handleChange}
-                  placeholder="27"
+                  placeholder='e.g. 24"'
                 />
               </div>
               <div className="form-group">
@@ -231,35 +199,22 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
                   name="resolution"
                   value={formData.resolution}
                   onChange={handleChange}
-                  placeholder="2560x1440"
+                  placeholder="1920x1080"
                 />
               </div>
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label>Refresh Rate (Hz)</label>
+                <label>Refresh Rate</label>
                 <input
                   type="text"
                   name="refresh_rate"
                   value={formData.refresh_rate}
                   onChange={handleChange}
-                  placeholder="144"
+                  placeholder="60Hz, 144Hz"
                 />
               </div>
-              <div className="form-group">
-                <label>Aspect Ratio</label>
-                <input
-                  type="text"
-                  name="aspect_ratio"
-                  value={formData.aspect_ratio}
-                  onChange={handleChange}
-                  placeholder="16:9"
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
               <div className="form-group">
                 <label>Panel Type</label>
                 <input
@@ -267,46 +222,13 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
                   name="panel_type"
                   value={formData.panel_type}
                   onChange={handleChange}
-                  placeholder="IPS"
-                />
-              </div>
-              <div className="form-group">
-                <label>Screen Type</label>
-                <select name="screen_type" value={formData.screen_type} onChange={handleChange}>
-                  <option value="Flat">Flat</option>
-                  <option value="Curved">Curved</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Hubs/Ports Available</label>
-                <input
-                  type="text"
-                  name="ports"
-                  value={formData.ports}
-                  onChange={handleChange}
-                  placeholder="HDMI, DP"
-                />
-              </div>
-              <div className="form-group">
-                <label>Adaptive Sync (Optional)</label>
-                <input
-                  type="text"
-                  name="adaptive_sync"
-                  value={formData.adaptive_sync}
-                  onChange={handleChange}
-                  placeholder="G-Sync"
+                  placeholder="IPS, VA, TN"
                 />
               </div>
             </div>
-          </div>
 
-          {/* 3. Procurement Information */}
-          <div className="subsection">
-            <div className="subsection-header">
-              <h3>Procurement Information</h3>
+            <div className="form-section">
+              <h3 className="section-title">Procurement Information</h3>
             </div>
             <div className="form-row">
               <div className="form-group">
@@ -340,9 +262,11 @@ export default function MonitorModal({ isOpen, onClose, onSubmit, monitor }) {
                 />
               </div>
             </div>
+
           </div>
 
-          <div className="modal-actions">
+          {/* FIXED FOOTER */}
+          <div className="modal-actions" style={{ flexShrink: 0, padding: '20px', borderTop: '1px solid #e5e7eb', background: 'white' }}>
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary">{monitor ? 'Update Monitor' : 'Add Monitor'}</button>
           </div>

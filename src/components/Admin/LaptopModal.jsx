@@ -10,7 +10,7 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
     serial_number: '',
     unit: '',
     system_model: '',
-    device_condition: 'brand_new', // NEW: Device condition field
+    device_condition: 'brand_new',
     // Specs
     operating_system: '',
     cpu: '',
@@ -42,7 +42,7 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
         serial_number: laptop.serial_number || '',
         unit: laptop.unit || '',
         system_model: laptop.system_model || '',
-        device_condition: laptop.device_condition || 'brand_new', // NEW: Include device condition
+        device_condition: laptop.device_condition || 'brand_new',
         operating_system: laptop.operating_system || '',
         cpu: laptop.cpu || '',
         memory: laptop.memory || '',
@@ -68,7 +68,7 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
         serial_number: '',
         unit: '',
         system_model: '',
-        device_condition: 'brand_new', // NEW: Default to brand new for new devices
+        device_condition: 'brand_new',
         operating_system: '',
         cpu: '',
         memory: '',
@@ -87,58 +87,43 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
         purchase_date: '',
       });
     }
-    setErrors({});
-  }, [laptop, isOpen]);
+  }, [laptop]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
-  };
-
-  const validate = () => {
-    const newErrors = {};
-    if (!formData.asset_id.trim()) newErrors.asset_id = 'Asset ID is required';
-    if (!formData.brand.trim()) newErrors.brand = 'Brand is required';
-    if (!formData.model.trim()) newErrors.model = 'Model is required';
-    return newErrors;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const newErrors = validate();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    const submitData = {
-      ...formData,
-      memory: formData.memory ? parseInt(formData.memory) : null,
-      storage: formData.storage ? parseInt(formData.storage) : null,
-    };
-
-    onSubmit(submitData);
+    onSubmit(formData);
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+      <div 
+        className="modal-content modal-large" 
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' }}
+      >
+        <div className="modal-header" style={{ flexShrink: 0 }}>
           <h2>{laptop ? 'Edit Laptop' : 'Add New Laptop'}</h2>
           <button className="modal-close" onClick={onClose}>
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          {/* 1. Device Identity */}
-          <div className="subsection">
-            <div className="subsection-header">
-              <h3>Device Identity</h3>
+        <form onSubmit={handleSubmit} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+          
+          {/* SCROLLABLE BODY */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+            
+            <div className="form-section">
+              <h3 className="section-title">Device Information</h3>
             </div>
+
             <div className="form-row">
               <div className="form-group">
                 <label>Asset ID <span className="required">*</span></label>
@@ -147,37 +132,8 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                   name="asset_id"
                   value={formData.asset_id}
                   onChange={handleChange}
-                  placeholder="LP-001"
-                  className={errors.asset_id ? 'error' : ''}
+                  required
                 />
-                {errors.asset_id && <span className="error-message">{errors.asset_id}</span>}
-              </div>
-              <div className="form-group">
-                <label>Brand <span className="required">*</span></label>
-                <input
-                  type="text"
-                  name="brand"
-                  value={formData.brand}
-                  onChange={handleChange}
-                  placeholder="LENOVO"
-                  className={errors.brand ? 'error' : ''}
-                />
-                {errors.brand && <span className="error-message">{errors.brand}</span>}
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Model <span className="required">*</span></label>
-                <input
-                  type="text"
-                  name="model"
-                  value={formData.model}
-                  onChange={handleChange}
-                  placeholder="ThinkPad X1"
-                  className={errors.model ? 'error' : ''}
-                />
-                {errors.model && <span className="error-message">{errors.model}</span>}
               </div>
               <div className="form-group">
                 <label>Serial Number</label>
@@ -186,74 +142,72 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                   name="serial_number"
                   value={formData.serial_number}
                   onChange={handleChange}
-                  placeholder="e.g., PF5EB6Z9"
                 />
               </div>
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label>Unit</label>
+                <label>Brand</label>
                 <input
                   type="text"
-                  name="unit"
-                  value={formData.unit}
+                  name="brand"
+                  value={formData.brand}
                   onChange={handleChange}
-                  placeholder="e.g., Unit A"
+                  placeholder="e.g. Dell, Lenovo"
                 />
               </div>
               <div className="form-group">
-                <label>System Model</label>
+                <label>Model</label>
                 <input
                   type="text"
-                  name="system_model"
-                  value={formData.system_model}
+                  name="model"
+                  value={formData.model}
                   onChange={handleChange}
+                  placeholder="e.g. Latitude 5420"
                 />
               </div>
             </div>
 
-            {/* NEW: Device Condition Row */}
             <div className="form-row">
               <div className="form-group">
-                <label>Device Condition <span className="required">*</span></label>
-                <select 
-                  name="device_condition" 
-                  value={formData.device_condition} 
+                <label>Condition</label>
+                <select
+                  name="device_condition"
+                  value={formData.device_condition}
                   onChange={handleChange}
-                  style={{
-                    backgroundColor: formData.device_condition === 'brand_new' ? '#f0f9ff' : '#fef3c7',
-                    borderColor: formData.device_condition === 'brand_new' ? '#0284c7' : '#d97706'
-                  }}
                 >
                   <option value="brand_new">Brand New</option>
-                  <option value="second_hand">Second Hand</option>
+                  <option value="good_condition">Good Condition</option>
+                  <option value="minor_issues">Minor Issues</option>
                 </select>
-                <small className="field-hint">
-                  {formData.device_condition === 'brand_new' 
-                    ? 'Device is brand new, unused' 
-                    : 'Device has been previously used or refurbished'
-                  }
-                </small>
               </div>
               <div className="form-group">
                 <label>Status</label>
                 <select name="status" value={formData.status} onChange={handleChange}>
                   <option value="available">Available</option>
-                  <option value="issued">Issued</option>
-                  <option value="defective">Defective</option>
+                  <option value="deployed">Deployed</option>
+                  <option value="maintenance">Maintenance</option>
                   <option value="retired">Retired</option>
                 </select>
               </div>
             </div>
-          </div>
 
-          {/* 2. Technical Specifications */}
-          <div className="subsection">
-            <div className="subsection-header">
-              <h3>Technical Specifications</h3>
+            <div className="form-section">
+              <h3 className="section-title">Technical Specifications</h3>
             </div>
+
             <div className="form-row">
+              <div className="form-group">
+                <label>CPU / Processor</label>
+                <input
+                  type="text"
+                  name="cpu"
+                  value={formData.cpu}
+                  onChange={handleChange}
+                  placeholder="e.g. i5-1135G7"
+                />
+              </div>
               <div className="form-group">
                 <label>Operating System</label>
                 <input
@@ -261,17 +215,7 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                   name="operating_system"
                   value={formData.operating_system}
                   onChange={handleChange}
-                  placeholder="Windows 11 Pro"
-                />
-              </div>
-              <div className="form-group">
-                <label>CPU</label>
-                <input
-                  type="text"
-                  name="cpu"
-                  value={formData.cpu}
-                  onChange={handleChange}
-                  placeholder="Intel Core i7"
+                  placeholder="e.g. Windows 11 Pro"
                 />
               </div>
             </div>
@@ -284,7 +228,6 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                   name="memory"
                   value={formData.memory}
                   onChange={handleChange}
-                  placeholder="16"
                 />
               </div>
               <div className="form-group">
@@ -294,7 +237,6 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                   name="storage"
                   value={formData.storage}
                   onChange={handleChange}
-                  placeholder="512"
                 />
               </div>
             </div>
@@ -302,93 +244,28 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
             <div className="form-row">
               <div className="form-group">
                 <label>Storage Type</label>
-                <select name="storage_type" value={formData.storage_type} onChange={handleChange}>
-                  <option value="">Select Type</option>
-                  <option value="SSD">SSD</option>
-                  <option value="HDD">HDD</option>
-                  <option value="NVMe">NVMe</option>
-                </select>
+                <input
+                  type="text"
+                  name="storage_type"
+                  value={formData.storage_type}
+                  onChange={handleChange}
+                  placeholder="SSD, HDD, NVMe"
+                />
               </div>
               <div className="form-group">
-                <label>Graphics/Video Card</label>
+                <label>Graphics</label>
                 <input
                   type="text"
                   name="graphics_card"
                   value={formData.graphics_card}
                   onChange={handleChange}
-                  placeholder="Intel Iris Xe"
+                  placeholder="Integrated or Dedicated"
                 />
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>Screen Size</label>
-                <input
-                  type="text"
-                  name="screen_size"
-                  value={formData.screen_size}
-                  onChange={handleChange}
-                  placeholder="e.g., 14 inch FHD"
-                />
-              </div>
-              <div className="form-group">
-                <label>Wireless Connection</label>
-                <input
-                  type="text"
-                  name="wireless_connection"
-                  value={formData.wireless_connection}
-                  onChange={handleChange}
-                  placeholder="e.g., Wi-Fi 6, Bluetooth 5.1"
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>USB Ports</label>
-                <input
-                  type="text"
-                  name="usb_ports"
-                  value={formData.usb_ports}
-                  onChange={handleChange}
-                  placeholder="e.g., 2x USB-C, 2x USB-A"
-                />
-              </div>
-              <div className="form-group">
-                <label>Weight</label>
-                <input
-                  type="text"
-                  name="weight"
-                  value={formData.weight}
-                  onChange={handleChange}
-                  placeholder="e.g., 1.4 kg"
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Dimensions</label>
-                <input
-                  type="text"
-                  name="dimensions"
-                  value={formData.dimensions}
-                  onChange={handleChange}
-                  placeholder="LxWxH"
-                />
-              </div>
-              {/* Moved Status field to Device Identity section above */}
-              <div className="form-group">
-                {/* Empty div to maintain form-row structure */}
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Procurement Information */}
-          <div className="subsection">
-            <div className="subsection-header">
-              <h3>Procurement Information</h3>
+            <div className="form-section">
+              <h3 className="section-title">Procurement Information</h3>
             </div>
             <div className="form-row">
               <div className="form-group">
@@ -432,9 +309,11 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                 />
               </div>
             </div>
+
           </div>
 
-          <div className="modal-actions">
+          {/* FIXED FOOTER */}
+          <div className="modal-actions" style={{ flexShrink: 0, padding: '20px', borderTop: '1px solid #e5e7eb', background: 'white' }}>
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary">{laptop ? 'Update Laptop' : 'Add Laptop'}</button>
           </div>

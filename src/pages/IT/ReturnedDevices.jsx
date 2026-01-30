@@ -182,6 +182,312 @@ export default function ReturnedDevices() {
 
   return (
     <div className="inventory-container">
+      <style>{`
+        /* Enhanced table styles for better organization */
+        .data-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-table thead {
+          background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+          border-bottom: 2px solid #e2e8f0;
+        }
+
+        .data-table th {
+          padding: 16px 14px;
+          text-align: left;
+          font-weight: 600;
+          font-size: 13px;
+          color: #475569;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          border-right: 1px solid #e2e8f0;
+          white-space: nowrap;
+          position: relative;
+        }
+
+        .data-table th:last-child {
+          border-right: none;
+        }
+
+        .data-table tbody tr {
+          border-bottom: 1px solid #f1f5f9;
+          transition: all 0.2s ease;
+        }
+
+        .data-table tbody tr:hover {
+          background-color: #f8fafc;
+          box-shadow: inset 0 0 0 1px #e2e8f0;
+        }
+
+        .data-table tbody tr:last-child {
+          border-bottom: none;
+        }
+
+        .data-table td {
+          padding: 16px 14px;
+          vertical-align: top;
+          font-size: 14px;
+          color: #334155;
+          border-right: 1px solid #f1f5f9;
+          line-height: 1.5;
+        }
+
+        .data-table td:last-child {
+          border-right: none;
+        }
+
+        /* Employee cell styling */
+        .employee-cell {
+          min-width: 200px;
+          max-width: 220px;
+        }
+
+        .employee-cell strong {
+          color: #1e293b;
+          font-weight: 600;
+          display: block;
+          margin-bottom: 4px;
+          font-size: 14px;
+        }
+
+        .employee-cell small {
+          color: #64748b;
+          font-size: 12px;
+          display: block;
+          line-height: 1.4;
+          margin-bottom: 2px;
+        }
+
+        .department-text {
+          color: #7c3aed !important;
+          font-weight: 500 !important;
+          font-size: 11px !important;
+        }
+
+        /* Device type badge */
+        .device-type-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          min-width: 90px;
+          justify-content: center;
+        }
+
+        .device-type-badge.laptop {
+          background: #dbeafe;
+          color: #1e40af;
+        }
+
+        .device-type-badge.desktop {
+          background: #fef3c7;
+          color: #d97706;
+        }
+
+        /* Asset ID styling */
+        .asset-id {
+          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+          font-size: 13px;
+          font-weight: 600;
+          color: #1e293b;
+          background: #f1f5f9;
+          padding: 6px 10px;
+          border-radius: 4px;
+          display: inline-block;
+          min-width: 80px;
+          text-align: center;
+        }
+
+        /* Deployment period styling */
+        .date-range {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 140px;
+        }
+
+        .date-cell {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #475569;
+          font-size: 12px;
+        }
+
+        .date-cell svg {
+          color: #94a3b8;
+          flex-shrink: 0;
+        }
+
+        .date-separator {
+          color: #94a3b8;
+          font-size: 12px;
+          text-align: center;
+          padding: 2px 0;
+        }
+
+        /* Return info styling */
+        .return-info {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 120px;
+        }
+
+        .return-period {
+          color: #059669 !important;
+          font-weight: 500 !important;
+          font-size: 11px !important;
+          background: #d1fae5;
+          padding: 2px 6px;
+          border-radius: 10px;
+          text-align: center;
+          display: inline-block;
+        }
+
+        .text-muted {
+          color: #94a3b8 !important;
+          font-style: italic;
+        }
+
+        /* Days badge with different colors for usage periods */
+        .days-badge {
+          display: inline-block;
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+          text-align: center;
+          min-width: 70px;
+        }
+
+        .days-badge.short-term {
+          background: #dbeafe;
+          color: #1e40af;
+        }
+
+        .days-badge.medium-term {
+          background: #fef3c7;
+          color: #d97706;
+        }
+
+        .days-badge.long-term {
+          background: #fee2e2;
+          color: #dc2626;
+        }
+
+        /* Monitor count for returned devices */
+        .monitor-count {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .monitor-count.returned {
+          background: #d1fae5;
+          color: #059669;
+        }
+
+        /* Action button styling */
+        .btn-view {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          background: #3b82f6;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+
+        .btn-view:hover {
+          background: #2563eb;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Table container improvements */
+        .table-container {
+          overflow: hidden;
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
+        }
+
+        .inventory-table-card {
+          background: white;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Column width optimization */
+        .data-table th:nth-child(1) { width: 220px; } /* Former Employee */
+        .data-table th:nth-child(2) { width: 120px; } /* Device Type */
+        .data-table th:nth-child(3) { width: 100px; } /* Device ID */
+        .data-table th:nth-child(4) { width: 160px; } /* Deployment Period */
+        .data-table th:nth-child(5) { width: 140px; } /* Date Returned */
+        .data-table th:nth-child(6) { width: 100px; } /* Days Used */
+        .data-table th:nth-child(7) { width: 100px; } /* Monitors */
+        .data-table th:nth-child(8) { width: 120px; } /* Actions */
+
+        /* Results summary styling */
+        .results-summary {
+          text-align: center;
+          padding: 16px;
+          color: #64748b;
+          font-size: 14px;
+          background: #f8fafc;
+          border-top: 1px solid #e2e8f0;
+          border-radius: 0 0 12px 12px;
+        }
+
+        .filter-indicator {
+          color: #059669;
+          font-weight: 500;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1400px) {
+          .data-table {
+            font-size: 13px;
+          }
+          
+          .data-table th,
+          .data-table td {
+            padding: 12px 10px;
+          }
+
+          .date-range {
+            min-width: 120px;
+          }
+
+          .return-info {
+            min-width: 100px;
+          }
+        }
+      `}</style>
+
       <header className="inventory-header">
         <div className="header-title">
           <RotateCcw size={32} className="header-icon" />
@@ -222,7 +528,7 @@ export default function ReturnedDevices() {
         </div>
         <div className="stat-item">
           <span className="stat-label">This Month</span>
-          <span className="stat-value">
+          <span className="stat-value stat-issued">
             {returnedDevices.filter(d => {
               if (!d.date_returned) return false;
               const returnDate = new Date(d.date_returned);
@@ -348,9 +654,7 @@ export default function ReturnedDevices() {
                       <td className="employee-cell">
                         <div>
                           <strong>{device.employees?.full_name || 'Unknown Employee'}</strong>
-                          <br />
                           <small>{device.employees?.employee_code || 'N/A'}</small>
-                          <br />
                           <small className="department-text">
                             {device.employees?.departments?.department_name || 'No Department'}
                           </small>
@@ -362,7 +666,9 @@ export default function ReturnedDevices() {
                           {device.device_type}
                         </span>
                       </td>
-                      <td className="asset-id">{device.device_asset_id || device.device_id}</td>
+                      <td>
+                        <span className="asset-id">{device.device_asset_id || device.device_id}</span>
+                      </td>
                       <td>
                         <div className="date-range">
                           <div className="date-cell">
@@ -380,7 +686,7 @@ export default function ReturnedDevices() {
                         <div className="return-info">
                           <div className="date-cell">
                             <Calendar size={14} />
-                            {formatDate(device.date_returned)}
+                            <span>{formatDate(device.date_returned)}</span>
                           </div>
                           <small className="return-period">
                             {getReturnPeriodText(device.date_returned)}
@@ -404,7 +710,7 @@ export default function ReturnedDevices() {
                       </td>
                       <td>
                         <button
-                          className="btn-icon btn-view"
+                          className="btn-view"
                           onClick={() => handleViewSpecs(device)}
                           title="View Device Specifications"
                         >
@@ -419,17 +725,17 @@ export default function ReturnedDevices() {
             </table>
           </div>
         )}
+        
+        {/* Results Summary */}
+        {filteredDevices.length > 0 && (
+          <div className="results-summary">
+            Showing {filteredDevices.length} of {returnedDevices.length} returned devices
+            {Object.values(filters).some(f => f && f !== 'date_returned' && f !== 'desc') && (
+              <span className="filter-indicator"> (filtered)</span>
+            )}
+          </div>
+        )}
       </div>
-
-      {/* Results Summary */}
-      {filteredDevices.length > 0 && (
-        <div className="results-summary">
-          Showing {filteredDevices.length} of {returnedDevices.length} returned devices
-          {Object.values(filters).some(f => f && f !== 'date_returned' && f !== 'desc') && (
-            <span className="filter-indicator"> (filtered)</span>
-          )}
-        </div>
-      )}
 
       {isModalOpen && (
         <InteractiveDeviceSpecModal

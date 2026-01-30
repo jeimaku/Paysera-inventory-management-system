@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Package, RotateCcw, Calendar, Monitor, Eye, Edit2, Trash2, Plus, Search } from 'lucide-react';
+import { Users, Package, RotateCcw, Calendar, Monitor as MonitorIcon, Eye, Edit2, Trash2, Plus, Search } from 'lucide-react';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
 import { getEmployeesForDeployment, getAvailableDevices, getAvailableMonitors, deployDevice } from '../../services/deploymentService';
@@ -201,6 +201,16 @@ export default function AdminEmployeeDevices() {
     ).join(', ');
   };
 
+  const getDaysActive = (dateIssued) => {
+    const issued = new Date(dateIssued);
+    const now = new Date();
+    return Math.floor((now - issued) / (1000 * 60 * 60 * 24));
+  };
+
+  const getDeviceTypeIcon = (type) => {
+    return type === 'LAPTOP' ? <Package size={14} /> : <MonitorIcon size={14} />;
+  };
+
   const filteredDeployments = deployments.filter(deployment => {
     const matchesSearch = !filters.search || 
       deployment.employees?.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -215,27 +225,525 @@ export default function AdminEmployeeDevices() {
     return matchesSearch && matchesDeviceType && matchesDepartment;
   });
 
-  const selectedEmployee = employees.find(emp => emp.employee_id === deploymentForm.employeeId);
-  const selectedDevice = devices.find(device => device.device_id === deploymentForm.deviceId);
+  const selectedEmployee = employees.find(emp => emp.employee_id === parseInt(deploymentForm.employeeId));
+  const selectedDevice = devices.find(dev => dev.device_id === parseInt(deploymentForm.deviceId));
 
   if (loading) {
     return (
       <div className="inventory-container">
-        <div className="loading">Loading device deployments...</div>
+        <div className="loading">Loading employee devices...</div>
       </div>
     );
   }
 
   return (
     <div className="inventory-container">
+      <style>{`
+        /* Enhanced table styles for better organization */
+        .data-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-table thead {
+          background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+          border-bottom: 2px solid #e2e8f0;
+        }
+
+        .data-table th {
+          padding: 16px 12px;
+          text-align: left;
+          font-weight: 600;
+          font-size: 13px;
+          color: #475569;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          border-right: 1px solid #e2e8f0;
+          white-space: nowrap;
+          position: relative;
+        }
+
+        .data-table th:last-child {
+          border-right: none;
+        }
+
+        .data-table tbody tr {
+          border-bottom: 1px solid #f1f5f9;
+          transition: all 0.2s ease;
+        }
+
+        .data-table tbody tr:hover {
+          background-color: #f8fafc;
+          box-shadow: inset 0 0 0 1px #e2e8f0;
+        }
+
+        .data-table tbody tr:last-child {
+          border-bottom: none;
+        }
+
+        .data-table td {
+          padding: 16px 12px;
+          vertical-align: top;
+          font-size: 14px;
+          color: #334155;
+          border-right: 1px solid #f1f5f9;
+          line-height: 1.5;
+        }
+
+        .data-table td:last-child {
+          border-right: none;
+        }
+
+        /* Employee cell styling */
+        .employee-cell {
+          min-width: 200px;
+          max-width: 220px;
+        }
+
+        .employee-cell strong {
+          color: #1e293b;
+          font-weight: 600;
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .employee-cell small {
+          color: #64748b;
+          font-size: 12px;
+          display: block;
+          line-height: 1.4;
+        }
+
+        .department-text {
+          color: #7c3aed !important;
+          font-weight: 500 !important;
+          margin-top: 2px;
+        }
+
+        /* Device type badge */
+        .device-type-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          min-width: 90px;
+          justify-content: center;
+        }
+
+        .device-type-badge.laptop {
+          background: #dbeafe;
+          color: #1e40af;
+        }
+
+        .device-type-badge.desktop {
+          background: #fef3c7;
+          color: #d97706;
+        }
+
+        /* Asset ID styling */
+        .asset-id {
+          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+          font-size: 13px;
+          font-weight: 600;
+          color: #1e293b;
+          background: #f1f5f9;
+          padding: 6px 10px;
+          border-radius: 6px;
+          display: inline-block;
+          min-width: 80px;
+          text-align: center;
+        }
+
+        /* Date cell styling */
+        .date-cell {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #475569;
+          font-size: 13px;
+          min-width: 120px;
+        }
+
+        .date-cell svg {
+          color: #94a3b8;
+          flex-shrink: 0;
+        }
+
+        .text-muted {
+          color: #94a3b8 !important;
+          font-style: italic;
+        }
+
+        /* Days badge */
+        .days-badge {
+          display: inline-block;
+          padding: 6px 12px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+          background: #f1f5f9;
+          color: #475569;
+          text-align: center;
+          min-width: 70px;
+        }
+
+        .days-badge.long-term {
+          background: #fef3c7;
+          color: #d97706;
+        }
+
+        /* Monitor info styling */
+        .monitor-info {
+          max-width: 200px;
+          font-size: 13px;
+          color: #475569;
+          line-height: 1.4;
+        }
+
+        .monitor-count {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 10px;
+          border-radius: 6px;
+          background: #f1f5f9;
+          color: #475569;
+          font-size: 12px;
+          font-weight: 600;
+          margin-bottom: 6px;
+        }
+
+        /* Action buttons */
+        .action-buttons {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .btn-view {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          background: #3b82f6;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+
+        .btn-view:hover {
+          background: #2563eb;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-return {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 8px 12px;
+          background: #dc2626;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-width: 40px;
+        }
+
+        .btn-return:hover:not(:disabled) {
+          background: #b91c1c;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+        }
+
+        .btn-return:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        /* Deploy button */
+        .btn-deploy-new {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+        }
+
+        .btn-deploy-new:hover {
+          background: linear-gradient(135deg, #059669 0%, #047857 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Table container improvements */
+        .table-container {
+          overflow: hidden;
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
+          overflow-x: auto;
+        }
+
+        .inventory-table-card {
+          background: white;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Column width optimization */
+        .data-table th:nth-child(1) { width: 200px; } /* Employee */
+        .data-table th:nth-child(2) { width: 120px; } /* Device Type */
+        .data-table th:nth-child(3) { width: 100px; } /* Device ID */
+        .data-table th:nth-child(4) { width: 220px; } /* Monitors */
+        .data-table th:nth-child(5) { width: 130px; } /* Date Deployed */
+        .data-table th:nth-child(6) { width: 100px; } /* Days Active */
+        .data-table th:nth-child(7) { width: 160px; } /* Actions */
+
+        /* Enhanced header styling */
+        .inventory-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 32px;
+          padding: 0 4px;
+        }
+
+        .header-title {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .header-icon {
+          color: #3b82f6;
+        }
+
+        .inventory-header h1 {
+          font-size: 32px;
+          font-weight: 700;
+          color: #1e293b;
+          margin: 0 0 4px 0;
+        }
+
+        .subtitle {
+          color: #64748b;
+          margin: 0;
+          font-size: 16px;
+        }
+
+        /* Stats styling improvements */
+        .inventory-stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 20px;
+          margin-bottom: 32px;
+        }
+
+        .stat-item {
+          background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+          padding: 20px;
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-label {
+          display: block;
+          font-size: 14px;
+          color: #64748b;
+          font-weight: 500;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+          font-size: 28px;
+          font-weight: 700;
+          color: #1e293b;
+        }
+
+        .stat-issued {
+          color: #dc2626 !important;
+        }
+
+        .stat-available {
+          color: #059669 !important;
+        }
+
+        /* Controls styling improvements */
+        .inventory-controls {
+          display: flex;
+          gap: 20px;
+          margin-bottom: 24px;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .search-box {
+          position: relative;
+          flex: 1;
+          max-width: 400px;
+        }
+
+        .search-box svg {
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #64748b;
+          z-index: 1;
+        }
+
+        .search-box input {
+          width: 100%;
+          padding: 12px 12px 12px 44px;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          font-size: 14px;
+          background: white;
+          transition: all 0.2s ease;
+        }
+
+        .search-box input:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .filters {
+          display: flex;
+          gap: 12px;
+        }
+
+        .filters select {
+          padding: 10px 16px;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          font-size: 14px;
+          background: white;
+          color: #374151;
+          cursor: pointer;
+        }
+
+        .filters select:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* No data state styling */
+        .no-data-state {
+          text-align: center;
+          padding: 60px 20px;
+          color: #64748b;
+        }
+
+        .no-data-icon {
+          margin-bottom: 16px;
+          opacity: 0.5;
+        }
+
+        .no-data-state h3 {
+          margin: 0 0 8px 0;
+          font-size: 18px;
+          font-weight: 600;
+          color: #475569;
+        }
+
+        .no-data-state p {
+          margin: 0;
+          font-size: 14px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+          .data-table {
+            font-size: 13px;
+          }
+          
+          .data-table th,
+          .data-table td {
+            padding: 12px 8px;
+          }
+          
+          .employee-cell {
+            min-width: 180px;
+            max-width: 200px;
+          }
+
+          .inventory-controls {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .search-box {
+            max-width: none;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .table-container {
+            overflow-x: scroll;
+          }
+
+          .inventory-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+          }
+
+          .inventory-stats {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+      `}</style>
+
       <header className="inventory-header">
         <div className="header-title">
           <Users size={32} className="header-icon" />
           <div>
             <h1>Employee Devices</h1>
-            <p className="subtitle">Manage and view current device deployments</p>
+            <p className="subtitle">Manage device assignments and deployments</p>
           </div>
         </div>
+        <button 
+          className="btn-deploy-new"
+          onClick={() => setIsDeployModalOpen(true)}
+        >
+          <Plus size={18} />
+          Deploy New Device
+        </button>
       </header>
 
       <div className="inventory-stats">
@@ -256,9 +764,9 @@ export default function AdminEmployeeDevices() {
           </span>
         </div>
         <div className="stat-item">
-          <span className="stat-label">Monitors Deployed</span>
+          <span className="stat-label">Unique Departments</span>
           <span className="stat-value stat-available">
-            {deployments.reduce((total, d) => total + (d.employee_monitors?.length || 0), 0)}
+            {departments.length}
           </span>
         </div>
       </div>
@@ -270,18 +778,14 @@ export default function AdminEmployeeDevices() {
             type="text"
             placeholder="Search by employee name, code, or device ID..."
             value={filters.search}
-            onChange={(e) =>
-              setFilters(prev => ({ ...prev, search: e.target.value }))
-            }
+            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
           />
         </div>
 
         <div className="filters">
           <select
             value={filters.deviceType}
-            onChange={(e) =>
-              setFilters(prev => ({ ...prev, deviceType: e.target.value }))
-            }
+            onChange={(e) => setFilters(prev => ({ ...prev, deviceType: e.target.value }))}
           >
             <option value="">All Device Types</option>
             <option value="LAPTOP">Laptops</option>
@@ -290,38 +794,22 @@ export default function AdminEmployeeDevices() {
 
           <select
             value={filters.department}
-            onChange={(e) =>
-              setFilters(prev => ({ ...prev, department: e.target.value }))
-            }
+            onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value }))}
           >
             <option value="">All Departments</option>
             {departments.map(dept => (
-              <option key={dept} value={dept}>
-                {dept}
-              </option>
+              <option key={dept} value={dept}>{dept}</option>
             ))}
           </select>
-
-          <button 
-            className="btn-add" 
-            onClick={() => setIsDeployModalOpen(true)}
-          >
-            <Plus size={18} />
-            Deploy Device
-          </button>
         </div>
       </div>
 
       <div className="inventory-table-card">
         {filteredDeployments.length === 0 ? (
           <div className="no-data-state">
-            <Package size={64} className="no-data-icon" />
-            <h3>No Device Deployments</h3>
-            <p>
-              {filters.search || filters.deviceType || filters.department 
-                ? 'No deployments match your current filters.'
-                : 'No devices are currently deployed to employees.'}
-            </p>
+            <Users size={64} className="no-data-icon" />
+            <h3>No Active Deployments</h3>
+            <p>No devices are currently deployed matching your search criteria.</p>
           </div>
         ) : (
           <div className="table-container">
@@ -329,7 +817,6 @@ export default function AdminEmployeeDevices() {
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Department</th>
                   <th>Device Type</th>
                   <th>Device ID</th>
                   <th>Monitors</th>
@@ -340,37 +827,47 @@ export default function AdminEmployeeDevices() {
               </thead>
               <tbody>
                 {filteredDeployments.map((deployment) => {
-                  const daysActive = Math.floor(
-                    (new Date() - new Date(deployment.date_issued)) / (1000 * 60 * 60 * 24)
-                  );
+                  const daysActive = getDaysActive(deployment.date_issued);
                   
                   return (
                     <tr key={deployment.employee_device_id}>
-                      <td className="employee-name">
+                      <td className="employee-cell">
                         <div>
-                          <strong>{deployment.employees?.full_name}</strong>
-                          <br />
-                          <small>{deployment.employees?.employee_code}</small>
+                          <strong>{deployment.employees?.full_name || 'N/A'}</strong>
+                          <small>{deployment.employees?.employee_code || 'N/A'}</small>
+                          <small className="department-text">
+                            {deployment.employees?.departments?.department_name || 'No Department'}
+                          </small>
                         </div>
                       </td>
-                      <td>{deployment.employees?.departments?.department_name || 'N/A'}</td>
                       <td>
                         <span className={`device-type-badge ${deployment.device_type.toLowerCase()}`}>
-                          {deployment.device_type === 'LAPTOP' ? (
-                            <><Package size={14} /> Laptop</>
-                          ) : (
-                            <><Monitor size={14} /> Desktop</>
-                          )}
+                          {getDeviceTypeIcon(deployment.device_type)}
+                          {deployment.device_type}
                         </span>
                       </td>
-                      <td className="asset-id">{deployment.device_id}</td>
-                      <td className="monitors-cell">
-                        {getMonitorsInfo(deployment)}
+                      <td>
+                        <span className="asset-id">{deployment.device_id}</span>
+                      </td>
+                      <td className="monitor-info">
+                        {deployment.employee_monitors?.length > 0 ? (
+                          <div>
+                            <div className="monitor-count">
+                              <MonitorIcon size={14} />
+                              {deployment.employee_monitors.length} Monitor{deployment.employee_monitors.length > 1 ? 's' : ''}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.3 }}>
+                              {getMonitorsInfo(deployment)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted">No monitors assigned</span>
+                        )}
                       </td>
                       <td>
                         <div className="date-cell">
                           <Calendar size={14} />
-                          {formatDate(deployment.date_issued)}
+                          <span>{formatDate(deployment.date_issued)}</span>
                         </div>
                       </td>
                       <td>
@@ -381,26 +878,16 @@ export default function AdminEmployeeDevices() {
                       <td>
                         <div className="action-buttons">
                           <button
-                            className="btn-icon"
-                            style={{ 
-                              color: '#8b5cf6', 
-                              backgroundColor: '#8b5cf620', 
-                              width: 'auto', 
-                              padding: '6px 12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              borderRadius: '6px'
-                            }}
+                            className="btn-view"
                             onClick={() => handleViewSpecs(deployment)}
-                            title="View Specifications"
+                            title="View Device Specifications"
                           >
                             <Eye size={16} />
-                            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>View</span>
+                            View Specs
                           </button>
 
                           <button
-                            className="btn-icon btn-return"
+                            className="btn-return"
                             onClick={() => handleReturnDevice(
                               deployment.employee_device_id,
                               deployment.employees?.full_name,
@@ -508,7 +995,7 @@ export default function AdminEmployeeDevices() {
 
               <div className="deployment-step">
                 <div className="step-header">
-                  <Monitor size={20} />
+                  <MonitorIcon size={20} />
                   <h3>Step 4: Select Monitors (Optional)</h3>
                 </div>
                 <div className="monitors-grid">
@@ -579,6 +1066,7 @@ export default function AdminEmployeeDevices() {
         type={viewSpecsType}
         showDeployment={true} // Enabled for Admin Side
         deploymentDetails={selectedDeployment} // Pass the deployment object
+        showProcurement={true} // Enable procurement information
       />
     </div>
   );
