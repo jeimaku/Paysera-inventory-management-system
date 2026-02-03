@@ -76,23 +76,6 @@ const NewSpecsModal_Admin = ({
   };
 
   // --- Content Renderers ---
-  const getMemoryInfo = () => {
-    const modules = device.desktop_memory || device.memory_modules || [];
-    if (modules.length > 0) {
-      const total = modules.reduce((acc, m) => acc + (m.size_gb || 0), 0);
-      return `${total} GB (${modules.length} slots)`;
-    }
-    return device.memory ? `${device.memory} GB` : 'N/A';
-  };
-
-  const getStorageInfo = () => {
-    const drives = device.desktop_storage || device.storage_devices || [];
-    if (drives.length > 0) {
-      return drives.map(d => `${d.capacity_gb}GB ${d.storage_type}`).join(' + ');
-    }
-    return device.storage ? `${device.storage} GB ${device.storage_type || ''}` : 'N/A';
-  };
-
   const renderSpecsContent = () => {
     if (!device) return <div className="nm-empty-state">No device details available.</div>;
 
@@ -109,7 +92,6 @@ const NewSpecsModal_Admin = ({
           </div>
           
           <SpecRow label="Asset ID" value={device.asset_id} />
-          {/* Show 'Custom Build' if no serial number exists */}
           <SpecRow label="Serial Number" value={device.serial_number || 'Custom / Assembled'} />
           <SpecRow label="Manufacturer" value={device.system_manufacturer} />
           <SpecRow label="Model" value={device.system_model} />
@@ -127,7 +109,7 @@ const NewSpecsModal_Admin = ({
           <SpecRow label="Processor (CPU)" value={device.processor} fullWidth />
           <SpecRow label="Graphics Card" value={device.graphics_card} fullWidth />
 
-          {/* Memory (RAM) - Loops through the array */}
+          {/* Memory (RAM) */}
           <div className="nm-col-span-2">
             <span className="nm-label">Memory (RAM)</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
@@ -143,7 +125,7 @@ const NewSpecsModal_Admin = ({
             </div>
           </div>
 
-          {/* Storage - Loops through the array */}
+          {/* Storage */}
           <div className="nm-col-span-2">
             <span className="nm-label">Storage Drives</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
@@ -179,7 +161,6 @@ const NewSpecsModal_Admin = ({
       return (
         <div className="nm-specs-grid">
           
-          {/* --- SECTION 1: IDENTITY --- */}
           <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px' }}>
             <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Identity & Classification
@@ -190,7 +171,6 @@ const NewSpecsModal_Admin = ({
           <SpecRow label="Brand" value={device.brand} />
           <SpecRow label="Model" value={device.model} />
           
-          {/* Smart Serial Number / SNID Display */}
           <SpecRow 
             label={device.brand?.toLowerCase().includes('acer') ? "SNID" : "Serial Number"} 
             value={device.brand?.toLowerCase().includes('acer') && device.snid ? device.snid : device.serial_number} 
@@ -199,7 +179,6 @@ const NewSpecsModal_Admin = ({
           <SpecRow label="Condition" value={device.device_condition?.replace(/_/g, ' ')} isPill />
           <SpecRow label="Status" value={device.status} isStatus />
 
-          {/* --- SECTION 2: TECHNICAL SPECS --- */}
           <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
             <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Technical Specifications
@@ -211,7 +190,6 @@ const NewSpecsModal_Admin = ({
           <SpecRow label="Operating System" value={device.operating_system} />
           <SpecRow label="Screen Size" value={device.screen_size} />
 
-          {/* Dynamic RAM Display */}
           <div className="nm-col-span-2">
             <span className="nm-label">Memory (RAM)</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
@@ -227,7 +205,6 @@ const NewSpecsModal_Admin = ({
             </div>
           </div>
 
-          {/* Dynamic Storage Display */}
           <div className="nm-col-span-2">
             <span className="nm-label">Storage Drives</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
@@ -243,7 +220,6 @@ const NewSpecsModal_Admin = ({
             </div>
           </div>
 
-          {/* --- SECTION 3: PROCUREMENT --- */}
           <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
             <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Procurement Details
@@ -259,7 +235,6 @@ const NewSpecsModal_Admin = ({
       );
     }
 
-    // ==================== MONITOR SPECS ====================
     if (type?.toLowerCase() === 'monitor') {
       return (
         <div className="nm-specs-grid">
@@ -310,6 +285,9 @@ const NewSpecsModal_Admin = ({
       ? Math.floor((new Date() - new Date(currentDeployment.date_issued)) / (1000 * 60 * 60 * 24))
       : 0;
 
+    // FIX: Fallback to archived_owner_name
+    const displayName = employee?.full_name || currentDeployment.archived_owner_name || 'Unknown (Deleted User)';
+
     return (
       <div className="nm-deployment-grid fade-in">
         <div className="nm-card">
@@ -318,12 +296,12 @@ const NewSpecsModal_Admin = ({
           </div>
           <div className="nm-employee-profile">
             <div className="nm-avatar">
-              {employee?.full_name?.charAt(0) || '?'}
+              {displayName.charAt(0)}
             </div>
             <div className="nm-emp-details">
-              <h4>{employee?.full_name || 'Unknown'}</h4>
+              <h4>{displayName}</h4>
               <p className="nm-emp-dept">
-                {employee?.employee_code} • {employee?.departments?.department_name || 'No Dept'}
+                {employee?.employee_code || 'LEGACY'} • {employee?.departments?.department_name || 'Archived'}
               </p>
             </div>
           </div>
@@ -379,12 +357,17 @@ const NewSpecsModal_Admin = ({
                   const start = new Date(log.date_issued);
                   const end = log.date_returned ? new Date(log.date_returned) : new Date();
                   const days = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+                  
+                  // FIX: Fallback to archived_owner_name
+                  const historyName = log.employees?.full_name || log.archived_owner_name || 'Unknown';
+                  const historyDept = log.employees?.departments?.department_name || 'Archived User';
+
                   return (
                     <tr key={log.employee_device_id}>
                       <td>
                         <div className="nm-emp-cell">
-                          <div className="nm-emp-name">{log.employees?.full_name || 'Unknown'}</div>
-                          <div className="nm-emp-dept">{log.employees?.departments?.department_name}</div>
+                          <div className="nm-emp-name">{historyName}</div>
+                          <div className="nm-emp-dept">{historyDept}</div>
                         </div>
                       </td>
                       <td>{formatDate(log.date_issued)}</td>
@@ -430,7 +413,6 @@ const NewSpecsModal_Admin = ({
             {showProcurement && (
               <button className={`nm-tab ${activeTab === 'procurement' ? 'active' : ''}`} onClick={() => setActiveTab('procurement')}>Procurement</button>
             )}
-            {/* Show Current User Tab if active deployment exists */}
             {currentDeployment && (
               <button className={`nm-tab ${activeTab === 'deployment' ? 'active' : ''}`} onClick={() => setActiveTab('deployment')}>Current User</button>
             )}

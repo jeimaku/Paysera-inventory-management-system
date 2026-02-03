@@ -95,7 +95,6 @@ export async function createLaptop(laptopData) {
 export async function updateLaptop(laptopId, laptopData) {
   try {
     // 1. Separate Arrays from Main Data
-    // Ensure 'storage_type' is NOT in mainData (it should be gone from Modal now)
     const { ram_modules, storage_drives, ...mainData } = laptopData;
 
     // 2. Sanitize Main Data (Convert "" to null)
@@ -142,18 +141,22 @@ export async function updateLaptop(laptopId, laptopData) {
     return { success: false, error: error.message };
   }
 }
+
+// IMPLEMENTED OPTION 2: SOFT DELETE
 export async function deleteLaptop(laptopId) {
   try {
+    // Instead of .delete(), we update the status to 'retired'
+    // This preserves the device history and prevents Foreign Key errors.
     const { error } = await supabase
       .from('laptops')
-      .delete()
+      .update({ status: 'retired' }) 
       .eq('laptop_id', laptopId);
 
     if (error) throw error;
 
     return { success: true };
   } catch (error) {
-    console.error('Error deleting laptop:', error);
+    console.error('Error retiring laptop:', error);
     return { success: false, error: error.message };
   }
 }
@@ -183,11 +186,9 @@ export async function getDesktops(filters = {}) {
       query = query.eq('status', filters.status);
     }
 
-    // --- ADD THIS BLOCK FOR DESKTOPS ---
     if (filters.device_condition) {
       query = query.eq('device_condition', filters.device_condition);
     }
-    // -----------------------------------
 
     if (filters.search) {
       query = query.or(
@@ -215,7 +216,6 @@ export async function createDesktop(desktopData) {
     Object.keys(desktop).forEach(key => {
       sanitizedDesktop[key] = (desktop[key] === '' || desktop[key] === undefined) ? null : desktop[key];
     });
-    // -----------------------------------------------
 
     // Insert desktop using sanitized data
     const { data: desktopResult, error: desktopError } = await supabase
@@ -272,7 +272,6 @@ export async function updateDesktop(desktopId, desktopData) {
     Object.keys(desktop).forEach(key => {
       sanitizedDesktop[key] = (desktop[key] === '' || desktop[key] === undefined) ? null : desktop[key];
     });
-    // --------------------------
 
     // Update desktop
     const { data: desktopResult, error: desktopError } = await supabase
@@ -283,8 +282,6 @@ export async function updateDesktop(desktopId, desktopData) {
       .single();
 
     if (desktopError) throw desktopError;
-
-    // ... (keep the rest of your memory/storage update logic the same) ...
     
     // Update memory (delete old, insert new)
     if (memory) {
@@ -319,19 +316,20 @@ export async function updateDesktop(desktopId, desktopData) {
   }
 }
 
+// IMPLEMENTED OPTION 2: SOFT DELETE
 export async function deleteDesktop(desktopId) {
   try {
-    // Delete related memory and storage (should cascade automatically)
+    // Soft delete: set status to retired
     const { error } = await supabase
       .from('desktops')
-      .delete()
+      .update({ status: 'retired' })
       .eq('desktop_id', desktopId);
 
     if (error) throw error;
 
     return { success: true };
   } catch (error) {
-    console.error('Error deleting desktop:', error);
+    console.error('Error retiring desktop:', error);
     return { success: false, error: error.message };
   }
 }
@@ -353,11 +351,9 @@ export async function getMonitors(filters = {}) {
       query = query.eq('brand', filters.brand);
     }
 
-    // --- ADD THIS BLOCK FOR MONITORS ---
     if (filters.device_condition) {
       query = query.eq('device_condition', filters.device_condition);
     }
-    // -----------------------------------
 
     if (filters.search) {
       query = query.or(
@@ -411,18 +407,20 @@ export async function updateMonitor(monitorId, monitorData) {
   }
 }
 
+// IMPLEMENTED OPTION 2: SOFT DELETE
 export async function deleteMonitor(monitorId) {
   try {
+    // Soft delete: set status to retired
     const { error } = await supabase
       .from('monitors')
-      .delete()
+      .update({ status: 'retired' })
       .eq('monitor_id', monitorId);
 
     if (error) throw error;
 
     return { success: true };
   } catch (error) {
-    console.error('Error deleting monitor:', error);
+    console.error('Error retiring monitor:', error);
     return { success: false, error: error.message };
   }
 }

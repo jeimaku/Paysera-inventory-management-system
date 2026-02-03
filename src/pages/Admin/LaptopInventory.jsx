@@ -60,6 +60,7 @@ export default function LaptopInventory() {
 
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
+      // This now triggers the Soft Delete (Set status to 'retired')
       await deleteLaptop(deleteConfirm.laptop_id);
       setDeleteConfirm(null);
       loadLaptops();
@@ -96,7 +97,8 @@ export default function LaptopInventory() {
       const activeDeployment = history.find(h => h.status === 'in_use');
 
       // 2. Prepare Data
-      const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
+      // UPDATED LINE: Checks for active name, then archived name, then default
+      const employeeName = activeDeployment?.employees?.full_name || activeDeployment?.archived_owner_name || 'Not Currently Assigned';
       const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
       const warrantyDate = laptop.warranty_end ? new Date(laptop.warranty_end).toLocaleDateString() : 'No Warranty Date';
       const specs = `${laptop.cpu || 'Unknown CPU'} / ${laptop.memory || '0'}GB RAM / ${laptop.storage || 'Unknown'} Storage`;
@@ -381,14 +383,14 @@ export default function LaptopInventory() {
             <div className="confirm-icon-wrapper">
               <AlertTriangle size={32} />
             </div>
-            <h3 className="confirm-title">Delete Device?</h3>
+            <h3 className="confirm-title">Retire Device?</h3>
             <p className="confirm-desc">
-              You are about to permanently delete <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong>. 
-              This action cannot be undone.
+              You are about to mark <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong> as <strong>Retired</strong>. 
+              This will remove it from the active fleet but preserve its history.
             </p>
             <div className="confirm-actions">
               <button className="btn-cancel-modern" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Delete</button>
+              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Retire Device</button>
             </div>
           </div> 
         </div>

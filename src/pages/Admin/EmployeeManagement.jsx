@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
-import { Plus, Edit2, Trash2, Search, User, Briefcase, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, User, AlertTriangle } from 'lucide-react';
 import EmployeeModal from '../../components/Admin/EmployeeModal';
 import {
   getEmployees,
@@ -187,11 +187,9 @@ export default function EmployeeManagement() {
                   </td>
                   <td>
                     <div className="col-main-text">
-                      {/* Access the nested 'positions' object */}
                       {employee.positions?.position_name || 'No Position'} 
                     </div>
                     <div className="col-sub-text">
-                      {/* Access the nested 'departments' object */}
                       {employee.departments?.department_name || 'No Department'}
                     </div>
                   </td>
@@ -240,17 +238,30 @@ export default function EmployeeManagement() {
         positions={positions}
       />
 
-      {/* Delete Confirmation */}
+      {/* REVISED Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>Delete Employee</h3>
-            <p>
-              Are you sure you want to delete <strong>{deleteConfirm.full_name}</strong>?
+            {/* Added Icon for symmetry with Laptop Inventory */}
+            <div className="confirm-icon-wrapper" style={{ backgroundColor: '#fee2e2', color: '#ef4444' }}>
+              <AlertTriangle size={32} />
+            </div>
+            
+            <h3 className="confirm-title">Deactivate Employee?</h3>
+            
+            <p className="confirm-desc">
+              Are you sure you want to deactivate <strong>{deleteConfirm.full_name}</strong>?
+              This will mark them as inactive but preserve their history.
             </p>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-danger" onClick={handleDeleteConfirm}>Delete</button>
+            
+            {/* New Button Layout: Symmetrical and Red Delete Button */}
+            <div className="confirm-actions">
+              <button className="btn-cancel-modern" onClick={() => setDeleteConfirm(null)}>
+                Cancel
+              </button>
+              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>
+                Deactivate
+              </button>
             </div>
           </div>
         </div>

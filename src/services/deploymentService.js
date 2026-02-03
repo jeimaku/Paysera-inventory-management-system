@@ -37,7 +37,6 @@ export async function getAvailableDevices(deviceType) {
     const idField = deviceType === 'LAPTOP' ? 'laptop_id' : 'desktop_id';
     
     console.log(`🔍 Fetching ${deviceType} devices from table: ${tableName}`);
-    console.log(`🔍 Looking for devices with status: 'available'`);
     
     const { data, error } = await supabase
       .from(tableName)
@@ -48,21 +47,6 @@ export async function getAvailableDevices(deviceType) {
     if (error) {
       console.error(`❌ Error fetching ${deviceType} devices:`, error);
       throw error;
-    }
-    
-    console.log(`✅ Found ${data?.length || 0} available ${deviceType} devices:`, data);
-    
-    // If no devices found, let's also check what devices exist with any status
-    if (!data || data.length === 0) {
-      console.log(`🔍 No available ${deviceType} found. Checking all devices in ${tableName}...`);
-      const { data: allDevices, error: allError } = await supabase
-        .from(tableName)
-        .select('asset_id, status')
-        .order('asset_id');
-      
-      if (!allError) {
-        console.log(`📋 All ${deviceType} devices in database:`, allDevices);
-      }
     }
     
     // Format data consistently
@@ -79,11 +63,9 @@ export async function getAvailableDevices(deviceType) {
         display_name: `${device.asset_id} - ${displayLabel}`
       };
       
-      console.log(`📦 Formatted ${deviceType}:`, formatted);
       return formatted;
     }) || [];
     
-    console.log(`✅ Returning ${formattedDevices.length} formatted ${deviceType} devices`);
     return formattedDevices;
   } catch (error) {
     console.error(`❌ Error in getAvailableDevices for ${deviceType}:`, error);
@@ -91,12 +73,22 @@ export async function getAvailableDevices(deviceType) {
   }
 }
 
-// Deploy device to employee
+// Deploy device to employee (UPDATED: Snapshots owner name)
 export async function deployDevice(deploymentData) {
   try {
     const { employeeId, deviceType, deviceId, monitorIds = [] } = deploymentData;
+
+    // STEP 1: Fetch the employee's name to snapshot it
+    // This ensures we have the name saved even if the user is deleted later.
+    const { data: employee, error: empError } = await supabase
+      .from('employees')
+      .select('full_name')
+      .eq('employee_id', employeeId)
+      .single();
+
+    if (empError) throw new Error('Employee not found for deployment');
     
-    // Step 1: Create employee_device record
+    // STEP 2: Create employee_device record WITH the snapshot name
     const { data: employeeDevice, error: deployError } = await supabase
       .from('employee_devices')
       .insert({
@@ -104,14 +96,15 @@ export async function deployDevice(deploymentData) {
         device_type: deviceType,
         device_id: deviceId,
         date_issued: new Date().toISOString().split('T')[0],
-        status: 'in_use'
+        status: 'in_use',
+        archived_owner_name: employee.full_name // <--- Saves name permanently
       })
       .select()
       .single();
 
     if (deployError) throw deployError;
 
-    // Step 2: Update device status to 'issued'
+    // STEP 3: Update device status to 'issued'
     const tableName = deviceType === 'LAPTOP' ? 'laptops' : 'desktops';
     const idField = deviceType === 'LAPTOP' ? 'laptop_id' : 'desktop_id';
     
@@ -122,7 +115,7 @@ export async function deployDevice(deploymentData) {
 
     if (deviceUpdateError) throw deviceUpdateError;
 
-    // Step 3: Assign monitors if provided
+    // STEP 4: Assign monitors if provided
     if (monitorIds.length > 0) {
       const monitorAssignments = monitorIds.map(monitorId => ({
         employee_device_id: employeeDevice.employee_device_id,
@@ -206,6 +199,7 @@ export async function getDeploymentHistory(filters = {}) {
         return_reason, 
         status,
         created_at,
+        archived_owner_name,
         employees (
           employee_id,
           employee_code,
@@ -229,7 +223,6 @@ export async function getDeploymentHistory(filters = {}) {
 
     // Apply filters
     if (filters.search) {
-      // Search in employee name or device info
       query = query.or(
         `employees.full_name.ilike.%${filters.search}%,employees.employee_code.ilike.%${filters.search}%`
       );
@@ -335,7 +328,7 @@ export async function getDetailedDeviceSpecs(deviceType, deviceId) {
   }
 }
 
-// Update this function to accept a 'reason'
+// Return Device
 export async function returnDevice(employeeDeviceId, reason = '') {
   try {
     // Step 1: Get the deployment details to know what devices to free up
@@ -398,7 +391,7 @@ export async function getAvailableMonitors() {
   try {
     const { data, error } = await supabase
       .from('monitors')
-      .select('*') // This will now include the new columns automatically
+      .select('*') 
       .eq('status', 'available')
       .order('asset_id');
 
@@ -411,13 +404,14 @@ export async function getAvailableMonitors() {
 }
 
 
-// NEW: Fetch usage history for a specific device
+// NEW: Fetch usage history for a specific device (UPDATED WITH archived_owner_name)
 export async function getDeviceUsageHistory(deviceType, deviceId) {
   try {
     const { data, error } = await supabase
       .from('employee_devices')
       .select(`
         *,
+        archived_owner_name,
         employees (
           full_name,
           employee_code,
