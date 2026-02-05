@@ -1,0 +1,390 @@
+/* /styles/teamModal.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Modal Overlay */
+.team-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  /* Alternative to backdrop-filter using multiple layered backgrounds */
+  background-image: 
+    radial-gradient(circle at center, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.6) 100%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Main Modal Container */
+.team-modal {
+  background: rgba(255, 255, 255, 0.95);
+  /* Alternative to backdrop-filter using layered backgrounds and enhanced opacity */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 
+    0 32px 80px rgba(0, 50, 150, 0.15), 
+    0 8px 32px rgba(0, 50, 150, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  width: 100%;
+  max-width: 900px;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  animation: modalSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Modal Header */
+.team-modal-header {
+  text-align: center;
+  padding: 40px 40px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.team-modal-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.team-modal-subtitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Close Button */
+.team-modal-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 18px;
+  color: #6b7280;
+}
+
+.team-modal-close:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  transform: scale(1.05);
+}
+
+/* Team Grid */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+  padding: 32px 40px;
+}
+
+/* Profile Card */
+.team-profile-card {
+  background: rgba(248, 248, 252, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 18px;
+  padding: 24px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  /* Alternative to backdrop-filter using layered backgrounds */
+  background-image: 
+    linear-gradient(rgba(248, 248, 252, 0.9), rgba(248, 248, 252, 0.9)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%);
+}
+
+.team-profile-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg, 
+    rgba(255, 255, 255, 0.3) 0%, 
+    rgba(255, 255, 255, 0) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.team-profile-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  border-color: rgba(0, 212, 255, 0.3);
+  box-shadow: 
+    0 20px 40px rgba(0, 50, 150, 0.15),
+    0 0 0 1px rgba(0, 212, 255, 0.2);
+}
+
+.team-profile-card:hover::before {
+  opacity: 1;
+}
+
+/* Profile Header */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+.profile-image {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.team-profile-card:hover .profile-image {
+  transform: scale(1.05);
+}
+
+.profile-info h3 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+  line-height: 1.2;
+}
+
+.profile-role {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0a0aa6;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Profile Description */
+.profile-description {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #4b5563;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Skills */
+.profile-skills {
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+.skills-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.skill-tag {
+  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 50%);
+  color: white;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(10, 10, 166, 0.2);
+}
+
+/* Contact Links */
+.profile-links {
+  display: flex;
+  gap: 12px;
+  position: relative;
+  z-index: 2;
+}
+
+.profile-link {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #4b5563;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  color: #0a0aa6;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.profile-link:hover::before {
+  opacity: 1;
+}
+
+.profile-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.profile-link:hover {
+  color: white;
+}
+
+.profile-link:hover::before {
+  opacity: 0.9;
+}
+
+.profile-link > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .team-modal {
+    margin: 10px;
+    max-height: 90vh;
+  }
+  
+  .team-modal-header {
+    padding: 24px 24px 16px;
+  }
+  
+  .team-modal-title {
+    font-size: 24px;
+  }
+  
+  .team-grid {
+    grid-template-columns: 1fr;
+    padding: 24px;
+    gap: 20px;
+  }
+  
+  .team-profile-card {
+    padding: 20px;
+  }
+  
+  .profile-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .profile-info h3 {
+    font-size: 16px;
+  }
+  
+  .profile-description {
+    font-size: 13px;
+    text-align: center;
+  }
+  
+  .profile-links {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .team-modal-close {
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+  }
+  
+  .team-modal-title {
+    font-size: 20px;
+  }
+  
+  .team-modal-subtitle {
+    font-size: 14px;
+  }
+}
+
+/* Custom scrollbar for modal */
+.team-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.team-modal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.team-modal::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.team-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}

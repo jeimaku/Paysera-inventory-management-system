@@ -44,11 +44,13 @@
 
 .login-left {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 40px 60px 40px 40px;
   position: relative;
   z-index: 2;
+  gap: 24px;
 }
 
 .login-right {
@@ -63,8 +65,10 @@
 /* Glassmorphism Login Form Card */
 .login-card {
   background: rgba(255, 255, 255, 0.85);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+  /* Alternative to backdrop-filter using enhanced background layers */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%);
   width: 580px;
   min-height: 500px; 
   padding: 64px 48px;
@@ -116,6 +120,106 @@
     transform: translateY(0) scale(1);
     filter: blur(0);
   }
+}
+
+/* Team Credits Section */
+.team-credits-section {
+  width: 100%;
+  max-width: 580px;
+  animation: slideInUp 1s ease-out 0.6s both;
+}
+
+.team-credits-button {
+  background: rgba(255, 255, 255, 0.9);
+  /* Alternative to backdrop-filter using layered backgrounds */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  padding: 16px 24px;
+  width: 100%;
+  font-family: 'Poppins', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #4a4a6a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 8px 24px rgba(0, 50, 150, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  text-decoration: none !important;
+  outline: none;
+}
+
+.team-credits-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 50%, #69f0ae 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+.team-credits-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 212, 255, 0.4);
+  box-shadow: 
+    0 16px 32px rgba(0, 50, 150, 0.12),
+    0 0 0 1px rgba(0, 212, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  color: white !important;
+  text-decoration: none !important;
+}
+
+.team-credits-button:hover::before {
+  opacity: 1;
+}
+
+.team-credits-button:hover * {
+  color: white !important;
+}
+
+.team-credits-button:active {
+  transform: translateY(0);
+}
+
+.team-credits-button:focus {
+  outline: none;
+  border-color: rgba(0, 212, 255, 0.4);
+  box-shadow: 
+    0 8px 24px rgba(0, 50, 150, 0.08),
+    0 0 0 3px rgba(0, 212, 255, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.team-credits-button:focus:not(:hover) {
+  color: #4a4a6a;
+}
+
+.team-icon {
+  transition: transform 0.3s ease;
+  position: relative;
+  z-index: 2;
+}
+
+.team-credits-button:hover .team-icon {
+  transform: scale(1.1);
+}
+
+.team-credits-button > * {
+  position: relative;
+  z-index: 2;
 }
 
 /* Headers */
@@ -326,13 +430,31 @@
     width: 90%;
     max-width: 480px;
   }
+  .team-credits-section {
+    max-width: 480px;
+  }
 }
 
 @media (max-width: 480px) {
+  .login-left {
+    padding: 24px;
+  }
+  
   .login-card {
     padding: 40px 24px;
   }
+  
   .login-card h2 {
     font-size: 26px;
+  }
+  
+  .team-credits-button {
+    padding: 14px 20px;
+    font-size: 14px;
+  }
+  
+  .team-icon {
+    width: 18px;
+    height: 18px;
   }
 }
