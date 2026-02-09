@@ -55,7 +55,7 @@ const TeamModal = ({ isOpen, onClose }) => {
             Meet Our Development Team
           </h2>
           <p className="team-modal-subtitle">
-            The talented individuals who built this inventory management system
+            The Intern Students who built Paysera's Inventory management system
           </p>
         </div>
 
