@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, HardDrive, Cpu, Monitor, Hash, Settings, User } from 'lucide-react';
+import { X, Plus, Trash2, HardDrive, Cpu, Monitor, Hash, Settings, User, Calendar, Truck } from 'lucide-react';
 
 export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
   // We add a local state for "Desktop Type" to control validation logic
@@ -14,13 +14,13 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
     device_condition: 'brand_new',
     
     // Specs
-    motherboard: '', // <--- NEW FIELD
+    motherboard: '',
     processor: '',
     graphics_card: '',
     operating_system: '',
     system_architecture: '',
     bios_mode: '',
-    username: '', // <--- User Account Name
+    username: '', 
     
     // Status & Procurement
     status: 'available',
@@ -35,7 +35,6 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
 
   useEffect(() => {
     if (desktop) {
-      // Determine if it's branded or custom based on existing data (logic: if has serial, assume branded, else custom)
       setDesktopType(desktop.serial_number ? 'branded' : 'custom');
 
       setFormData({
@@ -44,7 +43,7 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
         system_manufacturer: desktop.system_manufacturer || '',
         system_model: desktop.system_model || '',
         device_condition: desktop.device_condition || 'brand_new',
-        motherboard: desktop.motherboard || '', // Load Motherboard
+        motherboard: desktop.motherboard || '',
         processor: desktop.processor || '',
         graphics_card: desktop.graphics_card || '',
         operating_system: desktop.operating_system || '',
@@ -109,7 +108,6 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Custom Validation: Serial Number is required ONLY if type is Branded
     if (desktopType === 'branded' && !formData.serial_number.trim()) {
       alert('Serial Number is required for Branded desktops.');
       return;
@@ -117,8 +115,8 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
 
     const payload = {
       ...formData,
-      memory, // Pass the array to service
-      storage // Pass the array to service
+      memory, 
+      storage
     };
     onSubmit(payload);
   };
@@ -207,7 +205,7 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
               
               <div className="form-row">
                 <div className="form-group">
-                  <label>Motherboard</label> {/* NEW FIELD */}
+                  <label>Motherboard</label> 
                   <div style={{ position: 'relative' }}>
                     <Settings size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                     <input 
@@ -331,20 +329,36 @@ export default function DesktopModal({ isOpen, onClose, onSubmit, desktop }) {
               </div>
             </div>
 
-            {/* SECTION 4: PROCUREMENT */}
+            {/* SECTION 4: PROCUREMENT (UPDATED) */}
             <div style={{ marginTop: '20px' }}>
               <span className="modal-section-title">Procurement & Status</span>
+              
               <div className="form-row">
                 <div className="form-group">
-                  <label>Supplier</label>
-                  <input name="supplier" value={formData.supplier} onChange={handleChange} />
+                  <label>Supplier / Vendor</label>
+                  <div style={{ position: 'relative' }}>
+                    <Truck size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                    <input name="supplier" value={formData.supplier} onChange={handleChange} style={{ paddingLeft: '36px' }} placeholder="Optional" />
+                  </div>
                 </div>
+                
                 <div className="form-group">
-                  <label>Purchase Date</label>
-                  <input type="date" name="purchase_date" value={formData.purchase_date} onChange={handleChange} />
+                  <label>Date of Purchase</label>
+                  <div style={{ position: 'relative' }}>
+                    <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                    <input type="date" name="purchase_date" value={formData.purchase_date} onChange={handleChange} style={{ paddingLeft: '36px' }} />
+                  </div>
                 </div>
+              </div>
+
+              <div className="form-row">
                 <div className="form-group">
-                  <label>Status</label>
+                  <label>Warranty End Date</label>
+                  <input type="date" name="warranty_end" value={formData.warranty_end} onChange={handleChange} />
+                </div>
+
+                <div className="form-group">
+                  <label>Current Status</label>
                   <select name="status" value={formData.status} onChange={handleChange}>
                     <option value="available">Available</option>
                     <option value="deployed">Deployed</option>

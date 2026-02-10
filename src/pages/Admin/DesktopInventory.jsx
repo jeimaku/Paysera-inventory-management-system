@@ -228,7 +228,13 @@ export default function DesktopInventory() {
                 <tr key={desktop.desktop_id}>
                   <td>
                     <div className="col-asset">{desktop.asset_id}</div>
-                    <div className="col-sub-text">{desktop.serial_number || 'No Serial'}</div>
+                    {/* ADDED: Serial Number Display with Blue Style */}
+                    <div className="col-sub-text">
+                      <span style={{ color: '#64748b' }}>S/N: </span>
+                      <span style={{ color: '#0369a1', fontWeight: 500 }}>
+                        {desktop.serial_number || 'No Serial'}
+                      </span>
+                    </div>
                   </td>
                   <td>
                     <div className="col-main-text">{desktop.processor}</div>

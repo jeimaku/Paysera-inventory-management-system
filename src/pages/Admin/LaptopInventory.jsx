@@ -282,13 +282,19 @@ export default function LaptopInventory() {
                   <td>
                   <div className="col-asset">{laptop.asset_id}</div>
                   <div className="col-sub-text">
-                    {/* If Brand is Acer and SNID exists, show SNID. Otherwise, show Serial Number */}
+                    {/* UPDATED: Added "S/N:" prefix */}
                     {laptop.brand?.toLowerCase().includes('acer') && laptop.snid ? (
-                      <span title="SNID" style={{ color: '#0369a1', fontWeight: 500 }}>
-                        {laptop.snid} <span style={{ color: '#94a3b8', fontSize: '0.75em' }}>(SNID)</span>
-                      </span>
+                      <>
+                       
+                        <span title="SNID" style={{ color: '#0369a1', fontWeight: 500 }}>
+                          {laptop.snid} <span style={{ color: '#94a3b8', fontSize: '0.75em' }}>(SNID)</span>
+                        </span>
+                      </>
                     ) : (
-                      laptop.serial_number
+                      <>
+                        <span style={{ color: '#64748b' }}>S/N: </span>
+                        {laptop.serial_number}
+                      </>
                     )}
                   </div>
                   </td>

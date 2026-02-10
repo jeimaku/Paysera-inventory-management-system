@@ -145,6 +145,7 @@ export async function deployDevice(deploymentData) {
 }
 
 // Get all current deployments
+// UPDATED: Now enriches data to include Asset IDs (Fixes "Unknown" issue)
 export async function getCurrentDeployments() {
   try {
     const { data, error } = await supabase
@@ -176,7 +177,38 @@ export async function getCurrentDeployments() {
       .order('date_issued', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+
+    // ENRICHMENT STEP: Fetch Asset ID for every device
+    // This fixes the "Unknown" issue while keeping the Monitors logic intact.
+    const enrichedData = await Promise.all(
+      (data || []).map(async (deployment) => {
+        try {
+          const tableName = deployment.device_type === 'LAPTOP' ? 'laptops' : 'desktops';
+          const idField = deployment.device_type === 'LAPTOP' ? 'laptop_id' : 'desktop_id';
+          
+          const { data: deviceData, error: deviceError } = await supabase
+            .from(tableName)
+            .select('asset_id')
+            .eq(idField, deployment.device_id)
+            .single();
+
+          // If we found the specific device, attach its Asset ID
+          if (!deviceError && deviceData) {
+            return { 
+              ...deployment, 
+              device_asset_id: deviceData.asset_id 
+            };
+          }
+        } catch (err) {
+          console.warn('Could not fetch asset_id for device:', deployment.device_id);
+        }
+        
+        // Return original if fetch failed, but now it has a chance to have the ID
+        return deployment;
+      })
+    );
+
+    return enrichedData;
   } catch (error) {
     console.error('Error fetching current deployments:', error);
     return [];

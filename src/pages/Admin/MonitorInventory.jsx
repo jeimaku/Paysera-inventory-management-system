@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, Monitor as MonitorIcon, Eye, AlertTriangle, Printer } from 'lucide-react'; // <--- Imported Printer
+import { Plus, Edit2, Trash2, Search, Monitor as MonitorIcon, Eye, AlertTriangle, Printer } from 'lucide-react';
 import MonitorModal from '../../components/Admin/MonitorModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getMonitors, createMonitor, updateMonitor, deleteMonitor } from '../../services/deviceService';
-import { getDeviceUsageHistory } from '../../services/deploymentService'; // <--- Imported for print logic
+import { getDeviceUsageHistory } from '../../services/deploymentService';
 import '../../styles/admin-inventory.css';
 import '../../styles/new_modal.css';
 
@@ -69,21 +69,16 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- NEW PRINT FUNCTIONALITY (MONITOR) ---
+  // --- PRINT FUNCTIONALITY (MONITOR) ---
   const handlePrint = async (monitor) => {
     try {
-      // 1. Fetch current deployment details to get the accurate employee info
-      // Note: This relies on the backend tracking monitors in the history or linked tables
       const history = await getDeviceUsageHistory('MONITOR', monitor.monitor_id);
-      // Find the active deployment (status 'in_use')
       const activeDeployment = history.find(h => h.status === 'in_use');
 
-      // 2. Prepare Data
       const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
       const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
       const warrantyDate = monitor.warranty_end ? new Date(monitor.warranty_end).toLocaleDateString() : 'No Warranty Date';
       
-      // Monitor Specs Construction
       const sizeInfo = monitor.size_inches ? `${monitor.size_inches}" Display` : 'Unknown Size';
       const resInfo = monitor.resolution ? `(${monitor.resolution})` : '';
       const typeInfo = monitor.screen_type || '';
@@ -91,7 +86,6 @@ export default function MonitorInventory() {
       
       const specs = `${sizeInfo} ${resInfo} | ${typeInfo} ${refreshInfo}`.trim().replace('|  ', '');
 
-      // 3. Open Print Window
       const printWindow = window.open('', '_blank', 'width=800,height=600');
       
       printWindow.document.write(`
@@ -103,17 +97,13 @@ export default function MonitorInventory() {
               .header { border-bottom: 2px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
               .header h1 { margin: 0; color: #1e293b; font-size: 24px; }
               .header p { margin: 5px 0 0; color: #64748b; }
-              
               .section { margin-bottom: 30px; }
               .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
-              
               .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
               .field { margin-bottom: 15px; }
               .label { font-size: 12px; color: #64748b; display: block; margin-bottom: 4px; }
               .value { font-size: 16px; font-weight: 500; color: #0f172a; }
-              
               .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; }
-              
               .footer { margin-top: 50px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; text-align: center; }
             </style>
           </head>
@@ -122,7 +112,6 @@ export default function MonitorInventory() {
               <h1>Monitor Information Sheet</h1>
               <p>Asset ID: <strong>${monitor.asset_id}</strong></p>
             </div>
-
             <div class="section">
               <div class="section-title">Current Assignment</div>
               <div class="grid">
@@ -136,7 +125,6 @@ export default function MonitorInventory() {
                 </div>
               </div>
             </div>
-
             <div class="section">
               <div class="section-title">Display Specifications</div>
               <div class="grid">
@@ -154,7 +142,6 @@ export default function MonitorInventory() {
                 </div>
               </div>
             </div>
-
             <div class="section">
               <div class="section-title">Status & Warranty</div>
               <div class="grid">
@@ -168,11 +155,9 @@ export default function MonitorInventory() {
                 </div>
               </div>
             </div>
-
             <div class="footer">
               Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
             </div>
-
             <script>
               window.onload = function() { window.print(); }
             </script>
@@ -241,6 +226,13 @@ export default function MonitorInventory() {
                   <td>
                     <div className="col-asset">{monitor.asset_id}</div>
                     <div className="col-main-text">{monitor.brand} {monitor.model}</div>
+                    {/* ADDED: Serial Number Display with Blue Style */}
+                    <div className="col-sub-text" style={{ fontSize: '12px', marginTop: '2px' }}>
+                       <span style={{ color: '#64748b' }}>S/N: </span>
+                       <span style={{ color: '#0369a1', fontWeight: 500 }}>
+                         {monitor.serial_number || 'N/A'}
+                       </span>
+                    </div>
                   </td>
                   <td>
                     <div className="col-main-text">{monitor.size_inches}" {monitor.resolution}</div>
@@ -256,7 +248,6 @@ export default function MonitorInventory() {
                   </td>
                   <td>
                     <div className="admin-actions">
-                      {/* VIEW BUTTON */}
                       <button 
                         className="action-btn btn-view" 
                         onClick={() => { setViewSpecsDevice(monitor); setSpecsModalOpen(true); }}
@@ -265,7 +256,6 @@ export default function MonitorInventory() {
                         <Eye size={16} />
                       </button>
 
-                      {/* PRINT BUTTON */}
                       <button 
                         className="action-btn btn-print" 
                         onClick={() => handlePrint(monitor)} 
@@ -274,7 +264,6 @@ export default function MonitorInventory() {
                         <Printer size={16} />
                       </button>
 
-                      {/* EDIT BUTTON */}
                       <button 
                         className="action-btn btn-edit" 
                         onClick={() => { setSelectedMonitor(monitor); setIsModalOpen(true); }}
@@ -283,7 +272,6 @@ export default function MonitorInventory() {
                         <Edit2 size={16} />
                       </button>
 
-                      {/* DELETE BUTTON */}
                       <button 
                         className="action-btn btn-delete" 
                         onClick={() => setDeleteConfirm(monitor)}
@@ -299,43 +287,24 @@ export default function MonitorInventory() {
         </table>
       </div>
 
-      {/* Modals */}
       <MonitorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleModalSubmit} monitor={selectedMonitor} />
       <NewSpecsModal_Admin isOpen={specsModalOpen} onClose={() => setSpecsModalOpen(false)} device={viewSpecsDevice} type="monitor" />
       
-      {/* Enhanced Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            
-            {/* 1. Warning Icon */}
             <div className="confirm-icon-wrapper">
               <AlertTriangle size={32} />
             </div>
-
-            {/* 2. Text Content */}
             <h3 className="confirm-title">Delete Device?</h3>
             <p className="confirm-desc">
               You are about to permanently delete <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong>. 
               This action cannot be undone.
             </p>
-
-            {/* 3. Side-by-Side Actions */}
             <div className="confirm-actions">
-              <button 
-                className="btn-cancel-modern" 
-                onClick={() => setDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn-delete-modern" 
-                onClick={handleDeleteConfirm}
-              >
-                Delete
-              </button>
+              <button className="btn-cancel-modern" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Delete</button>
             </div>
-
           </div> 
         </div>
       )}

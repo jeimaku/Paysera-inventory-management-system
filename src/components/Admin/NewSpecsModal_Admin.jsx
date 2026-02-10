@@ -11,19 +11,17 @@ const NewSpecsModal_Admin = ({
   onClose, 
   device, 
   type, 
-  showDeployment = false, // Kept for backward compatibility
-  deploymentDetails = null, // Kept for backward compatibility
+  showDeployment = false, 
+  deploymentDetails = null, 
   showProcurement = false
 }) => {
   const [activeTab, setActiveTab] = useState('specs');
   const [historyLogs, setHistoryLogs] = useState([]);
   const [currentDeployment, setCurrentDeployment] = useState(null);
 
-  // Fetch history and active user automatically
   useEffect(() => {
     if (isOpen && device) {
       const fetchData = async () => {
-        // Use passed deploymentDetails if available, otherwise fetch
         if (deploymentDetails) {
           setCurrentDeployment(deploymentDetails);
         }
@@ -36,7 +34,6 @@ const NewSpecsModal_Admin = ({
           const logs = await getDeviceUsageHistory(type.toUpperCase(), id);
           setHistoryLogs(logs);
 
-          // If no deploymentDetails were passed, try to find it from logs
           if (!deploymentDetails && logs.length > 0 && !logs[0].date_returned) {
             setCurrentDeployment(logs[0]);
           }
@@ -48,7 +45,6 @@ const NewSpecsModal_Admin = ({
 
   if (!isOpen || !device) return null;
 
-  // --- Helpers ---
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -83,14 +79,11 @@ const NewSpecsModal_Admin = ({
     if (type?.toLowerCase() === 'desktop') {
       return (
         <div className="nm-specs-grid">
-          
-          {/* 1. Identity & Classification */}
           <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px' }}>
             <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Identity & Classification
             </h4>
           </div>
-          
           <SpecRow label="Asset ID" value={device.asset_id} />
           <SpecRow label="Serial Number" value={device.serial_number || 'Custom / Assembled'} />
           <SpecRow label="Manufacturer" value={device.system_manufacturer} />
@@ -98,18 +91,15 @@ const NewSpecsModal_Admin = ({
           <SpecRow label="Condition" value={device.device_condition?.replace(/_/g, ' ')} isPill />
           <SpecRow label="Status" value={device.status} isStatus />
 
-          {/* 2. Core Hardware */}
           <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
             <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Core Hardware
             </h4>
           </div>
-
           <SpecRow label="Motherboard" value={device.motherboard} fullWidth />
           <SpecRow label="Processor (CPU)" value={device.processor} fullWidth />
           <SpecRow label="Graphics Card" value={device.graphics_card} fullWidth />
 
-          {/* Memory (RAM) */}
           <div className="nm-col-span-2">
             <span className="nm-label">Memory (RAM)</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
@@ -125,7 +115,6 @@ const NewSpecsModal_Admin = ({
             </div>
           </div>
 
-          {/* Storage */}
           <div className="nm-col-span-2">
             <span className="nm-label">Storage Drives</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
@@ -141,17 +130,25 @@ const NewSpecsModal_Admin = ({
             </div>
           </div>
 
-          {/* 3. System Configuration */}
           <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
             <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               System Configuration
             </h4>
           </div>
-
           <SpecRow label="Operating System" value={device.operating_system} />
           <SpecRow label="Architecture" value={device.system_architecture} />
           <SpecRow label="BIOS Mode" value={device.bios_mode} />
           <SpecRow label="Local Username" value={device.username} />
+
+          {/* ADDED: Procurement Details Section for Desktops */}
+          <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
+            <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Procurement Details
+            </h4>
+          </div>
+          <SpecRow label="Supplier / Vendor" value={device.supplier || 'N/A'} />
+          <SpecRow label="Purchase Date" value={formatDate(device.purchase_date)} />
+          <SpecRow label="Warranty End" value={formatDate(device.warranty_end)} />
         </div>
       );
     }
@@ -160,13 +157,11 @@ const NewSpecsModal_Admin = ({
     if (type?.toLowerCase() === 'laptop') {
       return (
         <div className="nm-specs-grid">
-          
           <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px' }}>
             <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Identity & Classification
             </h4>
           </div>
-
           <SpecRow label="Asset ID" value={device.asset_id} />
           <SpecRow label="Brand" value={device.brand} />
           <SpecRow label="Model" value={device.model} />
@@ -184,7 +179,6 @@ const NewSpecsModal_Admin = ({
               Technical Specifications
             </h4>
           </div>
-
           <SpecRow label="Processor (CPU)" value={device.cpu} fullWidth />
           <SpecRow label="Graphics Card" value={device.graphics_card} fullWidth />
           <SpecRow label="Operating System" value={device.operating_system} />
@@ -225,22 +219,22 @@ const NewSpecsModal_Admin = ({
               Procurement Details
             </h4>
           </div>
-
           <SpecRow label="Supplier" value={device.supplier} />
           <SpecRow label="Distributor" value={device.distributor} />
           <SpecRow label="Purchase Date" value={device.purchase_date} />
           <SpecRow label="Warranty End" value={device.warranty_end} />
-
         </div>
       );
     }
 
+    // ==================== MONITOR SPECS ====================
     if (type?.toLowerCase() === 'monitor') {
       return (
         <div className="nm-specs-grid">
           <SpecRow label="Asset ID" value={device.asset_id} />
           <SpecRow label="Brand" value={device.brand} />
           <SpecRow label="Model" value={device.model} />
+          <SpecRow label="Serial Number" value={device.serial_number || 'N/A'} />
           <SpecRow label="Size" value={`${device.size_inches || 0}"`} />
           <SpecRow label="Resolution" value={device.resolution} />
           <SpecRow label="Refresh Rate" value={device.refresh_rate} />
@@ -285,7 +279,6 @@ const NewSpecsModal_Admin = ({
       ? Math.floor((new Date() - new Date(currentDeployment.date_issued)) / (1000 * 60 * 60 * 24))
       : 0;
 
-    // FIX: Fallback to archived_owner_name
     const displayName = employee?.full_name || currentDeployment.archived_owner_name || 'Unknown (Deleted User)';
 
     return (
@@ -358,7 +351,6 @@ const NewSpecsModal_Admin = ({
                   const end = log.date_returned ? new Date(log.date_returned) : new Date();
                   const days = Math.floor((end - start) / (1000 * 60 * 60 * 24));
                   
-                  // FIX: Fallback to archived_owner_name
                   const historyName = log.employees?.full_name || log.archived_owner_name || 'Unknown';
                   const historyDept = log.employees?.departments?.department_name || 'Archived User';
 
