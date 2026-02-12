@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Eye, Trash2, Search, Monitor as MonitorIcon, Laptop, HardDrive, Calendar, AlertTriangle, Building2 } from 'lucide-react';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
-import '../../styles/admin-inventory.css'; // Use consistent Admin styling
+import '../../styles/admin-inventory.css'; 
 import '../../styles/new_modal.css';
 
 export default function AdminEmployeeDevices() {
@@ -42,10 +42,44 @@ export default function AdminEmployeeDevices() {
   };
 
   const handleViewSpecs = async (deployment) => {
+    // 1. Fetch main device specs (Laptop/Desktop)
     const deviceSpecs = await getDetailedDeviceSpecs(deployment.device_type, deployment.device_id);
+    
+    // 2. ENRICHMENT STEP: Fetch full details for attached monitors
+    let enrichedDeployment = { ...deployment };
+    
+    if (deployment.employee_monitors && deployment.employee_monitors.length > 0) {
+      try {
+        const enrichedMonitors = await Promise.all(
+          deployment.employee_monitors.map(async (em) => {
+            // Ensure we have a valid monitor ID to query
+            if (!em.monitor_id) {
+              console.warn("Monitor ID missing for employee_monitor record:", em);
+              return em;
+            }
+
+            // Fetch detailed specs from monitors table via the updated service
+            const response = await getDetailedDeviceSpecs('MONITOR', em.monitor_id);
+            
+            // Normalize: If Supabase returns an array, take the first item
+            const fullSpecs = Array.isArray(response) ? response[0] : response;
+
+            // If fetch returned valid data, use it. Otherwise fallback to existing data.
+            return {
+              ...em,
+              monitors: fullSpecs || em.monitors
+            };
+          })
+        );
+        enrichedDeployment.employee_monitors = enrichedMonitors;
+      } catch (err) {
+        console.error("Failed to fetch monitor details:", err);
+      }
+    }
+
     setViewSpecsDevice(deviceSpecs);
     setViewSpecsType(deployment.device_type.toLowerCase());
-    setSelectedDeployment(deployment);
+    setSelectedDeployment(enrichedDeployment);
     setIsSpecModalOpen(true);
   };
 
@@ -65,7 +99,6 @@ export default function AdminEmployeeDevices() {
     }
   };
 
-  // Calculate days deployed
   const getDaysDeployed = (dateIssued) => {
     if (!dateIssued) return 0;
     const issued = new Date(dateIssued);
@@ -74,7 +107,6 @@ export default function AdminEmployeeDevices() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  // Filter deployments
   const filteredDeployments = deployments.filter(deployment => {
     const matchesSearch = !filters.search || 
       deployment.employees?.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -87,7 +119,6 @@ export default function AdminEmployeeDevices() {
     return matchesSearch && matchesDeviceType && matchesDepartment;
   });
 
-  // Get deployment statistics
   const stats = {
     total: deployments.length,
     laptops: deployments.filter(d => d.device_type === 'LAPTOP').length,
@@ -97,17 +128,13 @@ export default function AdminEmployeeDevices() {
 
   return (
     <div className="admin-inventory-container">
-      
-      {/* Header Card - Matches Department Management */}
       <div className="admin-header-card">
         <div className="header-title-group">
           <h1>Employee Devices</h1>
           <div className="header-meta">Manage device assignments and deployments</div>
         </div>
-        {/* No Add button - Admin cannot deploy devices */}
       </div>
 
-      {/* Info Banner - Explains Admin vs IT Roles */}
       <div className="info-banner">
         <Building2 className="info-banner-icon" size={20} />
         <div className="info-banner-content">
@@ -120,7 +147,6 @@ export default function AdminEmployeeDevices() {
         </div>
       </div>
 
-      {/* Statistics Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
@@ -155,7 +181,6 @@ export default function AdminEmployeeDevices() {
         </div>
       </div>
 
-      {/* Filters Bar - Matches Department Management */}
       <div className="admin-filters-bar">
         <div className="filter-input-wrapper">
           <Search className="filter-icon" size={18} />
@@ -190,7 +215,6 @@ export default function AdminEmployeeDevices() {
         </select>
       </div>
 
-      {/* Data Table - Matches Department Management */}
       <div className="admin-table-wrapper">
         <table className="admin-table">
           <thead>
@@ -268,7 +292,6 @@ export default function AdminEmployeeDevices() {
 
                     <td>
                       <div className="admin-actions">
-                        {/* View Specs Button */}
                         <button 
                           className="action-btn btn-view" 
                           onClick={() => handleViewSpecs(deployment)}
@@ -276,8 +299,6 @@ export default function AdminEmployeeDevices() {
                         >
                           <Eye size={16} />
                         </button>
-
-                        {/* Terminate/Delete Deployment Button */}
                         <button 
                           className="action-btn btn-delete" 
                           onClick={() => handleDeleteClick(deployment)}
@@ -295,7 +316,6 @@ export default function AdminEmployeeDevices() {
         </table>
       </div>
 
-      {/* Specs Modal */}
       <NewSpecsModal_Admin 
         isOpen={isSpecModalOpen} 
         onClose={() => setIsSpecModalOpen(false)} 
@@ -304,39 +324,21 @@ export default function AdminEmployeeDevices() {
         deployment={selectedDeployment}
       />
 
-      {/* Delete Confirmation Modal - Matches Department Management */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            
-            {/* Warning Icon */}
             <div className="confirm-icon-wrapper">
               <AlertTriangle size={32} />
             </div>
-
-            {/* Text Content */}
             <h3 className="confirm-title">Terminate Deployment?</h3>
             <p className="confirm-desc">
               You are about to terminate the deployment for <strong>{deleteConfirm.employees?.full_name}</strong>.
               <br />This will return the device to available inventory and cannot be undone.
             </p>
-
-            {/* Actions */}
             <div className="confirm-actions">
-              <button 
-                className="btn-cancel-modern" 
-                onClick={() => setDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn-delete-modern" 
-                onClick={handleDeleteConfirm}
-              >
-                Terminate
-              </button>
+              <button className="btn-cancel-modern" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Terminate</button>
             </div>
-
           </div> 
         </div>
       )}

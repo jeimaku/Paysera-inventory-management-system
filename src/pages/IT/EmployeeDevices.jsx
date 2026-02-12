@@ -70,14 +70,45 @@ export default function EmployeeDevices() {
     }
   };
 
+  // UPDATED: Added "Enrichment Logic" to fetch full monitor details (Serial No, Specs)
   const handleViewSpecs = async (deployment) => {
     try {
+      // 1. Fetch main device specs (Laptop/Desktop)
       const fullDeviceData = await getDetailedDeviceSpecs(deployment.device_type, deployment.device_id);
       
+      // 2. ENRICHMENT STEP: Fetch full details for attached monitors
+      let enrichedDeployment = { ...deployment };
+      
+      if (deployment.employee_monitors && deployment.employee_monitors.length > 0) {
+        try {
+          const enrichedMonitors = await Promise.all(
+            deployment.employee_monitors.map(async (em) => {
+              // Ensure we have a valid monitor ID to query
+              if (!em.monitor_id) return em;
+
+              // Fetch detailed specs specifically for this monitor ID
+              const response = await getDetailedDeviceSpecs('MONITOR', em.monitor_id);
+              
+              // Normalize: If Supabase returns an array, take the first item
+              const fullSpecs = Array.isArray(response) ? response[0] : response;
+
+              // If fetch returned valid data, use it. Otherwise fallback to existing data.
+              return {
+                ...em,
+                monitors: fullSpecs || em.monitors 
+              };
+            })
+          );
+          enrichedDeployment.employee_monitors = enrichedMonitors;
+        } catch (err) {
+          console.error("Failed to fetch monitor details:", err);
+        }
+      }
+
       if (fullDeviceData) {
         setViewSpecsDevice(fullDeviceData);
         setViewSpecsType(deployment.device_type.toLowerCase());
-        setSelectedDeployment(deployment);
+        setSelectedDeployment(enrichedDeployment); // Pass the enriched data to the modal
         setIsSpecModalOpen(true);
       }
     } catch (error) {

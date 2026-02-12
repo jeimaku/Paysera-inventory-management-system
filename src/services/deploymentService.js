@@ -79,7 +79,6 @@ export async function deployDevice(deploymentData) {
     const { employeeId, deviceType, deviceId, monitorIds = [] } = deploymentData;
 
     // STEP 1: Fetch the employee's name to snapshot it
-    // This ensures we have the name saved even if the user is deleted later.
     const { data: employee, error: empError } = await supabase
       .from('employees')
       .select('full_name')
@@ -179,7 +178,6 @@ export async function getCurrentDeployments() {
     if (error) throw error;
 
     // ENRICHMENT STEP: Fetch Asset ID for every device
-    // This fixes the "Unknown" issue while keeping the Monitors logic intact.
     const enrichedData = await Promise.all(
       (data || []).map(async (deployment) => {
         try {
@@ -192,7 +190,6 @@ export async function getCurrentDeployments() {
             .eq(idField, deployment.device_id)
             .single();
 
-          // If we found the specific device, attach its Asset ID
           if (!deviceError && deviceData) {
             return { 
               ...deployment, 
@@ -203,7 +200,6 @@ export async function getCurrentDeployments() {
           console.warn('Could not fetch asset_id for device:', deployment.device_id);
         }
         
-        // Return original if fetch failed, but now it has a chance to have the ID
         return deployment;
       })
     );
@@ -313,6 +309,7 @@ export async function getDeploymentHistory(filters = {}) {
 // ==================== DEVICE SPECIFICATIONS ====================
 
 // Get detailed device specifications for modal
+// UPDATED: Now supports 'MONITOR' type
 export async function getDetailedDeviceSpecs(deviceType, deviceId) {
   try {
     if (deviceType === 'LAPTOP') {
@@ -325,7 +322,6 @@ export async function getDetailedDeviceSpecs(deviceType, deviceId) {
       if (error) throw error;
       return data;
     } else if (deviceType === 'DESKTOP') {
-      // Get desktop with memory modules and storage devices
       const { data, error } = await supabase
         .from('desktops')
         .select(`
@@ -351,6 +347,16 @@ export async function getDetailedDeviceSpecs(deviceType, deviceId) {
         memory_modules: data.desktop_memory || [],
         storage_devices: data.desktop_storage || []
       };
+    } else if (deviceType === 'MONITOR') {
+      // NEW: Support for fetching full monitor specs
+      const { data, error } = await supabase
+        .from('monitors')
+        .select('*')
+        .eq('monitor_id', deviceId)
+        .single();
+
+      if (error) throw error;
+      return data;
     }
     
     return null;

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, HardDrive, Monitor, Server, Laptop, 
-  Cpu, Wifi, Hash, Layers, ShoppingCart, DollarSign, User, Clock, History
+  ShoppingCart, Layers, User, Clock, History,
+  Cable, AlertCircle
 } from 'lucide-react';
 import '../../styles/new_modal.css';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
@@ -13,7 +14,8 @@ const NewSpecsModal_Admin = ({
   type, 
   showDeployment = false, 
   deploymentDetails = null, 
-  showProcurement = false
+  showProcurement = false,
+  deployment // Can accept deployment via this prop name as well (from parent)
 }) => {
   const [activeTab, setActiveTab] = useState('specs');
   const [historyLogs, setHistoryLogs] = useState([]);
@@ -22,8 +24,11 @@ const NewSpecsModal_Admin = ({
   useEffect(() => {
     if (isOpen && device) {
       const fetchData = async () => {
-        if (deploymentDetails) {
-          setCurrentDeployment(deploymentDetails);
+        // Prioritize the direct prop, fallback to the other named prop
+        const deployData = deploymentDetails || deployment;
+        
+        if (deployData) {
+          setCurrentDeployment(deployData);
         }
 
         const id = type?.toLowerCase() === 'laptop' ? device.laptop_id : 
@@ -34,14 +39,15 @@ const NewSpecsModal_Admin = ({
           const logs = await getDeviceUsageHistory(type.toUpperCase(), id);
           setHistoryLogs(logs);
 
-          if (!deploymentDetails && logs.length > 0 && !logs[0].date_returned) {
+          // If no active deployment passed but logs exist and latest is active
+          if (!deployData && logs.length > 0 && !logs[0].date_returned) {
             setCurrentDeployment(logs[0]);
           }
         }
       };
       fetchData();
     }
-  }, [isOpen, device, type, deploymentDetails]);
+  }, [isOpen, device, type, deploymentDetails, deployment]);
 
   if (!isOpen || !device) return null;
 
@@ -69,6 +75,115 @@ const NewSpecsModal_Admin = ({
   const getDeviceTitle = () => {
     if (type === 'desktop') return `Desktop ${device.asset_id}`; 
     return `${device.brand || ''} ${device.model || ''}`;
+  };
+
+  // --- Helper to Render Additional Monitors ---
+  const renderConnectedMonitors = () => {
+    // 1. Determine if we have monitors
+    const monitorList = currentDeployment?.employee_monitors || [];
+    const hasMonitors = monitorList.length > 0;
+
+    return (
+      <>
+        {/* Section Header */}
+        <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '20px' }}>
+          <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Monitor size={14} /> Additional Monitors
+          </h4>
+        </div>
+        
+        {/* Empty State: Explicitly render if list is empty */}
+        {!hasMonitors && (
+          <div className="nm-col-span-2" style={{ 
+            padding: '16px', 
+            textAlign: 'center', 
+            color: '#94a3b8',
+            background: '#f8fafc',
+            borderRadius: '8px',
+            border: '1px dashed #e2e8f0',
+            fontSize: '0.875rem'
+          }}>
+            No Additional Monitors Deployed
+          </div>
+        )}
+
+        {/* List of Monitors */}
+        {hasMonitors && monitorList.map((item, index) => {
+          // Handle Supabase nested join structure (item.monitors) or flat structure
+          // If 'monitors' is an array (edge case), take the first item
+          let mon = item.monitors || item; 
+          if (Array.isArray(mon)) mon = mon[0];
+          
+          return (
+            <div key={index} className="nm-col-span-2" style={{ 
+              background: '#fff', 
+              borderRadius: '8px', 
+              marginBottom: '12px', 
+              border: '1px solid #e2e8f0',
+              overflow: 'hidden'
+            }}>
+              {/* Monitor Card Header */}
+              <div style={{
+                background: '#f8fafc',
+                padding: '10px 12px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <span style={{ fontWeight: 600, color: '#334155', fontSize: '0.85rem' }}>
+                  Monitor #{index + 1}
+                </span>
+                <span className="nm-value-pill" style={{ fontSize: '0.7rem' }}>Deployed Accessory</span>
+              </div>
+              
+              {/* Monitor Content */}
+              <div style={{ padding: '12px' }}>
+                <div className="nm-specs-grid" style={{ rowGap: '8px' }}>
+                  
+                  {/* Primary Info */}
+                  <SpecRow label="Asset ID" value={mon.asset_id} />
+                  
+                  {/* Full width with Left Align for Brand & Model */}
+                  <SpecRow 
+                    label="Brand & Model" 
+                    value={`${mon.brand} ${mon.model}`} 
+                    fullWidth 
+                    alignLeft 
+                  />
+                  
+                  {/* Fixed Serial Number Rendering - Checks multiple potential property names */}
+                  <SpecRow 
+                    label="Serial Number" 
+                    value={mon.serial_number || mon.snid || mon.serial_no || mon.sn || 'N/A'} 
+                  />
+                  
+                  {mon.size_inches && <SpecRow label="Size" value={`${mon.size_inches}"`} />}
+
+                  {/* Detailed Monitor Specs Section */}
+                  <div className="nm-col-span-2" style={{ 
+                    marginTop: '8px', 
+                    paddingTop: '8px', 
+                    borderTop: '1px dashed #e2e8f0' 
+                  }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Monitor Specifications
+                    </span>
+                  </div>
+
+                  <SpecRow label="Resolution" value={mon.resolution} />
+                  <SpecRow label="Refresh Rate" value={mon.refresh_rate} />
+                  <SpecRow label="Panel Type" value={mon.panel_type} />
+                  <SpecRow label="Aspect Ratio" value={mon.aspect_ratio} />
+                  {mon.ports && <SpecRow label="Ports" value={mon.ports} fullWidth alignLeft />}
+                  
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </>
+    );
   };
 
   // --- Content Renderers ---
@@ -140,7 +255,6 @@ const NewSpecsModal_Admin = ({
           <SpecRow label="BIOS Mode" value={device.bios_mode} />
           <SpecRow label="Local Username" value={device.username} />
 
-          {/* ADDED: Procurement Details Section for Desktops */}
           <div className="nm-col-span-2" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px', marginBottom: '8px', marginTop: '16px' }}>
             <h4 style={{ margin: 0, color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Procurement Details
@@ -149,6 +263,9 @@ const NewSpecsModal_Admin = ({
           <SpecRow label="Supplier / Vendor" value={device.supplier || 'N/A'} />
           <SpecRow label="Purchase Date" value={formatDate(device.purchase_date)} />
           <SpecRow label="Warranty End" value={formatDate(device.warranty_end)} />
+
+          {/* Render Additional Monitors for Desktop */}
+          {renderConnectedMonitors()}
         </div>
       );
     }
@@ -223,11 +340,14 @@ const NewSpecsModal_Admin = ({
           <SpecRow label="Distributor" value={device.distributor} />
           <SpecRow label="Purchase Date" value={device.purchase_date} />
           <SpecRow label="Warranty End" value={device.warranty_end} />
+
+          {/* Render Additional Monitors for Laptop */}
+          {renderConnectedMonitors()}
         </div>
       );
     }
 
-    // ==================== MONITOR SPECS ====================
+    // ==================== MONITOR SPECS (Standalone) ====================
     if (type?.toLowerCase() === 'monitor') {
       return (
         <div className="nm-specs-grid">
@@ -427,7 +547,7 @@ const NewSpecsModal_Admin = ({
   );
 };
 
-const SpecRow = ({ label, value, fullWidth, isPill, isStatus }) => {
+const SpecRow = ({ label, value, fullWidth, isPill, isStatus, alignLeft }) => {
   if (!value) return null;
   let content = <span className="nm-value">{value}</span>;
   if (isPill) content = <span className="nm-value-pill">{value}</span>;
@@ -435,8 +555,17 @@ const SpecRow = ({ label, value, fullWidth, isPill, isStatus }) => {
     const color = value.toLowerCase() === 'available' ? '#10B981' : '#3B82F6';
     content = <span className="nm-value" style={{ color, fontWeight: 'bold', textTransform: 'uppercase' }}>{value}</span>;
   }
+  
+  // Custom style for alignment override
+  const rowStyle = alignLeft 
+    ? { display: 'flex', justifyContent: 'flex-start', gap: '32px' } 
+    : {};
+
   return (
-    <div className={`nm-spec-row ${fullWidth ? 'nm-col-span-2' : ''}`}>
+    <div 
+      className={`nm-spec-row ${fullWidth ? 'nm-col-span-2' : ''}`}
+      style={rowStyle}
+    >
       <span className="nm-label">{label}</span>
       {content}
     </div>
