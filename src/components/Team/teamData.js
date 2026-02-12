@@ -25,14 +25,14 @@ export const teamMembers = [
   },
   {
     id: 3,
-    name: "Raphael Maraviles",
-    role: "Backend Developer & Database Administrator",
-    description: "Focused on server-side logic, API development, and database optimization. Built the core inventory tracking and reporting systems.",
+    name: "Raphael G. Maraviles",
+    role: "Database Infrastructure Engineer & Backend Specialist",
+    description: "Architected the foundational database infrastructure and server-side logic for high-performance inventory tracking. Focused on structural design, schema optimization, and reinforced enhanced data integrity protocols to ensure system reliability and reporting accuracy.",
     skills: ["Supabase", "PostgreSQL", "API Design", "Performance Optimization", "Data Analytics"],
     image: "https://cdn.vectorstock.com/i/500p/43/97/default-avatar-photo-placeholder-icon-grey-vector-38594397.jpg",
-    github: "https://github.com/michaelthompson",
+    github: "https://github.com/ProbablyRyoshi",
     linkedin: "https://linkedin.com/in/michaelthompson",
-    email: "michael.thompson@company.com"
+    email: "raphaelmaraviles03@gmail.com | raphaelmaraviles13@gmail.com"
   },
   {
     id: 4,
