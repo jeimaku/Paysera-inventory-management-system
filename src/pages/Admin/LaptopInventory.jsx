@@ -241,7 +241,8 @@ export default function LaptopInventory() {
         >
           <option value="">All Statuses</option>
           <option value="available">Available</option>
-          <option value="deployed">Deployed</option>
+          {/* Change value and text from Deployed to Issued */}
+          <option value="issued">Issued</option>
           <option value="maintenance">Maintenance</option>
           <option value="retired">Retired</option>
         </select>

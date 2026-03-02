@@ -146,7 +146,7 @@ export default function EmployeeManagement() {
           <option value="">All Statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
-          <option value="resigned">Resigned</option>
+          {/* <option value="resigned">Resigned</option> */}
         </select>
       </div>
 

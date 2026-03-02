@@ -198,7 +198,8 @@ export default function DesktopInventory() {
         <select className="admin-select" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
           <option value="">All Statuses</option>
           <option value="available">Available</option>
-          <option value="deployed">Deployed</option>
+          {/* Change value from "deployed" to "issued" and text to "Issued" */}
+          <option value="issued">Issued</option>
           <option value="maintenance">Maintenance</option>
           <option value="retired">Retired</option>
         </select>

@@ -8,9 +8,12 @@ export const teamMembers = [
     description: "Specialized in full-stack development with React, Node.js, and database design. Led the authentication and security implementation.",
     skills: ["React", "Node.js", "PostgreSQL", "System Architecture", "Security"],
     image: "https://cdn.vectorstock.com/i/500p/43/97/default-avatar-photo-placeholder-icon-grey-vector-38594397.jpg",
-    github: "https://github.com/alexrodriguez",
-    linkedin: "https://linkedin.com/in/alexrodriguez",
-    email: "alex.rodriguez@company.com"
+    github: "https://github.com/jeimaku",
+    linkedin: "http://www.linkedin.com/in/jaymarkapelado",
+    email: "jaymrkapelado@gmail.com",
+    website: "https://jay-mark-portfolio.onrender.com/",
+    instagram: "https://www.instagram.com/mrkapldo/",
+    facebook: "https://web.facebook.com/Jeimakuu"
   },
   {
     id: 2,
