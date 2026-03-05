@@ -49,6 +49,7 @@ export default function RouteGuard({ children, requiredRole = null, allowedRoles
     const dashboardRoutes = {
       'ADMIN': '/admin',
       'IT': '/it',
+      'HR': '/hr',
       'EMPLOYEE': '/employee'
     };
 
@@ -77,3 +78,7 @@ export function withRouteGuard(Component, options = {}) {
 export function AdminGuard({ children }) { return <RouteGuard requiredRole="ADMIN">{children}</RouteGuard>; }
 export function ITGuard({ children }) { return <RouteGuard requiredRole="IT">{children}</RouteGuard>; }
 export function EmployeeGuard({ children }) { return <RouteGuard requiredRole="EMPLOYEE">{children}</RouteGuard>; }
+// NEW: Export the HR Guard
+export function HRGuard({ children }) { 
+  return <RouteGuard requiredRole="HR">{children}</RouteGuard>; 
+}

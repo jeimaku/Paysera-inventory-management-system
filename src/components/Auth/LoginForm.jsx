@@ -15,7 +15,8 @@ export default function LoginForm() {
   useEffect(() => {
     if (sessionManager.isValid()) {
        const role = sessionManager.getCurrentRole();
-       const routes = { 'ADMIN': '/admin', 'IT': '/it', 'EMPLOYEE': '/employee' };
+       // NEW: Added 'HR': '/hr' to the routes object
+       const routes = { 'ADMIN': '/admin', 'IT': '/it', 'HR': '/hr', 'EMPLOYEE': '/employee' };
        if (routes[role]) navigate(routes[role], { replace: true });
     }
   }, [navigate]);
@@ -44,10 +45,16 @@ export default function LoginForm() {
 
       console.log(`✅ Login success: ${role}`);
 
-      // 4. Navigate (Delay prevents race conditions)
+      // 4. Redirect based on role
       setTimeout(() => {
-        const routes = { 'ADMIN': '/admin', 'IT': '/it', 'EMPLOYEE': '/employee' };
-        navigate(routes[role] || '/admin', { replace: true });
+        const routes = {
+          'ADMIN': '/admin',
+          'IT': '/it',
+          'HR': '/hr',             // <-- Added HR here!
+          'EMPLOYEE': '/employee'
+        };
+        // Changed fallback to /login just in case a role is missing
+        navigate(routes[role] || '/login', { replace: true }); 
       }, 500);
       
     } catch (error) {

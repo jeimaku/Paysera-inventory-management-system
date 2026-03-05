@@ -1,90 +1,92 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, UserCheck, Briefcase } from 'lucide-react';
-import PositionModal from '../../components/Admin/PositionModal';
+import { Plus, Edit2, Trash2, Search, Building2, Users } from 'lucide-react';
+import DepartmentModal from '../../components/Admin/DepartmentModal';
 import {
-  getPositions,
-  createPosition,
-  updatePosition,
-  deletePosition,
+  getDepartments,
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
 } from '../../services/organizationService';
-import '../../styles/admin-inventory.css';
+import '../../styles/admin-inventory.css'; // Shared Theme
 import '../../styles/new_modal.css';
 
-export default function PositionManagement() {
-  const [positions, setPositions] = useState([]);
+export default function HRDepartmentManagement() {
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedPosition, setSelectedPosition] = useState(null);
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [fetchError, setFetchError] = useState(null); // <-- NEW: Added fetchError state
+  const [fetchError, setFetchError] = useState(null);
 
-  const [filters, setFilters] = useState({ search: '' });
+  const [filters, setFilters] = useState({
+    search: '',
+  });
 
-  useEffect(() => { loadPositions(); }, [filters]);
+  useEffect(() => {
+    loadDepartments();
+  }, [filters]);
 
-  const loadPositions = async () => {
+  const loadDepartments = async () => {
     setLoading(true);
-    setFetchError(null); // <-- NEW: Reset error before fetching
+    setFetchError(null);
     try {
-      const data = await getPositions(filters);
+      const data = await getDepartments(filters);
       
-      // Define the names of positions you want to hide
-      const hiddenPositions = ['IT Admin', 'System Administrator', 'HR Manager', 'HR Admin'];
+      // NEW: Define the names of departments you want to hide
+      const hiddenDepartments = ['IT', 'Admin', 'HR', 'Information Technology', 'Human Resources'];
       
-      // Filter out those system positions
-      const regularPositions = data.filter(
-        (pos) => !hiddenPositions.includes(pos.position_name)
+      // Filter out those system departments
+      const regularDepartments = data.filter(
+        (dept) => !hiddenDepartments.includes(dept.department_name)
       );
 
-      setPositions(regularPositions);
+      setDepartments(regularDepartments);
     } catch (error) {
       console.error('Error loading data:', error);
-      setFetchError("Unable to load data. Please check your connection."); // <-- NEW: Set error on failure
+      setFetchError("Unable to load data. Please check your connection."); // <-- Set here
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddPosition = () => {
-    setSelectedPosition(null);
+  const handleAddDepartment = () => {
+    setSelectedDepartment(null);
     setIsModalOpen(true);
   };
 
-  const handleEditPosition = (position) => {
-    setSelectedPosition(position);
+  const handleEditDepartment = (department) => {
+    setSelectedDepartment(department);
     setIsModalOpen(true);
   };
 
-  const handleDeleteClick = (position) => {
-    setDeleteConfirm(position);
+  const handleDeleteClick = (department) => {
+    setDeleteConfirm(department);
   };
 
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
-      const result = await deletePosition(deleteConfirm.position_id);
-      // NEW: Intercept and display errors
+      const result = await deleteDepartment(deleteConfirm.department_id);
       if (result && !result.success) {
          alert(`Action failed: ${result.error}`);
       }
       setDeleteConfirm(null);
-      loadPositions();
+      loadDepartments();
     }
   };
 
   const handleModalSubmit = async (formData) => {
     let result;
-    if (selectedPosition) {
-      result = await updatePosition(selectedPosition.position_id, formData);
+    if (selectedDepartment) {
+      result = await updateDepartment(selectedDepartment.department_id, formData);
     } else {
-      result = await createPosition(formData);
+      result = await createDepartment(formData);
     }
     
-    // NEW: Intercept and display errors
     if (result && !result.success) {
       alert(`Unable to save: ${result.error}`);
     } else {
       setIsModalOpen(false);
-      loadPositions();
+      loadDepartments();
     }
   };
 
@@ -93,11 +95,11 @@ export default function PositionManagement() {
       
       <div className="admin-header-card">
         <div className="header-title-group">
-          <h1>Job Positions</h1>
-          <div className="header-meta">Manage roles and titles across departments</div>
+          <h1>Departments</h1>
+          <div className="header-meta">Organize company structure and teams</div>
         </div>
-        <button className="btn-add-device" onClick={handleAddPosition}>
-          <Plus size={20} /> New Position
+        <button className="btn-add-device" onClick={handleAddDepartment}>
+          <Plus size={20} /> New Department
         </button>
       </div>
 
@@ -107,7 +109,7 @@ export default function PositionManagement() {
           <input
             type="text"
             className="admin-search-input"
-            placeholder="Search positions..."
+            placeholder="Search departments..."
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
@@ -118,8 +120,8 @@ export default function PositionManagement() {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Position Title</th>
-              <th>Occupied By</th>
+              <th>Department Name</th>
+              <th>Workforce</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
@@ -127,31 +129,31 @@ export default function PositionManagement() {
             {loading ? (
               <tr><td colSpan="3" className="admin-empty-state">Loading...</td></tr>
             ) : fetchError ? (
-              /* NEW: Display fetch errors cleanly in the table */
+              /* NEW ERROR ROW */
               <tr><td colSpan="3" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
-            ) : positions.length === 0 ? (
-              <tr><td colSpan="3" className="admin-empty-state">No positions found.</td></tr>
+            ) : departments.length === 0 ? (
+              <tr><td colSpan="3" className="admin-empty-state">No departments found.</td></tr>
             ) : (
-              positions.map((pos) => (
-                <tr key={pos.position_id}>
+              departments.map((dept) => (
+                <tr key={dept.department_id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Briefcase size={18} className="text-gray-400" />
-                      <span className="col-main-text">{pos.position_name}</span>
+                      <Building2 size={18} className="text-gray-400" />
+                      <span className="col-main-text">{dept.department_name}</span>
                     </div>
                   </td>
-                
                   <td>
-                    <span className="admin-badge badge-available">
-                      {pos.employee_count || 0} Staff
+                    <span className="admin-badge badge-deployed" style={{ display: 'inline-flex', gap: '6px' }}>
+                      <Users size={14} />
+                      {dept.employee_count || 0} Employees
                     </span>
                   </td>
                   <td>
                     <div className="admin-actions">
-                      <button className="action-btn btn-edit" onClick={() => handleEditPosition(pos)}>
+                      <button className="action-btn btn-edit" onClick={() => handleEditDepartment(dept)}>
                         <Edit2 size={16} />
                       </button>
-                      <button className="action-btn btn-delete" onClick={() => handleDeleteClick(pos)}>
+                      <button className="action-btn btn-delete" onClick={() => handleDeleteClick(dept)}>
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -163,23 +165,23 @@ export default function PositionManagement() {
         </table>
       </div>
 
-      <PositionModal
+      <DepartmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleModalSubmit}
-        position={selectedPosition}
+        department={selectedDepartment}
       />
 
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>Delete Position</h3>
-            <p>Delete <strong>"{deleteConfirm.position_name}"</strong>?</p>
-            {deleteConfirm.employee_count > 0 && (
-              <p className="warning-text" style={{color: '#ef4444'}}>
-                ⚠️ Cannot delete: Position has {deleteConfirm.employee_count} active employees.
+            <h3>Delete Department</h3>
+            <p>Are you sure you want to delete <strong>"{deleteConfirm.department_name}"</strong>?</p>
+            {deleteConfirm.employee_count > 0 ? (
+              <p className="warning-text" style={{color: '#ef4444', fontSize: '0.9rem', marginTop: '8px'}}>
+                ⚠️ Cannot delete: This department has {deleteConfirm.employee_count} active employees.
               </p>
-            )}
+            ) : null}
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
               {deleteConfirm.employee_count === 0 && (

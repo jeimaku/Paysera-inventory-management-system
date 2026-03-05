@@ -93,6 +93,7 @@ class SessionManager {
     const allowedRoutes = {
       'ADMIN': ['/admin'],
       'IT': ['/it'],
+      'HR': ['/hr'],
       'EMPLOYEE': ['/employee']
     };
 

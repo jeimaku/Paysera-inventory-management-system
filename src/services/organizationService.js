@@ -48,7 +48,13 @@ export async function createDepartment(departmentData) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Intercept duplicate department names
+      if (error.code === '23505') {
+        return { success: false, error: 'A department with this name already exists.' };
+      }
+      throw error;
+    }
 
     return { success: true, data };
   } catch (error) {
@@ -67,7 +73,12 @@ export async function updateDepartment(departmentId, departmentData) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'A department with this name already exists.' };
+      }
+      throw error;
+    }
 
     return { success: true, data };
   } catch (error) {
@@ -153,7 +164,13 @@ export async function createPosition(positionData) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Intercept duplicate position titles
+      if (error.code === '23505') {
+        return { success: false, error: 'A position with this title already exists.' };
+      }
+      throw error;
+    }
 
     return { success: true, data };
   } catch (error) {
@@ -172,7 +189,12 @@ export async function updatePosition(positionId, positionData) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'A position with this title already exists.' };
+      }
+      throw error;
+    }
 
     return { success: true, data };
   } catch (error) {

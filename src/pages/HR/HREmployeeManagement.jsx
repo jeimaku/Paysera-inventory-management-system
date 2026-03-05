@@ -12,10 +12,10 @@ import {
   getDepartments,
   getPositions,
 } from '../../services/employeeService';
-import '../../styles/admin-inventory.css'; // Shared Admin Theme
+import '../../styles/admin-inventory.css';
 import '../../styles/new_modal.css';
 
-export default function EmployeeManagement() {
+export default function HREmployeeManagement() {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -24,7 +24,7 @@ export default function EmployeeManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [fetchError, setFetchError] = useState(null); // Added fetchError state
+  const [fetchError, setFetchError] = useState(null);
 
   // NEW: State to track sorting order (default is 'desc' - highest to lowest)
   const [sortOrder, setSortOrder] = useState('desc');
@@ -99,7 +99,6 @@ export default function EmployeeManagement() {
       setIsModalOpen(false);
       loadData();
     } else {
-      // Show clean error
       alert(`Unable to save: ${result.error}`);
     }
   };
@@ -111,6 +110,7 @@ export default function EmployeeManagement() {
 
   // --- NEW: SORTING LOGIC ---
   const sortedEmployees = [...employees].sort((a, b) => {
+    // Fallback to empty string if no ID exists to prevent crashes
     const idA = a.employee_code || '';
     const idB = b.employee_code || '';
     
@@ -169,7 +169,7 @@ export default function EmployeeManagement() {
         </div>
       </div>
 
-{/* Filters */}
+      {/* Filters */}
       <div className="admin-filters-bar">
         <div className="filter-input-wrapper">
           <Search className="filter-icon" size={18} />

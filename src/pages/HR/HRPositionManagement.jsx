@@ -10,13 +10,13 @@ import {
 import '../../styles/admin-inventory.css';
 import '../../styles/new_modal.css';
 
-export default function PositionManagement() {
+export default function HRPositionManagement() {
   const [positions, setPositions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [fetchError, setFetchError] = useState(null); // <-- NEW: Added fetchError state
+  const [fetchError, setFetchError] = useState(null);
 
   const [filters, setFilters] = useState({ search: '' });
 
@@ -24,11 +24,11 @@ export default function PositionManagement() {
 
   const loadPositions = async () => {
     setLoading(true);
-    setFetchError(null); // <-- NEW: Reset error before fetching
+    setFetchError(null);
     try {
       const data = await getPositions(filters);
       
-      // Define the names of positions you want to hide
+      // NEW: Define the names of positions you want to hide
       const hiddenPositions = ['IT Admin', 'System Administrator', 'HR Manager', 'HR Admin'];
       
       // Filter out those system positions
@@ -39,7 +39,7 @@ export default function PositionManagement() {
       setPositions(regularPositions);
     } catch (error) {
       console.error('Error loading data:', error);
-      setFetchError("Unable to load data. Please check your connection."); // <-- NEW: Set error on failure
+      setFetchError("Unable to load data. Please check your connection."); // <-- Set here
     } finally {
       setLoading(false);
     }
@@ -62,7 +62,6 @@ export default function PositionManagement() {
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
       const result = await deletePosition(deleteConfirm.position_id);
-      // NEW: Intercept and display errors
       if (result && !result.success) {
          alert(`Action failed: ${result.error}`);
       }
@@ -79,7 +78,6 @@ export default function PositionManagement() {
       result = await createPosition(formData);
     }
     
-    // NEW: Intercept and display errors
     if (result && !result.success) {
       alert(`Unable to save: ${result.error}`);
     } else {
@@ -127,7 +125,7 @@ export default function PositionManagement() {
             {loading ? (
               <tr><td colSpan="3" className="admin-empty-state">Loading...</td></tr>
             ) : fetchError ? (
-              /* NEW: Display fetch errors cleanly in the table */
+              /* NEW ERROR ROW */
               <tr><td colSpan="3" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
             ) : positions.length === 0 ? (
               <tr><td colSpan="3" className="admin-empty-state">No positions found.</td></tr>

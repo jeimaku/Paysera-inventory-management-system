@@ -2,6 +2,8 @@ import { supabase } from '../supabase/client';
 import { getDepartmentsList, getPositionsList } from './organizationService';
 
 // Get all employees with department and position details
+// Inside src/services/employeeService.js
+
 export async function getEmployees(filters = {}) {
   try {
     let query = supabase
@@ -23,8 +25,9 @@ export async function getEmployees(filters = {}) {
         positions (
           position_id,
           position_name
-        )
-      `)
+        ),
+        accounts ( account_id ) 
+      `) // <-- NEW: We added 'accounts ( account_id )' to the select query
       .order('created_at', { ascending: false });
 
     // Apply filters
@@ -48,21 +51,17 @@ export async function getEmployees(filters = {}) {
 
     const { data, error } = await query;
 
-    if (error) {
-      console.error('RLS Error fetching employees:', error);
-      throw error;
-    }
+    if (error) throw error;
 
-    return data || [];
+    // --- NEW FILTERING LOGIC ---
+    // Supabase returns 'accounts' as an array if a relationship exists.
+    // We filter out any employee that has an associated account record.
+    const regularEmployees = data.filter(emp => !emp.accounts || emp.accounts.length === 0);
+
+    return regularEmployees;
   } catch (error) {
     console.error('Error fetching employees:', error);
-    
-    // Handle RLS permission errors gracefully
-    if (error.code === 'PGRST116' || error.message?.includes('permission denied')) {
-      throw new Error('You do not have permission to view employees. Please contact your administrator.');
-    }
-    
-    throw error;
+    return [];
   }
 }
 

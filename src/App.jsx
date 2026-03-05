@@ -4,22 +4,30 @@ import { supabase } from './supabase/client';
 import { sessionManager } from './auth/SessionManager';
 
 // Import route protection components
-import RouteGuard, { AdminGuard, ITGuard } from './components/Auth/RouteGuard';
+import RouteGuard, { AdminGuard, ITGuard, HRGuard } from './components/Auth/RouteGuard';
 
 // Import pages and layouts
 import Login from './pages/Auth/Login';
 import AdminLayout from './components/Layout/AdminLayout';
 import ITLayout from './components/Layout/ITLayout';
+import HRLayout from './components/Layout/HRLayout';
 import Admin from './pages/Admin/Admin';
 import IT from './pages/IT/IT';
 
-// Admin Pages
+// --- NEW: HR Dedicated Pages ---
+import HRDashboard from './pages/HR/HRDashboard';
+import HREmployeeManagement from './pages/HR/HREmployeeManagement';
+import HRDepartmentManagement from './pages/HR/HRDepartmentManagement';
+import HRPositionManagement from './pages/HR/HRPositionManagement';
+import HREmployeeDevicePage from './pages/HR/HREmployeedevicepage';
+
+// Admin
 import EmployeeManagement from './pages/Admin/EmployeeManagement';
+import DepartmentManagement from './pages/Admin/DepartmentManagement';
+import PositionManagement from './pages/Admin/PositionManagement';
 import AdminLaptopInventory from './pages/Admin/LaptopInventory';
 import AdminDesktopInventory from './pages/Admin/DesktopInventory';
 import AdminMonitorInventory from './pages/Admin/MonitorInventory';
-import DepartmentManagement from './pages/Admin/DepartmentManagement';
-import PositionManagement from './pages/Admin/PositionManagement';
 import EmployeeDevicesPage from './pages/Admin/Employeedevicepage';
 import MaintenanceHistory from './pages/Admin/MaintenanceHistory';
 import UserManagement from './pages/Admin/UserManagement';
@@ -147,6 +155,25 @@ export default function App() {
         <Route path="desktops" element={<ITDesktopInventory />} />
         <Route path="monitors" element={<ITMonitorInventory />} />
         <Route path="repairs" element={<RepairHistory />} />
+      </Route>
+
+      {/* --- NEW: HR Routes --- */}
+      <Route 
+        path="/hr" 
+        element={
+          <HRGuard>
+            <HRLayout />
+          </HRGuard>
+        }
+      >
+        {/* Replace the Navigate redirect with the actual HR Dashboard */}
+        <Route index element={<HRDashboard />} /> 
+
+        {/* Dedicated HR Components */}
+        <Route path="employees" element={<HREmployeeManagement />} />
+        <Route path="departments" element={<HRDepartmentManagement />} />
+        <Route path="positions" element={<HRPositionManagement />} />
+        <Route path="employee-devices" element={<HREmployeeDevicePage />} />
       </Route>
 
       {/* Catch-all */}

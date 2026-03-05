@@ -16,6 +16,7 @@ export default function DepartmentManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [fetchError, setFetchError] = useState(null); // <-- NEW: Added fetchError state
 
   const [filters, setFilters] = useState({
     search: '',
@@ -27,11 +28,22 @@ export default function DepartmentManagement() {
 
   const loadDepartments = async () => {
     setLoading(true);
+    setFetchError(null); // <-- NEW: Reset error before fetching
     try {
       const data = await getDepartments(filters);
-      setDepartments(data);
+      
+      // Define the names of departments you want to hide
+      const hiddenDepartments = ['IT', 'Admin', 'HR', 'Information Technology', 'Human Resources'];
+      
+      // Filter out those system departments
+      const regularDepartments = data.filter(
+        (dept) => !hiddenDepartments.includes(dept.department_name)
+      );
+
+      setDepartments(regularDepartments);
     } catch (error) {
       console.error('Error loading departments:', error);
+      setFetchError("Unable to load data. Please check your connection."); // <-- NEW: Set error on failure
     } finally {
       setLoading(false);
     }
@@ -53,23 +65,30 @@ export default function DepartmentManagement() {
 
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
-      await deleteDepartment(deleteConfirm.department_id);
+      const result = await deleteDepartment(deleteConfirm.department_id);
+      // NEW: Intercept and display errors
+      if (result && !result.success) {
+         alert(`Action failed: ${result.error}`);
+      }
       setDeleteConfirm(null);
       loadDepartments();
     }
   };
 
   const handleModalSubmit = async (formData) => {
-    try {
-      if (selectedDepartment) {
-        await updateDepartment(selectedDepartment.department_id, formData);
-      } else {
-        await createDepartment(formData);
-      }
+    let result;
+    if (selectedDepartment) {
+      result = await updateDepartment(selectedDepartment.department_id, formData);
+    } else {
+      result = await createDepartment(formData);
+    }
+    
+    // NEW: Intercept and display errors
+    if (result && !result.success) {
+      alert(`Unable to save: ${result.error}`);
+    } else {
       setIsModalOpen(false);
       loadDepartments();
-    } catch (error) {
-      console.error('Error saving department:', error);
     }
   };
 
@@ -111,6 +130,9 @@ export default function DepartmentManagement() {
           <tbody>
             {loading ? (
               <tr><td colSpan="3" className="admin-empty-state">Loading...</td></tr>
+            ) : fetchError ? (
+              /* NEW: Display fetch errors cleanly in the table */
+              <tr><td colSpan="3" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
             ) : departments.length === 0 ? (
               <tr><td colSpan="3" className="admin-empty-state">No departments found.</td></tr>
             ) : (
