@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, User, Laptop, Monitor, Check, Users, HardDrive, Building2, Zap } from 'lucide-react';
+import { Package, User, Laptop, Monitor, Check, Users, HardDrive, Building2, Zap, Search } from 'lucide-react';
 import {
   getEmployeesForDeployment,
   getAvailableDevices,
@@ -15,6 +15,10 @@ export default function DeployDevice() {
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
 
+  // NEW: State for the search bars
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [deviceSearch, setDeviceSearch] = useState('');
+
   const [deploymentForm, setDeploymentForm] = useState({
     employeeId: '',
     deviceType: 'LAPTOP',
@@ -29,6 +33,7 @@ export default function DeployDevice() {
   useEffect(() => {
     if (deploymentForm.deviceType) {
       loadDevices();
+      setDeviceSearch(''); // <-- NEW: Reset search when changing device types
     }
   }, [deploymentForm.deviceType]);
 
@@ -58,6 +63,21 @@ export default function DeployDevice() {
       console.error('Error loading devices:', error);
     }
   };
+
+  // --- NEW: Filtering Logic ---
+  const filteredEmployees = employees.filter(emp => {
+    const searchLower = employeeSearch.toLowerCase();
+    return (
+      emp.full_name?.toLowerCase().includes(searchLower) ||
+      emp.employee_code?.toLowerCase().includes(searchLower) ||
+      emp.departments?.department_name?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const filteredDevices = devices.filter(dev => 
+    dev.display_name?.toLowerCase().includes(deviceSearch.toLowerCase())
+  );
+  // -----------------------------
 
   const handleFormChange = (field, value) => {
     setDeploymentForm(prev => ({ ...prev, [field]: value }));
@@ -200,29 +220,34 @@ export default function DeployDevice() {
         <div className="deployment-workflow">
           
           {/* Step 1: Select Employee */}
-          <div className="workflow-step">
-            <div className="step-indicator">
-              <div className="step-number active">1</div>
-              <div className="step-line"></div>
+          {/* NEW: Searchable Wrapper for Employee */}
+          <div className="searchable-select-wrapper">
+            <div className="it-search-input-box">
+              <Search size={16} className="search-icon" />
+              <input 
+                type="text" 
+                placeholder="Search by name, ID, or department..." 
+                value={employeeSearch}
+                onChange={(e) => setEmployeeSearch(e.target.value)}
+              />
             </div>
-            <div className="step-content">
-              <div className="step-header">
-                <User size={20} />
-                <h4>Select Employee</h4>
-              </div>
-              <select 
-                value={deploymentForm.employeeId}
-                onChange={(e) => handleFormChange('employeeId', e.target.value)}
-                className="it-form-select"
-              >
-                <option value="">Choose an employee...</option>
-                {employees.map(employee => (
-                  <option key={employee.employee_id} value={employee.employee_id}>
-                    {employee.full_name} ({employee.employee_code}) - {employee.departments?.department_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            
+            <select 
+              value={deploymentForm.employeeId}
+              onChange={(e) => handleFormChange('employeeId', e.target.value)}
+              className="it-form-select"
+            >
+              <option value="">Choose an employee...</option>
+              {/* Changed employees.map to filteredEmployees.map */}
+              {filteredEmployees.map(employee => (
+                <option key={employee.employee_id} value={employee.employee_id}>
+                  {employee.full_name} ({employee.employee_code}) - {employee.departments?.department_name}
+                </option>
+              ))}
+            </select>
+            {filteredEmployees.length === 0 && (
+              <div className="no-results-text">No employees match your search.</div>
+            )}
           </div>
 
           {/* Step 2: Select Device Type */}
@@ -264,30 +289,36 @@ export default function DeployDevice() {
           </div>
 
           {/* Step 3: Select Device */}
-          <div className="workflow-step">
-            <div className="step-indicator">
-              <div className={`step-number ${deploymentForm.deviceType ? 'active' : ''}`}>3</div>
-              <div className="step-line"></div>
-            </div>
-            <div className="step-content">
-              <div className="step-header">
-                <Package size={20} />
-                <h4>Select Specific Device</h4>
+          {/* NEW: Searchable Wrapper for Device */}
+            <div className="searchable-select-wrapper">
+              <div className={`it-search-input-box ${!deploymentForm.deviceType ? 'disabled' : ''}`}>
+                <Search size={16} className="search-icon" />
+                <input 
+                  type="text" 
+                  placeholder={`Search available ${deploymentForm.deviceType ? deploymentForm.deviceType.toLowerCase() + 's' : 'devices'}...`}
+                  value={deviceSearch}
+                  onChange={(e) => setDeviceSearch(e.target.value)}
+                  disabled={!deploymentForm.deviceType}
+                />
               </div>
-              <select 
-                value={deploymentForm.deviceId}
-                onChange={(e) => handleFormChange('deviceId', e.target.value)}
-                className="it-form-select"
-                disabled={!deploymentForm.deviceType}
-              >
-                <option value="">Choose a {deploymentForm.deviceType.toLowerCase()}...</option>
-                {devices.map(device => (
-                  <option key={device.device_id} value={device.device_id}>
-                    {device.display_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+
+                <select 
+                  value={deploymentForm.deviceId}
+                  onChange={(e) => handleFormChange('deviceId', e.target.value)}
+                  className="it-form-select"
+                  disabled={!deploymentForm.deviceType}
+                >
+                  <option value="">Choose a {deploymentForm.deviceType ? deploymentForm.deviceType.toLowerCase() : 'device'}...</option>
+              {/* Changed devices.map to filteredDevices.map */}
+              {filteredDevices.map(device => (
+                <option key={device.device_id} value={device.device_id}>
+                  {device.display_name}
+                </option>
+              ))}
+            </select>
+            {deploymentForm.deviceType && filteredDevices.length === 0 && (
+              <div className="no-results-text">No devices match your search.</div>
+            )}
           </div>
 
           {/* Step 4: Select Monitors */}

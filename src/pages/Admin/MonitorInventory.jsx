@@ -17,6 +17,8 @@ export default function MonitorInventory() {
   const [specsModalOpen, setSpecsModalOpen] = useState(false);
   const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
 
+  const [fetchError, setFetchError] = useState(null);
+
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -38,11 +40,16 @@ export default function MonitorInventory() {
 
   const loadMonitors = async () => {
     setLoading(true);
+    setFetchError(null); // Reset before fetching
     try {
       const data = await getMonitors(filters);
       setMonitors(data);
-    } catch (e) { console.error(e); } 
-    finally { setLoading(false); }
+    } catch (e) { 
+      console.error(e); 
+      setFetchError("Unable to load monitors. Please check your connection and try again."); // Handle fetch error
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleModalSubmit = async (formData) => {
@@ -57,15 +64,23 @@ export default function MonitorInventory() {
       setIsModalOpen(false);
       loadMonitors();
     } else {
-      alert(`Failed to save monitor: ${result.error}`);
+      // Show clean error
+      alert(`Unable to save: ${result.error}`);
     }
   };
 
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
-      await deleteMonitor(deleteConfirm.monitor_id);
-      setDeleteConfirm(null);
-      loadMonitors();
+      const result = await deleteMonitor(deleteConfirm.monitor_id);
+      
+      if (result.success) {
+        setDeleteConfirm(null);
+        loadMonitors();
+      } else {
+        // Show clean error on failure
+        alert(`Action failed: ${result.error}`);
+        setDeleteConfirm(null);
+      }
     }
   };
 
@@ -220,14 +235,19 @@ export default function MonitorInventory() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> : 
-             monitors.length === 0 ? <tr><td colSpan="5" className="admin-empty-state">No monitors found.</td></tr> :
-             monitors.map((monitor) => (
+            {loading ? (
+              <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> 
+            ) : fetchError ? (
+              // NEW: Displays the network/fetch error if one exists
+              <tr><td colSpan="5" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
+            ) : monitors.length === 0 ? (
+              <tr><td colSpan="5" className="admin-empty-state">No monitors found.</td></tr> 
+            ) : (
+              monitors.map((monitor) => (
                 <tr key={monitor.monitor_id}>
                   <td>
                     <div className="col-asset">{monitor.asset_id}</div>
                     <div className="col-main-text">{monitor.brand} {monitor.model}</div>
-                    {/* ADDED: Serial Number Display with Blue Style */}
                     <div className="col-sub-text" style={{ fontSize: '12px', marginTop: '2px' }}>
                        <span style={{ color: '#64748b' }}>S/N: </span>
                        <span style={{ color: '#0369a1', fontWeight: 500 }}>
@@ -283,7 +303,7 @@ export default function MonitorInventory() {
                   </td>
                 </tr>
               ))
-            }
+            )}
           </tbody>
         </table>
       </div>

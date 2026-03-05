@@ -1,5 +1,42 @@
 import { supabase } from '../supabase/client';
 
+
+// Helper function to translate raw Supabase/Postgres errors
+const formatDatabaseError = (error) => {
+  // PostgreSQL Error Codes
+  const code = error?.code || error?.details?.code;
+  const message = error?.message?.toLowerCase() || '';
+
+  // 23505: Unique violation (Duplicate entries)
+  if (code === '23505') {
+    if (message.includes('asset_id')) {
+      return 'This Asset ID is already registered in the system. Please use a unique Asset ID.';
+    }
+    if (message.includes('serial_number') || message.includes('snid')) {
+      return 'A device with this Serial Number or SNID already exists.';
+    }
+    return 'A record with this unique information already exists.';
+  }
+
+  // 23503: Foreign key violation (Data tied to other tables)
+  if (code === '23503') {
+    return 'This device cannot be modified or deleted because it is currently assigned to an employee or linked to other active records.';
+  }
+
+  // 22P02: Invalid text representation (Wrong data type)
+  if (code === '22P02') {
+    return 'Invalid data format submitted. Please check your number and text inputs.';
+  }
+
+  // Network or timeout errors
+  if (message.includes('fetch') || message.includes('network')) {
+    return 'Network error. Please check your internet connection and try again.';
+  }
+
+  // Default fallback for unhandled errors
+  return 'An unexpected system error occurred while processing your request. Please try again later.';
+};
+
 // ==================== LAPTOPS ====================
 
 export async function getLaptops(filters = {}) {
@@ -88,7 +125,8 @@ export async function createLaptop(laptopData) {
     return { success: true, data: laptop };
   } catch (error) {
     console.error('Error creating laptop:', error);
-    return { success: false, error: error.message };
+    // Replace error.message with the formatter
+    return { success: false, error: formatDatabaseError(error) }; 
   }
 }
 
@@ -138,7 +176,8 @@ export async function updateLaptop(laptopId, laptopData) {
     return { success: true, data };
   } catch (error) {
     console.error('Error updating laptop:', error);
-    return { success: false, error: error.message };
+    // Replace error.message with the formatter
+    return { success: false, error: formatDatabaseError(error) };
   }
 }
 
@@ -157,7 +196,8 @@ export async function deleteLaptop(laptopId) {
     return { success: true };
   } catch (error) {
     console.error('Error retiring laptop:', error);
-    return { success: false, error: error.message };
+    // Replace error.message with the formatter
+    return { success: false, error: formatDatabaseError(error) };
   }
 }
 
@@ -257,9 +297,10 @@ export async function createDesktop(desktopData) {
     }
 
     return { success: true, data: desktopResult };
-  } catch (error) {
+    } catch (error) {
     console.error('Error creating desktop:', error);
-    return { success: false, error: error.message || error.details };
+    // Apply the formatter here
+    return { success: false, error: formatDatabaseError(error) }; 
   }
 }
 
@@ -312,7 +353,8 @@ export async function updateDesktop(desktopId, desktopData) {
     return { success: true, data: desktopResult };
   } catch (error) {
     console.error('Error updating desktop:', error);
-    return { success: false, error: error.message };
+    // Apply the formatter here
+    return { success: false, error: formatDatabaseError(error) };
   }
 }
 
@@ -330,7 +372,8 @@ export async function deleteDesktop(desktopId) {
     return { success: true };
   } catch (error) {
     console.error('Error retiring desktop:', error);
-    return { success: false, error: error.message };
+    // Apply the formatter here
+    return { success: false, error: formatDatabaseError(error) };
   }
 }
 
@@ -385,7 +428,8 @@ export async function createMonitor(monitorData) {
     return { success: true, data };
   } catch (error) {
     console.error('Error creating monitor:', error);
-    return { success: false, error: error.message };
+    // Apply the formatter
+    return { success: false, error: formatDatabaseError(error) };
   }
 }
 
@@ -403,7 +447,8 @@ export async function updateMonitor(monitorId, monitorData) {
     return { success: true, data };
   } catch (error) {
     console.error('Error updating monitor:', error);
-    return { success: false, error: error.message };
+    // Apply the formatter
+    return { success: false, error: formatDatabaseError(error) };
   }
 }
 
@@ -421,6 +466,7 @@ export async function deleteMonitor(monitorId) {
     return { success: true };
   } catch (error) {
     console.error('Error retiring monitor:', error);
-    return { success: false, error: error.message };
+    // Apply the formatter
+    return { success: false, error: formatDatabaseError(error) };
   }
 }

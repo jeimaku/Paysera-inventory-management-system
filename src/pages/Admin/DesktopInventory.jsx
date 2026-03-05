@@ -10,6 +10,7 @@ import '../../styles/new_modal.css';
 export default function DesktopInventory() {
   const [desktops, setDesktops] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDesktop, setSelectedDesktop] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -26,11 +27,17 @@ export default function DesktopInventory() {
 
   const loadDesktops = async () => {
     setLoading(true);
+    setFetchError(null); // Reset error before fetching
     try {
       const data = await getDesktops(filters);
       setDesktops(data);
-    } catch(e) { console.error(e); } 
-    finally { setLoading(false); }
+    } catch(e) { 
+      console.error(e);
+      // Set a friendly error message
+      setFetchError("Unable to load desktops. Please check your connection and try again.");
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleModalSubmit = async (formData) => {
@@ -45,15 +52,23 @@ export default function DesktopInventory() {
       setIsModalOpen(false);
       loadDesktops();
     } else {
-      alert(`Failed to save desktop: ${result.error}`);
+      // Display the friendly error from the service
+      alert(`Unable to save: ${result.error}`);
     }
   };
 
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
-      await deleteDesktop(deleteConfirm.desktop_id);
-      setDeleteConfirm(null);
-      loadDesktops();
+      const result = await deleteDesktop(deleteConfirm.desktop_id);
+      
+      if (result.success) {
+        setDeleteConfirm(null);
+        loadDesktops();
+      } else {
+        // Display the friendly error if deletion/retirement fails
+        alert(`Action failed: ${result.error}`);
+        setDeleteConfirm(null);
+      }
     }
   };
 
@@ -223,13 +238,19 @@ export default function DesktopInventory() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> : 
-             desktops.length === 0 ? <tr><td colSpan="5" className="admin-empty-state">No desktops found.</td></tr> :
-             desktops.map((desktop) => (
+            {loading ? (
+              <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> 
+            ) : fetchError ? (
+              // NEW: Displays the network/fetch error if one exists
+              <tr><td colSpan="5" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
+            ) : desktops.length === 0 ? (
+              <tr><td colSpan="5" className="admin-empty-state">No desktops found.</td></tr> 
+            ) : (
+              desktops.map((desktop) => (
                 <tr key={desktop.desktop_id}>
                   <td>
                     <div className="col-asset">{desktop.asset_id}</div>
-                    {/* ADDED: Serial Number Display with Blue Style */}
+                    {/* Serial Number Display with Blue Style */}
                     <div className="col-sub-text">
                       <span style={{ color: '#64748b' }}>S/N: </span>
                       <span style={{ color: '#0369a1', fontWeight: 500 }}>
@@ -291,7 +312,7 @@ export default function DesktopInventory() {
                   </td>
                 </tr>
               ))
-            }
+            )}
           </tbody>
         </table>
       </div>

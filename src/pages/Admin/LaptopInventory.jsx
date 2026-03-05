@@ -60,10 +60,16 @@ export default function LaptopInventory() {
 
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
-      // This now triggers the Soft Delete (Set status to 'retired')
-      await deleteLaptop(deleteConfirm.laptop_id);
-      setDeleteConfirm(null);
-      loadLaptops();
+      const result = await deleteLaptop(deleteConfirm.laptop_id);
+      
+      if (result.success) {
+        setDeleteConfirm(null);
+        loadLaptops();
+      } else {
+        // Display the friendly error if retirement fails
+        alert(`Action failed: ${result.error}`);
+        setDeleteConfirm(null); // Optional: close the modal even on fail, or leave it open
+      }
     }
   };
 
@@ -79,7 +85,8 @@ export default function LaptopInventory() {
       setIsModalOpen(false);
       loadLaptops();
     } else {
-      alert(`Failed to save laptop: ${result.error}`);
+      // Display the clean error directly to the user
+      alert(`Unable to save: ${result.error}`);
     }
   };
 
