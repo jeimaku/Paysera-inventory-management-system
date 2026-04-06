@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Wrench, Search, Calendar, AlertCircle, 
   CheckCircle, Clock, DollarSign, FileText,
-  ArrowLeft, CheckSquare, ShieldAlert 
+  ArrowLeft, CheckSquare, ShieldAlert,
+  FileSpreadsheet // <-- Added for Excel Icon
 } from 'lucide-react';
 
 import MaintenanceActionModal from '../../components/Admin/MaintenanceActionModal';
@@ -22,6 +23,7 @@ import {
 } from '../../services/repairService';
 
 import { getDetailedDeviceSpecs } from '../../services/deploymentService';
+import { exportMaintenanceToExcel, exportMaintenanceToPDF } from '../../utils/maintenanceExportUtils'; // <-- Export Utils
 import '../../styles/maintenance.css';
 
 export default function MaintenanceHistory() {
@@ -33,6 +35,7 @@ export default function MaintenanceHistory() {
   const [statistics, setStatistics] = useState({});
   const [deviceDetails, setDeviceDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false); // <-- Export State
   
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -120,6 +123,31 @@ export default function MaintenanceHistory() {
     }
   };
 
+  // --- EXPORT FUNCTIONALITY ---
+  const handleExportExcel = () => {
+    setIsExporting(true);
+    try {
+      exportMaintenanceToExcel(maintenanceRecords, deviceDetails);
+    } catch (error) {
+      console.error("Excel Export Error:", error);
+      alert(`Failed to export to Excel. Error: ${error.message || 'Check console'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    setIsExporting(true);
+    try {
+      exportMaintenanceToPDF(maintenanceRecords, deviceDetails);
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      alert(`Failed to export to PDF. Error: ${error.message || 'Check console'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed': return '#10b981';
@@ -148,7 +176,6 @@ export default function MaintenanceHistory() {
     });
   };
 
-  // Helper to format: "10:43 AM 1/21/26 – Ongoing"
   const formatTimelineEntry = (dateString, label, color) => {
     if (!dateString) return null;
     const date = new Date(dateString);
@@ -183,8 +210,12 @@ export default function MaintenanceHistory() {
 
   return (
     <div className="maintenance-container">
-      <header className="maintenance-header">
-        <div className="header-title">
+      {/* Modified Header: 
+        Added flex wrap layout to beautifully stack the title and buttons on smaller screens, 
+        and float them to the edges on larger screens.
+      */}
+      <header className="maintenance-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           {view === 'device' && (
             <button 
               className="back-button" 
@@ -196,19 +227,40 @@ export default function MaintenanceHistory() {
           )}
           <Wrench size={32} className="header-icon" />
           <div>
-            <h1>
+            <h1 style={{ margin: 0 }}>
               {view === 'device' 
                 ? `Maintenance History - ${deviceDetails?.asset_id || `${deviceType} ${deviceId}`}`
                 : 'All Maintenance Records'
               }
             </h1>
-            <p className="subtitle">
+            <p className="subtitle" style={{ margin: 0 }}>
               {view === 'device' 
                 ? 'Device repair and maintenance history'
                 : 'Complete maintenance and repair tracking'
               }
             </p>
           </div>
+        </div>
+
+        {/* Export Buttons Container */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button 
+            onClick={handleExportExcel} 
+            disabled={isExporting || maintenanceRecords.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || maintenanceRecords.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || maintenanceRecords.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+          >
+            <FileSpreadsheet size={18} />
+            {isExporting ? 'Exporting...' : 'Export Excel'}
+          </button>
+          
+          <button 
+            onClick={handleExportPDF} 
+            disabled={isExporting || maintenanceRecords.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#ef4444', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || maintenanceRecords.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || maintenanceRecords.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+          >
+            <FileText size={18} />
+            {isExporting ? 'Exporting...' : 'Export PDF'}
+          </button>
         </div>
       </header>
 

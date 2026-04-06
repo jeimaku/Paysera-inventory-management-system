@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Search, Laptop as LaptopIcon, Eye, Filter, AlertTriangle, Printer } from 'lucide-react';
+import { 
+  Plus, Edit2, Trash2, Search, Laptop as LaptopIcon, 
+  Eye, Filter, AlertTriangle, Printer, FileSpreadsheet, FileText 
+} from 'lucide-react';
 import LaptopModal from '../../components/Admin/LaptopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getLaptops, createLaptop, updateLaptop, deleteLaptop } from '../../services/deviceService';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
+import { exportLaptopsToExcel, exportLaptopsToPDF } from '../../utils/laptopExportUtils';
 import '../../styles/admin-inventory.css';
 import '../../styles/new_modal.css';
 
@@ -13,6 +17,7 @@ export default function LaptopInventory() {
   const [laptops, setLaptops] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLaptop, setSelectedLaptop] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -66,9 +71,8 @@ export default function LaptopInventory() {
         setDeleteConfirm(null);
         loadLaptops();
       } else {
-        // Display the friendly error if retirement fails
         alert(`Action failed: ${result.error}`);
-        setDeleteConfirm(null); // Optional: close the modal even on fail, or leave it open
+        setDeleteConfirm(null); 
       }
     }
   };
@@ -85,7 +89,6 @@ export default function LaptopInventory() {
       setIsModalOpen(false);
       loadLaptops();
     } else {
-      // Display the clean error directly to the user
       alert(`Unable to save: ${result.error}`);
     }
   };
@@ -95,22 +98,42 @@ export default function LaptopInventory() {
     setSpecsModalOpen(true);
   };
 
+  // --- EXPORT FUNCTIONALITY ---
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      await exportLaptopsToExcel(laptops, getDeviceUsageHistory);
+    } catch (error) {
+      console.error("Excel Export Error:", error);
+      alert(`Failed to export to Excel. Error: ${error.message || 'Check console'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      await exportLaptopsToPDF(laptops, getDeviceUsageHistory);
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      alert(`Failed to export to PDF. Error: ${error.message || 'Check console'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // --- PRINT FUNCTIONALITY ---
   const handlePrint = async (laptop) => {
     try {
-      // 1. Fetch current deployment details to get the accurate employee info
       const history = await getDeviceUsageHistory('LAPTOP', laptop.laptop_id);
-      // Find the active deployment (status 'in_use')
       const activeDeployment = history.find(h => h.status === 'in_use');
 
-      // 2. Prepare Data
-      // UPDATED LINE: Checks for active name, then archived name, then default
       const employeeName = activeDeployment?.employees?.full_name || activeDeployment?.archived_owner_name || 'Not Currently Assigned';
       const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
       const warrantyDate = laptop.warranty_end ? new Date(laptop.warranty_end).toLocaleDateString() : 'No Warranty Date';
       const specs = `${laptop.cpu || 'Unknown CPU'} / ${laptop.memory || '0'}GB RAM / ${laptop.storage || 'Unknown'} Storage`;
 
-      // 3. Open Print Window
       const printWindow = window.open('', '_blank', 'width=800,height=600');
       
       printWindow.document.write(`
@@ -214,9 +237,31 @@ export default function LaptopInventory() {
           <h1>Laptop Management</h1>
           <div className="header-meta">Manage inventory, assignments, and lifecycle</div>
         </div>
-        <button className="btn-add-device" onClick={handleAddClick}>
-          <Plus size={20} /> Add Laptop
-        </button>
+        
+        {/* Export Action Buttons */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button 
+            onClick={handleExportExcel} 
+            disabled={isExporting || laptops.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || laptops.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || laptops.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+          >
+            <FileSpreadsheet size={18} />
+            {isExporting ? 'Exporting...' : 'Export Excel'}
+          </button>
+          
+          <button 
+            onClick={handleExportPDF} 
+            disabled={isExporting || laptops.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#ef4444', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || laptops.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || laptops.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+          >
+            <FileText size={18} />
+            {isExporting ? 'Exporting...' : 'Export PDF'}
+          </button>
+
+          <button className="btn-add-device" onClick={handleAddClick}>
+            <Plus size={20} /> Add Laptop
+          </button>
+        </div>
       </div>
 
       {/* 2. Filters Bar */}
@@ -248,7 +293,6 @@ export default function LaptopInventory() {
         >
           <option value="">All Statuses</option>
           <option value="available">Available</option>
-          {/* Change value and text from Deployed to Issued */}
           <option value="issued">Issued</option>
           <option value="maintenance">Maintenance</option>
           <option value="retired">Retired</option>
@@ -290,10 +334,8 @@ export default function LaptopInventory() {
                   <td>
                   <div className="col-asset">{laptop.asset_id}</div>
                   <div className="col-sub-text">
-                    {/* UPDATED: Added "S/N:" prefix */}
                     {laptop.brand?.toLowerCase().includes('acer') && laptop.snid ? (
                       <>
-                       
                         <span title="SNID" style={{ color: '#0369a1', fontWeight: 500 }}>
                           {laptop.snid} <span style={{ color: '#94a3b8', fontSize: '0.75em' }}>(SNID)</span>
                         </span>
@@ -327,7 +369,6 @@ export default function LaptopInventory() {
                   </td>
                   <td>
                     <div className="admin-actions">
-                      {/* VIEW BUTTON */}
                       <button 
                         className="action-btn btn-view" 
                         onClick={() => handleViewSpecs(laptop)} 
@@ -336,7 +377,6 @@ export default function LaptopInventory() {
                         <Eye size={16} />
                       </button>
                       
-                      {/* PRINT BUTTON - Updated with inline border & background */}
                       <button 
                         className="action-btn" 
                         onClick={() => handlePrint(laptop)} 
@@ -350,7 +390,6 @@ export default function LaptopInventory() {
                         <Printer size={16} />
                       </button>
 
-                      {/* EDIT BUTTON */}
                       <button 
                         className="action-btn btn-edit" 
                         onClick={() => handleEditClick(laptop)} 
@@ -359,7 +398,6 @@ export default function LaptopInventory() {
                         <Edit2 size={16} />
                       </button>
 
-                      {/* DELETE BUTTON */}
                       <button 
                         className="action-btn btn-delete" 
                         onClick={() => handleDeleteClick(laptop)} 
@@ -376,7 +414,6 @@ export default function LaptopInventory() {
         </table>
       </div>
 
-      {/* Keep Modals Same */}
       <LaptopModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -390,7 +427,6 @@ export default function LaptopInventory() {
         type="laptop"
       />
       
-      {/* Enhanced Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>

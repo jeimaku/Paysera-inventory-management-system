@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, HardDrive, Eye, AlertTriangle, Printer } from 'lucide-react'; // <--- Imported Printer
+import { 
+  Plus, Edit2, Trash2, Search, HardDrive, Eye, AlertTriangle, 
+  Printer, FileSpreadsheet, FileText 
+} from 'lucide-react';
 import DesktopModal from '../../components/Admin/DesktopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getDesktops, createDesktop, updateDesktop, deleteDesktop } from '../../services/deviceService';
-import { getDeviceUsageHistory } from '../../services/deploymentService'; // <--- Imported to get current user details
+import { getDeviceUsageHistory } from '../../services/deploymentService';
+import { exportDesktopsToExcel, exportDesktopsToPDF } from '../../utils/desktopExportUtils';
 import '../../styles/admin-inventory.css';
 import '../../styles/new_modal.css';
 
@@ -11,6 +15,7 @@ export default function DesktopInventory() {
   const [desktops, setDesktops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDesktop, setSelectedDesktop] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -27,13 +32,12 @@ export default function DesktopInventory() {
 
   const loadDesktops = async () => {
     setLoading(true);
-    setFetchError(null); // Reset error before fetching
+    setFetchError(null); 
     try {
       const data = await getDesktops(filters);
       setDesktops(data);
     } catch(e) { 
       console.error(e);
-      // Set a friendly error message
       setFetchError("Unable to load desktops. Please check your connection and try again.");
     } finally { 
       setLoading(false); 
@@ -52,7 +56,6 @@ export default function DesktopInventory() {
       setIsModalOpen(false);
       loadDesktops();
     } else {
-      // Display the friendly error from the service
       alert(`Unable to save: ${result.error}`);
     }
   };
@@ -65,30 +68,49 @@ export default function DesktopInventory() {
         setDeleteConfirm(null);
         loadDesktops();
       } else {
-        // Display the friendly error if deletion/retirement fails
         alert(`Action failed: ${result.error}`);
         setDeleteConfirm(null);
       }
     }
   };
 
-  // --- NEW PRINT FUNCTIONALITY (DESKTOP) ---
+  // --- EXPORT FUNCTIONALITY ---
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      await exportDesktopsToExcel(desktops, getDeviceUsageHistory);
+    } catch (error) {
+      console.error("Excel Export Error:", error);
+      alert(`Failed to export to Excel. Error: ${error.message || 'Check console'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      await exportDesktopsToPDF(desktops, getDeviceUsageHistory);
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      alert(`Failed to export to PDF. Error: ${error.message || 'Check console'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // --- PRINT FUNCTIONALITY (DESKTOP) ---
   const handlePrint = async (desktop) => {
     try {
-      // 1. Fetch current deployment details to get the accurate employee info
       const history = await getDeviceUsageHistory('DESKTOP', desktop.desktop_id);
-      // Find the active deployment (status 'in_use')
       const activeDeployment = history.find(h => h.status === 'in_use');
 
-      // 2. Prepare Data
       const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
       const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
       const warrantyDate = desktop.warranty_end ? new Date(desktop.warranty_end).toLocaleDateString() : 'No Warranty Date';
       
-      // Desktop Specs
       const specs = `CPU: ${desktop.processor || 'Unknown'} | GPU: ${desktop.graphics_card || 'Integrated Graphics'}`;
 
-      // 3. Open Print Window
       const printWindow = window.open('', '_blank', 'width=800,height=600');
       
       printWindow.document.write(`
@@ -194,9 +216,31 @@ export default function DesktopInventory() {
           <h1>Desktop Management</h1>
           <div className="header-meta">Workstations, Servers, and PC Units</div>
         </div>
-        <button className="btn-add-device" onClick={() => { setSelectedDesktop(null); setIsModalOpen(true); }}>
-          <Plus size={20} /> Add Desktop
-        </button>
+        
+        {/* Export Action Buttons */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button 
+            onClick={handleExportExcel} 
+            disabled={isExporting || desktops.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || desktops.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || desktops.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+          >
+            <FileSpreadsheet size={18} />
+            {isExporting ? 'Exporting...' : 'Export Excel'}
+          </button>
+          
+          <button 
+            onClick={handleExportPDF} 
+            disabled={isExporting || desktops.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#ef4444', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || desktops.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || desktops.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+          >
+            <FileText size={18} />
+            {isExporting ? 'Exporting...' : 'Export PDF'}
+          </button>
+
+          <button className="btn-add-device" onClick={() => { setSelectedDesktop(null); setIsModalOpen(true); }}>
+            <Plus size={20} /> Add Desktop
+          </button>
+        </div>
       </div>
 
       <div className="admin-filters-bar">
@@ -213,7 +257,6 @@ export default function DesktopInventory() {
         <select className="admin-select" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
           <option value="">All Statuses</option>
           <option value="available">Available</option>
-          {/* Change value from "deployed" to "issued" and text to "Issued" */}
           <option value="issued">Issued</option>
           <option value="maintenance">Maintenance</option>
           <option value="retired">Retired</option>
@@ -241,7 +284,6 @@ export default function DesktopInventory() {
             {loading ? (
               <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> 
             ) : fetchError ? (
-              // NEW: Displays the network/fetch error if one exists
               <tr><td colSpan="5" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
             ) : desktops.length === 0 ? (
               <tr><td colSpan="5" className="admin-empty-state">No desktops found.</td></tr> 
@@ -250,7 +292,6 @@ export default function DesktopInventory() {
                 <tr key={desktop.desktop_id}>
                   <td>
                     <div className="col-asset">{desktop.asset_id}</div>
-                    {/* Serial Number Display with Blue Style */}
                     <div className="col-sub-text">
                       <span style={{ color: '#64748b' }}>S/N: </span>
                       <span style={{ color: '#0369a1', fontWeight: 500 }}>
@@ -273,7 +314,6 @@ export default function DesktopInventory() {
                   </td>
                   <td>
                     <div className="admin-actions">
-                      {/* VIEW BUTTON */}
                       <button 
                         className="action-btn btn-view" 
                         onClick={() => { setViewSpecsDevice(desktop); setSpecsModalOpen(true); }}
@@ -282,7 +322,6 @@ export default function DesktopInventory() {
                         <Eye size={16} />
                       </button>
 
-                      {/* PRINT BUTTON */}
                       <button 
                         className="action-btn btn-print" 
                         onClick={() => handlePrint(desktop)} 
@@ -291,7 +330,6 @@ export default function DesktopInventory() {
                         <Printer size={16} />
                       </button>
 
-                      {/* EDIT BUTTON */}
                       <button 
                         className="action-btn btn-edit" 
                         onClick={() => { setSelectedDesktop(desktop); setIsModalOpen(true); }}
@@ -300,7 +338,6 @@ export default function DesktopInventory() {
                         <Edit2 size={16} />
                       </button>
 
-                      {/* DELETE BUTTON */}
                       <button 
                         className="action-btn btn-delete" 
                         onClick={() => setDeleteConfirm(desktop)}
@@ -317,43 +354,24 @@ export default function DesktopInventory() {
         </table>
       </div>
 
-      {/* Modals */}
       <DesktopModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleModalSubmit} desktop={selectedDesktop} />
       <NewSpecsModal_Admin isOpen={specsModalOpen} onClose={() => setSpecsModalOpen(false)} device={viewSpecsDevice} type="desktop" />
       
-      {/* Enhanced Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            
-            {/* 1. Warning Icon */}
             <div className="confirm-icon-wrapper">
               <AlertTriangle size={32} />
             </div>
-
-            {/* 2. Text Content */}
             <h3 className="confirm-title">Delete Device?</h3>
             <p className="confirm-desc">
               You are about to permanently delete <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong>. 
               This action cannot be undone.
             </p>
-
-            {/* 3. Side-by-Side Actions */}
             <div className="confirm-actions">
-              <button 
-                className="btn-cancel-modern" 
-                onClick={() => setDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn-delete-modern" 
-                onClick={handleDeleteConfirm}
-              >
-                Delete
-              </button>
+              <button className="btn-cancel-modern" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Delete</button>
             </div>
-
           </div> 
         </div>
       )}

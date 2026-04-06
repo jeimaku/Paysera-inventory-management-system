@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, Monitor as MonitorIcon, Eye, AlertTriangle, Printer } from 'lucide-react';
+import { 
+  Plus, Edit2, Trash2, Search, Monitor as MonitorIcon, Eye, AlertTriangle, 
+  Printer, FileSpreadsheet, FileText 
+} from 'lucide-react';
 import MonitorModal from '../../components/Admin/MonitorModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getMonitors, createMonitor, updateMonitor, deleteMonitor } from '../../services/deviceService';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
+import { exportMonitorsToExcel, exportMonitorsToPDF } from '../../utils/monitorExportUtils';
 import '../../styles/admin-inventory.css';
 import '../../styles/new_modal.css';
 
 export default function MonitorInventory() {
   const [monitors, setMonitors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMonitor, setSelectedMonitor] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -40,13 +45,13 @@ export default function MonitorInventory() {
 
   const loadMonitors = async () => {
     setLoading(true);
-    setFetchError(null); // Reset before fetching
+    setFetchError(null); 
     try {
       const data = await getMonitors(filters);
       setMonitors(data);
     } catch (e) { 
       console.error(e); 
-      setFetchError("Unable to load monitors. Please check your connection and try again."); // Handle fetch error
+      setFetchError("Unable to load monitors. Please check your connection and try again."); 
     } finally { 
       setLoading(false); 
     }
@@ -64,7 +69,6 @@ export default function MonitorInventory() {
       setIsModalOpen(false);
       loadMonitors();
     } else {
-      // Show clean error
       alert(`Unable to save: ${result.error}`);
     }
   };
@@ -77,10 +81,34 @@ export default function MonitorInventory() {
         setDeleteConfirm(null);
         loadMonitors();
       } else {
-        // Show clean error on failure
         alert(`Action failed: ${result.error}`);
         setDeleteConfirm(null);
       }
+    }
+  };
+
+  // --- EXPORT FUNCTIONALITY ---
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      await exportMonitorsToExcel(monitors, getDeviceUsageHistory);
+    } catch (error) {
+      console.error("Excel Export Error:", error);
+      alert(`Failed to export to Excel. Error: ${error.message || 'Check console'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      await exportMonitorsToPDF(monitors, getDeviceUsageHistory);
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      alert(`Failed to export to PDF. Error: ${error.message || 'Check console'}`);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -193,9 +221,31 @@ export default function MonitorInventory() {
           <h1>Monitor Management</h1>
           <div className="header-meta">Displays, Projectors, and Screens</div>
         </div>
-        <button className="btn-add-device" onClick={() => { setSelectedMonitor(null); setIsModalOpen(true); }}>
-          <Plus size={20} /> Add Monitor
-        </button>
+        
+        {/* Export Action Buttons */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button 
+            onClick={handleExportExcel} 
+            disabled={isExporting || monitors.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || monitors.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || monitors.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+          >
+            <FileSpreadsheet size={18} />
+            {isExporting ? 'Exporting...' : 'Export Excel'}
+          </button>
+          
+          <button 
+            onClick={handleExportPDF} 
+            disabled={isExporting || monitors.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#ef4444', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || monitors.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || monitors.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+          >
+            <FileText size={18} />
+            {isExporting ? 'Exporting...' : 'Export PDF'}
+          </button>
+
+          <button className="btn-add-device" onClick={() => { setSelectedMonitor(null); setIsModalOpen(true); }}>
+            <Plus size={20} /> Add Monitor
+          </button>
+        </div>
       </div>
 
       <div className="admin-filters-bar">
@@ -216,7 +266,6 @@ export default function MonitorInventory() {
         <select className="admin-select" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
           <option value="">All Statuses</option>
           <option value="available">Available</option>
-          {/* Change value from "deployed" to "issued" and text to "Issued" */}
           <option value="issued">Issued</option>
           <option value="maintenance">Maintenance</option>
           <option value="retired">Retired</option>
@@ -238,7 +287,6 @@ export default function MonitorInventory() {
             {loading ? (
               <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> 
             ) : fetchError ? (
-              // NEW: Displays the network/fetch error if one exists
               <tr><td colSpan="5" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
             ) : monitors.length === 0 ? (
               <tr><td colSpan="5" className="admin-empty-state">No monitors found.</td></tr> 
