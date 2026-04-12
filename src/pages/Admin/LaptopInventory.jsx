@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Search, Laptop as LaptopIcon, 
-  Eye, Filter, AlertTriangle, Printer, FileSpreadsheet, FileText 
+  Eye, Filter, AlertTriangle, Printer, FileSpreadsheet, FileText,
+ Archive, RefreshCw, Info, X
 } from 'lucide-react';
 import LaptopModal from '../../components/Admin/LaptopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
@@ -21,8 +22,29 @@ export default function LaptopInventory() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLaptop, setSelectedLaptop] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  const [restoreConfirm, setRestoreConfirm] = useState(null); // <-- Add this
+
   const [specsModalOpen, setSpecsModalOpen] = useState(false);
   const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
+
+  // --- NEW: Pagination State ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Adjust this number if you want more/less rows per page
+
+  // --- NEW: Info Banner State ---
+  const [showBanner, setShowBanner] = useState(true);
+
+  // --- NEW: Tooltip Helper for Statuses ---
+  const getStatusTooltip = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'available': return "Device is in storage and ready for deployment.";
+      case 'issued': return "Device is currently deployed to an employee.";
+      case 'maintenance': return "Device is currently being repaired or inspected.";
+      case 'retired': return "Device is permanently out of service but kept for records.";
+      default: return "";
+    }
+  };
 
   const [filters, setFilters] = useState({
     search: '',
@@ -31,7 +53,28 @@ export default function LaptopInventory() {
     device_condition: '',
   });
 
-  const brands = [...new Set(laptops.map((l) => l.brand).filter(Boolean))];
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' for Lowest to Highest, 'desc' for Highest to Lowest
+
+  // --- NEW: Fetch all brands ONCE when the page loads ---
+  useEffect(() => {
+    const fetchInitialBrands = async () => {
+      try {
+        // Passing an empty object means "get everything without filters"
+        const allData = await getLaptops({});
+        const uniqueBrands = [...new Set(allData.map((l) => l.brand).filter(Boolean))];
+        
+        // Save this to the state you already declared at the top!
+        setBrandOptions(uniqueBrands);
+      } catch (error) {
+        console.error('Error fetching brands:', error);
+      }
+    };
+    fetchInitialBrands();
+  }, []); // The empty bracket [] means this only runs once!
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortOrder]); // <-- Added sortOrder here
 
   useEffect(() => {
     loadLaptops();
@@ -73,6 +116,22 @@ export default function LaptopInventory() {
       } else {
         alert(`Action failed: ${result.error}`);
         setDeleteConfirm(null); 
+      }
+    }
+  };
+
+  // Add this new function to handle the restoration
+  const handleRestoreConfirm = async (newStatus) => {
+    if (restoreConfirm) {
+      // Assuming your updateLaptop function accepts partial updates
+      const result = await updateLaptop(restoreConfirm.laptop_id, { status: newStatus });
+      
+      if (result.success) {
+        setRestoreConfirm(null);
+        loadLaptops();
+      } else {
+        alert(`Failed to restore device: ${result.error}`);
+        setRestoreConfirm(null);
       }
     }
   };
@@ -228,6 +287,30 @@ export default function LaptopInventory() {
     }
   };
 
+  // --- NEW: Smart Sorting Logic (Immune to spaces) ---
+  const sortedLaptops = [...laptops].sort((a, b) => {
+    // 1. Get the raw IDs
+    const rawIdA = a.asset_id || '';
+    const rawIdB = b.asset_id || '';
+    
+    // 2. Sanitize: Remove all spaces for the comparison 
+    // This turns "LAP - 033" into "LAP-033" behind the scenes
+    const cleanIdA = rawIdA.replace(/\s+/g, '');
+    const cleanIdB = rawIdB.replace(/\s+/g, '');
+    
+    // 3. Compare the cleaned IDs
+    const comparison = cleanIdA.localeCompare(cleanIdB, undefined, { numeric: true, sensitivity: 'base' });
+    
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  // --- UPDATED: Pagination Logic ---
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  // Make sure to use sortedLaptops here instead of laptops
+  const currentLaptops = sortedLaptops.slice(indexOfFirstItem, indexOfLastItem); 
+  const totalPages = Math.ceil(sortedLaptops.length / itemsPerPage);
+
   return (
     <div className="admin-inventory-container">
       
@@ -265,7 +348,7 @@ export default function LaptopInventory() {
       </div>
 
       {/* 2. Filters Bar */}
-      <div className="admin-filters-bar">
+      <div className="admin-filters-bar" style={{ flexWrap: 'wrap' }}> {/* Added flexWrap for smaller screens */}
         <div className="filter-input-wrapper">
           <Search className="filter-icon" size={18} />
           <input
@@ -283,7 +366,8 @@ export default function LaptopInventory() {
           onChange={(e) => setFilters({ ...filters, brand: e.target.value })}
         >
           <option value="">All Brands</option>
-          {brands.map(b => <option key={b} value={b}>{b}</option>)}
+          {/* CHANGED: Now mapping over the fixed brandOptions state */}
+          {brandOptions.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
 
         <select 
@@ -298,17 +382,45 @@ export default function LaptopInventory() {
           <option value="retired">Retired</option>
         </select>
 
+        {/* NEW: Sort Dropdown */}
         <select
           className="admin-select"
-          value={filters.device_condition}
-          onChange={(e) => setFilters({ ...filters, device_condition: e.target.value })}
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ borderLeft: '2px solid #cbd5e1', marginLeft: 'auto' }} // Visually separates sort from filters
         >
-          <option value="">All Conditions</option>
-          <option value="brand_new">Brand New</option>
-          <option value="good_condition">Good</option>
-          <option value="minor_issues">Minor Issues</option>
+          <option value="asc">Sort ID: Lowest to Highest</option>
+          <option value="desc">Sort ID: Highest to Lowest</option>
         </select>
       </div>
+
+      {/* --- NEW: Quick Guide Info Banner --- */}
+      {showBanner && (
+        <div className="info-banner">
+          <div className="info-banner-icon">
+            <Info size={24} />
+          </div>
+          <div className="info-banner-content" style={{ flex: 1 }}>
+            <h4>Quick Guide: Device Lifecycle</h4>
+            <p style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+              <span><strong style={{ color: '#166534' }}>Available:</strong> Ready to deploy.</span>
+              <span><strong style={{ color: '#1e40af' }}>Issued:</strong> Assigned to a user.</span>
+              <span><strong style={{ color: '#9a3412' }}>Maintenance:</strong> Being repaired.</span>
+              <span>
+                <strong style={{ color: '#475569' }}>Retired:</strong> Removed from active fleet. 
+                (Use <Archive size={14} style={{ verticalAlign: 'middle', margin: '0 2px' }}/> to retire, and <RefreshCw size={14} style={{ verticalAlign: 'middle', margin: '0 2px' }}/> to restore)
+              </span>
+            </p>
+          </div>
+          <button 
+            onClick={() => setShowBanner(false)} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#60a5fa', padding: '4px' }}
+            title="Dismiss Guide"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
 
       {/* 3. Data Grid */}
       <div className="admin-table-wrapper">
@@ -326,52 +438,51 @@ export default function LaptopInventory() {
           <tbody>
             {loading ? (
               <tr><td colSpan="6" className="admin-empty-state">Loading inventory...</td></tr>
-            ) : laptops.length === 0 ? (
+            ) : currentLaptops.length === 0 ? (
               <tr><td colSpan="6" className="admin-empty-state">No laptops found matching your criteria.</td></tr>
             ) : (
-              laptops.map((laptop) => (
-                <tr key={laptop.laptop_id}>
+              currentLaptops.map((laptop) => (
+                <tr 
+                  key={laptop.laptop_id} 
+                  onClick={() => handleViewSpecs(laptop)} 
+                  style={{ cursor: 'pointer' }} 
+                >
+                  {/* --- RESTORED DATA COLUMNS --- */}
                   <td>
-                  <div className="col-asset">{laptop.asset_id}</div>
-                  <div className="col-sub-text">
-                    {laptop.brand?.toLowerCase().includes('acer') && laptop.snid ? (
-                      <>
-                        <span title="SNID" style={{ color: '#0369a1', fontWeight: 500 }}>
-                          {laptop.snid} <span style={{ color: '#94a3b8', fontSize: '0.75em' }}>(SNID)</span>
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span style={{ color: '#64748b' }}>S/N: </span>
-                        {laptop.serial_number}
-                      </>
-                    )}
-                  </div>
+                    <div className="col-asset">{laptop.asset_id}</div>
+                    <div className="col-sub-text">
+                      S/N: {laptop.brand?.toLowerCase().includes('acer') && laptop.snid ? laptop.snid : (laptop.serial_number || 'N/A')}
+                    </div>
                   </td>
                   <td>
                     <div className="col-main-text">{laptop.brand} {laptop.model}</div>
-                    <div className="col-sub-text">{laptop.cpu} • {laptop.memory}GB RAM</div>
-                  </td>
-                  <td>
-                    <div className="col-main-text">
-                      {laptop.warranty_end ? new Date(laptop.warranty_end).toLocaleDateString() : 'N/A'}
+                    <div className="col-sub-text">
+                      {laptop.cpu || 'N/A'} • {laptop.memory || 0}GB RAM
                     </div>
                   </td>
                   <td>
-                    <div className="col-sub-text" style={{ textTransform: 'capitalize', color: '#475569', fontWeight: 500 }}>
-                      {laptop.device_condition?.replace(/_/g, ' ') || '-'}
-                    </div>
+                    {laptop.warranty_end ? new Date(laptop.warranty_end).toLocaleDateString() : 'N/A'}
                   </td>
                   <td>
-                    <span className={`admin-badge badge-${laptop.status}`}>
-                      {laptop.status}
+                    {laptop.device_condition ? laptop.device_condition.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A'}
+                  </td>
+                  <td>
+                    {/* NEW: Added title attribute for hover tooltips */}
+                    <span 
+                      className={`admin-badge badge-${laptop.status?.toLowerCase() || 'available'}`}
+                      title={getStatusTooltip(laptop.status)}
+                      style={{ cursor: 'help' }} // Changes the cursor to indicate it's hoverable
+                    >
+                      {laptop.status || 'AVAILABLE'}
                     </span>
                   </td>
+
+                  {/* --- ACTION BUTTONS --- */}
                   <td>
                     <div className="admin-actions">
                       <button 
                         className="action-btn btn-view" 
-                        onClick={() => handleViewSpecs(laptop)} 
+                        onClick={(e) => { e.stopPropagation(); handleViewSpecs(laptop); }} 
                         title="View Specs"
                       >
                         <Eye size={16} />
@@ -379,32 +490,48 @@ export default function LaptopInventory() {
                       
                       <button 
                         className="action-btn" 
-                        onClick={() => handlePrint(laptop)} 
+                        onClick={(e) => { e.stopPropagation(); handlePrint(laptop); }} 
                         title="Print Info Sheet"
-                        style={{ 
-                          color: '#4f46e5',
-                          borderColor: '#c7d2fe',
-                          backgroundColor: '#e0e7ff'
-                        }}
+                        style={{ color: '#4f46e5', borderColor: '#c7d2fe', backgroundColor: '#e0e7ff' }}
                       >
                         <Printer size={16} />
                       </button>
 
                       <button 
                         className="action-btn btn-edit" 
-                        onClick={() => handleEditClick(laptop)} 
+                        onClick={(e) => { e.stopPropagation(); handleEditClick(laptop); }} 
                         title="Edit"
                       >
                         <Edit2 size={16} />
                       </button>
 
-                      <button 
-                        className="action-btn btn-delete" 
-                        onClick={() => handleDeleteClick(laptop)} 
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {/* --- NEW: Protected Lifecycle Buttons --- */}
+                      {laptop.status?.toLowerCase() === 'issued' ? (
+                        <button 
+                          className="action-btn btn-delete" 
+                          style={{ opacity: 0.4, cursor: 'not-allowed', background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}
+                          onClick={(e) => { e.stopPropagation(); /* Do nothing */ }} 
+                          title="Cannot retire: Device is currently deployed. Terminate deployment first."
+                        >
+                          <Archive size={16} />
+                        </button>
+                      ) : laptop.status?.toLowerCase() === 'retired' ? (
+                        <button 
+                          className="action-btn btn-restore" 
+                          onClick={(e) => { e.stopPropagation(); setRestoreConfirm(laptop); }} 
+                          title="Restore Device"
+                        >
+                          <RefreshCw size={16} />
+                        </button>
+                      ) : (
+                        <button 
+                          className="action-btn btn-delete" 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteClick(laptop); }} 
+                          title="Retire Device"
+                        >
+                          <Archive size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -443,6 +570,58 @@ export default function LaptopInventory() {
               <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Retire Device</button>
             </div>
           </div> 
+        </div>
+      )}
+      {/* Restore Device Modal */}
+      {restoreConfirm && (
+        <div className="modal-overlay" onClick={() => setRestoreConfirm(null)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-icon-wrapper" style={{ background: '#ecfdf5', color: '#10b981' }}>
+              <RefreshCw size={32} />
+            </div>
+            <h3 className="confirm-title">Restore Device?</h3>
+            <p className="confirm-desc">
+              You are about to restore <strong>{restoreConfirm.asset_id || restoreConfirm.brand}</strong>. 
+              Which status should it be assigned to?
+            </p>
+            <div className="confirm-actions" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              <button className="btn-cancel-modern" onClick={() => setRestoreConfirm(null)}>Cancel</button>
+              
+              <button 
+                className="btn-delete-modern" 
+                style={{ background: '#10b981', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)' }} 
+                onClick={() => handleRestoreConfirm('available')}
+              >
+                Available
+              </button>
+              
+              <button 
+                className="btn-delete-modern" 
+                style={{ background: '#f59e0b', boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.3)' }} 
+                onClick={() => handleRestoreConfirm('maintenance')}
+              >
+                Maintenance
+              </button>
+            </div>
+          </div> 
+        </div>
+      )}
+      {/* NEW: Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="admin-pagination">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+          >
+            Previous
+          </button>
+          <span>Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

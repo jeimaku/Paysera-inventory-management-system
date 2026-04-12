@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, Edit2, Trash2, Search, Monitor as MonitorIcon, Eye, AlertTriangle, 
-  Printer, FileSpreadsheet, FileText 
+  Printer, FileSpreadsheet, FileText,
+  Archive, RefreshCw, Info, X // <-- Added new icons
 } from 'lucide-react';
 import MonitorModal from '../../components/Admin/MonitorModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
-import { getMonitors, createMonitor, updateMonitor, deleteMonitor } from '../../services/deviceService';
+import { getMonitors, createMonitor, updateMonitor } from '../../services/deviceService';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
 import { exportMonitorsToExcel, exportMonitorsToPDF } from '../../utils/monitorExportUtils';
 import '../../styles/admin-inventory.css';
@@ -24,6 +25,13 @@ export default function MonitorInventory() {
 
   const [fetchError, setFetchError] = useState(null);
 
+  // --- NEW: Smart Engine States ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [showBanner, setShowBanner] = useState(true);
+  const [restoreConfirm, setRestoreConfirm] = useState(null);
+
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -32,6 +40,11 @@ export default function MonitorInventory() {
   });
 
   const [brandOptions, setBrandOptions] = useState([]);
+
+  // Reset pagination on filter or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortOrder]);
 
   useEffect(() => {
     const fetchBrands = async () => {
@@ -73,9 +86,10 @@ export default function MonitorInventory() {
     }
   };
 
+  // --- UPDATED: Soft Delete (Retire) instead of Hard Delete ---
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
-      const result = await deleteMonitor(deleteConfirm.monitor_id);
+      const result = await updateMonitor(deleteConfirm.monitor_id, { status: 'retired' });
       
       if (result.success) {
         setDeleteConfirm(null);
@@ -87,7 +101,22 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- EXPORT FUNCTIONALITY ---
+  // --- NEW: Restore functionality ---
+  const handleRestoreConfirm = async (newStatus) => {
+    if (restoreConfirm) {
+      const result = await updateMonitor(restoreConfirm.monitor_id, { status: newStatus });
+      
+      if (result.success) {
+        setRestoreConfirm(null);
+        loadMonitors();
+      } else {
+        alert(`Failed to restore device: ${result.error}`);
+        setRestoreConfirm(null);
+      }
+    }
+  };
+
+  // --- EXPORT FUNCTIONALITY (Kept Exactly As Is) ---
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
@@ -112,7 +141,7 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- PRINT FUNCTIONALITY (MONITOR) ---
+  // --- PRINT FUNCTIONALITY (Kept Exactly As Is) ---
   const handlePrint = async (monitor) => {
     try {
       const history = await getDeviceUsageHistory('MONITOR', monitor.monitor_id);
@@ -214,6 +243,31 @@ export default function MonitorInventory() {
     }
   };
 
+  // --- NEW: Tooltip Helper ---
+  const getStatusTooltip = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'available': return "Device is in storage and ready for deployment.";
+      case 'issued': return "Device is currently deployed. Retire is locked.";
+      case 'maintenance': return "Device is being repaired.";
+      case 'retired': return "Device is permanently out of service.";
+      default: return "";
+    }
+  };
+
+  // --- NEW: Smart Sorting Logic ---
+  const sortedMonitors = [...monitors].sort((a, b) => {
+    const cleanIdA = (a.asset_id || '').replace(/\s+/g, '');
+    const cleanIdB = (b.asset_id || '').replace(/\s+/g, '');
+    const comparison = cleanIdA.localeCompare(cleanIdB, undefined, { numeric: true, sensitivity: 'base' });
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  // --- NEW: Pagination Logic ---
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentMonitors = sortedMonitors.slice(indexOfFirstItem, indexOfLastItem); 
+  const totalPages = Math.ceil(sortedMonitors.length / itemsPerPage);
+
   return (
     <div className="admin-inventory-container">
       <div className="admin-header-card">
@@ -248,6 +302,34 @@ export default function MonitorInventory() {
         </div>
       </div>
 
+      {/* --- NEW: Quick Guide Info Banner --- */}
+      {showBanner && (
+        <div className="info-banner">
+          <div className="info-banner-icon">
+            <Info size={24} />
+          </div>
+          <div className="info-banner-content" style={{ flex: 1 }}>
+            <h4>Quick Guide: Device Lifecycle</h4>
+            <p style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+              <span><strong style={{ color: '#166534' }}>Available:</strong> Ready to deploy.</span>
+              <span><strong style={{ color: '#1e40af' }}>Issued:</strong> Assigned to a user.</span>
+              <span><strong style={{ color: '#9a3412' }}>Maintenance:</strong> Being repaired.</span>
+              <span>
+                <strong style={{ color: '#475569' }}>Retired:</strong> Out of active fleet. 
+                (Use <Archive size={14} style={{ verticalAlign: 'middle', margin: '0 2px' }}/> to retire, and <RefreshCw size={14} style={{ verticalAlign: 'middle', margin: '0 2px' }}/> to restore)
+              </span>
+            </p>
+          </div>
+          <button 
+            onClick={() => setShowBanner(false)} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#60a5fa', padding: '4px' }}
+            title="Dismiss Guide"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
       <div className="admin-filters-bar">
         <div className="filter-input-wrapper">
           <Search className="filter-icon" size={18} />
@@ -270,6 +352,17 @@ export default function MonitorInventory() {
           <option value="maintenance">Maintenance</option>
           <option value="retired">Retired</option>
         </select>
+
+        {/* NEW: Sort Dropdown */}
+        <select
+          className="admin-select"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ borderLeft: '2px solid #cbd5e1', marginLeft: 'auto' }}
+        >
+          <option value="asc">Sort Asset ID: Lowest to Highest</option>
+          <option value="desc">Sort Asset ID: Highest to Lowest</option>
+        </select>
       </div>
 
       <div className="admin-table-wrapper">
@@ -288,11 +381,15 @@ export default function MonitorInventory() {
               <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> 
             ) : fetchError ? (
               <tr><td colSpan="5" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
-            ) : monitors.length === 0 ? (
+            ) : currentMonitors.length === 0 ? (
               <tr><td colSpan="5" className="admin-empty-state">No monitors found.</td></tr> 
             ) : (
-              monitors.map((monitor) => (
-                <tr key={monitor.monitor_id}>
+              currentMonitors.map((monitor) => (
+                <tr 
+                  key={monitor.monitor_id}
+                  onClick={() => { setViewSpecsDevice(monitor); setSpecsModalOpen(true); }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <td>
                     <div className="col-asset">{monitor.asset_id}</div>
                     <div className="col-main-text">{monitor.brand} {monitor.model}</div>
@@ -311,7 +408,11 @@ export default function MonitorInventory() {
                     <div className="col-sub-text" style={{textTransform: 'capitalize'}}>{monitor.device_condition?.replace('_', ' ')}</div>
                   </td>
                   <td>
-                    <span className={`admin-badge badge-${monitor.status}`}>
+                    <span 
+                      className={`admin-badge badge-${monitor.status?.toLowerCase() || 'available'}`}
+                      title={getStatusTooltip(monitor.status)}
+                      style={{ cursor: 'help' }}
+                    >
                       {monitor.status}
                     </span>
                   </td>
@@ -319,7 +420,7 @@ export default function MonitorInventory() {
                     <div className="admin-actions">
                       <button 
                         className="action-btn btn-view" 
-                        onClick={() => { setViewSpecsDevice(monitor); setSpecsModalOpen(true); }}
+                        onClick={(e) => { e.stopPropagation(); setViewSpecsDevice(monitor); setSpecsModalOpen(true); }}
                         title="View Specs"
                       >
                         <Eye size={16} />
@@ -327,7 +428,7 @@ export default function MonitorInventory() {
 
                       <button 
                         className="action-btn btn-print" 
-                        onClick={() => handlePrint(monitor)} 
+                        onClick={(e) => { e.stopPropagation(); handlePrint(monitor); }} 
                         title="Print Info Sheet"
                       >
                         <Printer size={16} />
@@ -335,18 +436,39 @@ export default function MonitorInventory() {
 
                       <button 
                         className="action-btn btn-edit" 
-                        onClick={() => { setSelectedMonitor(monitor); setIsModalOpen(true); }}
+                        onClick={(e) => { e.stopPropagation(); setSelectedMonitor(monitor); setIsModalOpen(true); }}
                         title="Edit"
                       >
                         <Edit2 size={16} />
                       </button>
 
-                      <button 
-                        className="action-btn btn-delete" 
-                        onClick={() => setDeleteConfirm(monitor)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {/* --- PROTECTED STATE MACHINE ACTIONS --- */}
+                      {monitor.status?.toLowerCase() === 'issued' ? (
+                        <button 
+                          className="action-btn btn-delete" 
+                          style={{ opacity: 0.4, cursor: 'not-allowed', background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}
+                          onClick={(e) => { e.stopPropagation(); }} 
+                          title="Cannot retire: Device is currently deployed."
+                        >
+                          <Archive size={16} />
+                        </button>
+                      ) : monitor.status?.toLowerCase() === 'retired' ? (
+                        <button 
+                          className="action-btn btn-restore" 
+                          onClick={(e) => { e.stopPropagation(); setRestoreConfirm(monitor); }} 
+                          title="Restore Device"
+                        >
+                          <RefreshCw size={16} />
+                        </button>
+                      ) : (
+                        <button 
+                          className="action-btn btn-delete" 
+                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(monitor); }}
+                          title="Retire Device"
+                        >
+                          <Archive size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -356,23 +478,78 @@ export default function MonitorInventory() {
         </table>
       </div>
 
+      {/* NEW: Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="admin-pagination">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+          >
+            Previous
+          </button>
+          <span>Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       <MonitorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleModalSubmit} monitor={selectedMonitor} />
       <NewSpecsModal_Admin isOpen={specsModalOpen} onClose={() => setSpecsModalOpen(false)} device={viewSpecsDevice} type="monitor" />
       
+      {/* Retire Confirm Modal */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-icon-wrapper">
-              <AlertTriangle size={32} />
+              <Archive size={32} />
             </div>
-            <h3 className="confirm-title">Delete Device?</h3>
+            <h3 className="confirm-title">Retire Device?</h3>
             <p className="confirm-desc">
-              You are about to permanently delete <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong>. 
-              This action cannot be undone.
+              You are about to mark <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong> as <strong>Retired</strong>. 
+              This will remove it from the active fleet but preserve its history.
             </p>
             <div className="confirm-actions">
               <button className="btn-cancel-modern" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Delete</button>
+              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Retire Device</button>
+            </div>
+          </div> 
+        </div>
+      )}
+
+      {/* Restore Device Modal */}
+      {restoreConfirm && (
+        <div className="modal-overlay" onClick={() => setRestoreConfirm(null)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-icon-wrapper" style={{ background: '#ecfdf5', color: '#10b981' }}>
+              <RefreshCw size={32} />
+            </div>
+            <h3 className="confirm-title">Restore Device?</h3>
+            <p className="confirm-desc">
+              You are about to restore <strong>{restoreConfirm.asset_id || restoreConfirm.brand}</strong>. 
+              Which status should it be assigned to?
+            </p>
+            <div className="confirm-actions" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              <button className="btn-cancel-modern" onClick={() => setRestoreConfirm(null)}>Cancel</button>
+              
+              <button 
+                className="btn-delete-modern" 
+                style={{ background: '#10b981', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)' }} 
+                onClick={() => handleRestoreConfirm('available')}
+              >
+                Available
+              </button>
+              
+              <button 
+                className="btn-delete-modern" 
+                style={{ background: '#f59e0b', boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.3)' }} 
+                onClick={() => handleRestoreConfirm('maintenance')}
+              >
+                Maintenance
+              </button>
             </div>
           </div> 
         </div>

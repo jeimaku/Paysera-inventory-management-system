@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Search, HardDrive, Eye, Shield, Printer } from 'lucide-react';
+import { 
+  Search, HardDrive, Eye, Shield, Printer,
+  Info, X, CheckCircle, Users, Wrench 
+} from 'lucide-react';
 import { getDesktops } from '../../services/deviceService';
-import { getDeviceUsageHistory } from '../../services/deploymentService'; // <--- Import
+import { getDeviceUsageHistory } from '../../services/deploymentService';
 import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
 import '../../styles/new_modal.css'; 
 import '../../styles/read-only-inventory.css';
@@ -10,6 +13,12 @@ export default function DesktopInventory() {
   const [desktops, setDesktops] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // --- Smart Engine States ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [showBanner, setShowBanner] = useState(true);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,8 +29,10 @@ export default function DesktopInventory() {
     status: '',
     brand: '', 
     device_condition: '',
+    build_type: '', // Branded vs Custom
   });
 
+  // Fetch brands ONCE on load
   useEffect(() => {
     const fetchBrands = async () => {
       const allData = await getDesktops({}); 
@@ -33,6 +44,11 @@ export default function DesktopInventory() {
     fetchBrands();
   }, []);
 
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortOrder]);
+
   useEffect(() => {
     loadDesktops();
   }, [filters]);
@@ -41,10 +57,7 @@ export default function DesktopInventory() {
     setLoading(true);
     try {
       const data = await getDesktops(filters);
-      const filteredData = filters.brand 
-        ? data.filter(d => d.system_manufacturer === filters.brand)
-        : data;
-      setDesktops(filteredData);
+      setDesktops(data);
     } catch (error) {
       console.error('Error loading desktops:', error);
     } finally {
@@ -57,90 +70,13 @@ export default function DesktopInventory() {
     setIsModalOpen(true);
   };
 
-  // --- PRINT FUNCTIONALITY ---
-  const handlePrint = async (desktop) => {
-    try {
-      const history = await getDeviceUsageHistory('DESKTOP', desktop.desktop_id);
-      const activeDeployment = history.find(h => h.status === 'in_use');
-
-      const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
-      const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
-      const warrantyDate = desktop.warranty_end ? new Date(desktop.warranty_end).toLocaleDateString() : 'No Warranty Date';
-      const specs = `CPU: ${desktop.processor || 'Unknown'} | GPU: ${desktop.graphics_card || 'Integrated'}`;
-
-      const printWindow = window.open('', '_blank', 'width=800,height=600');
-      
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Device Info Sheet - ${desktop.asset_id}</title>
-            <style>
-              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; }
-              .header { border-bottom: 2px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
-              .header h1 { margin: 0; color: #1e293b; font-size: 24px; }
-              .section { margin-bottom: 30px; }
-              .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
-              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-              .field { margin-bottom: 15px; }
-              .label { font-size: 12px; color: #64748b; display: block; margin-bottom: 4px; }
-              .value { font-size: 16px; font-weight: 500; color: #0f172a; }
-              .badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; }
-              .footer { margin-top: 50px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #94a3b8; text-align: center; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>Desktop Information Sheet</h1>
-              <p>Asset ID: <strong>${desktop.asset_id}</strong></p>
-            </div>
-            <div class="section">
-              <div class="section-title">Current Assignment</div>
-              <div class="grid">
-                <div class="field"><span class="label">Assigned Employee</span><span class="value">${employeeName}</span></div>
-                <div class="field"><span class="label">Department</span><span class="value">${department}</span></div>
-              </div>
-            </div>
-            <div class="section">
-              <div class="section-title">System Specifications</div>
-              <div class="grid">
-                <div class="field"><span class="label">Processor</span><span class="value">${desktop.processor || 'N/A'}</span></div>
-                <div class="field"><span class="label">Graphics</span><span class="value">${desktop.graphics_card || 'Integrated'}</span></div>
-                <div class="field"><span class="label">Serial Number</span><span class="value">${desktop.serial_number || 'N/A'}</span></div>
-                <div class="field"><span class="label">Supplier</span><span class="value">${desktop.supplier || 'N/A'}</span></div>
-              </div>
-            </div>
-            <div class="section">
-              <div class="section-title">Status & Warranty</div>
-              <div class="grid">
-                <div class="field"><span class="label">Current Status</span><span class="value"><span class="badge">${desktop.status?.toUpperCase()}</span></span></div>
-                <div class="field"><span class="label">Warranty Expiry</span><span class="value">${warrantyDate}</span></div>
-              </div>
-            </div>
-            <div class="footer">Printed on ${new Date().toLocaleDateString()}</div>
-            <script>window.onload = function() { window.print(); }</script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    } catch (error) {
-      console.error("Error generating print:", error);
-      alert("Failed to generate print preview.");
-    }
-  };
-
+  // --- UI Helpers ---
   const getConditionColor = (condition) => {
     switch (condition?.toLowerCase()) {
       case 'brand_new': return '#0284c7';
+      case 'good_condition': return '#10b981';
       case 'second_hand': return '#d97706';
       default: return '#6b7280';
-    }
-  };
-
-  const getConditionText = (condition) => {
-    switch (condition?.toLowerCase()) {
-      case 'brand_new': return 'Brand New';
-      case 'second_hand': return 'Second Hand';
-      default: return 'Unknown';
     }
   };
 
@@ -148,8 +84,19 @@ export default function DesktopInventory() {
     switch (status?.toLowerCase()) {
       case 'available': return '#10b981';
       case 'issued': return '#0a0aa6';
-      case 'defective': return '#ef4444';
+      case 'maintenance': return '#ea580c';
+      case 'retired': return '#6b7280';
       default: return '#6b7280';
+    }
+  };
+
+  const getStatusTooltip = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'available': return "Ready for deployment.";
+      case 'issued': return "Currently deployed to an employee.";
+      case 'maintenance': return "Currently in repair/maintenance.";
+      case 'retired': return "Device is permanently out of service.";
+      default: return "";
     }
   };
 
@@ -160,16 +107,45 @@ export default function DesktopInventory() {
     });
   };
 
-  const getWarrantyStatus = (warrantyEnd) => {
-    if (!warrantyEnd) return { status: 'Unknown', color: '#6b7280' };
-    const endDate = new Date(warrantyEnd);
-    const today = new Date();
-    const daysLeft = Math.floor((endDate - today) / (1000 * 60 * 60 * 24));
+// --- NEW: Bulletproof Alphanumeric Sorting & Filtering ---
+  const processedDesktops = desktops.filter(desktop => {
+    // 1. Build Type Filter
+    if (!filters.build_type) return true;
+    const hasSerial = desktop.serial_number && 
+                      desktop.serial_number.trim() !== '' && 
+                      !desktop.serial_number.toLowerCase().includes('custom');
     
-    if (daysLeft < 0) return { status: 'Expired', color: '#ef4444' };
-    if (daysLeft < 90) return { status: `${daysLeft} days left`, color: '#f59e0b' };
-    return { status: 'Active', color: '#10b981' };
-  };
+    if (filters.build_type === 'branded') return hasSerial;
+    if (filters.build_type === 'custom') return !hasSerial;
+    return true;
+  }).sort((a, b) => {
+    // 2. Clean the IDs and convert to uppercase
+    const idA = (a.asset_id || '').replace(/\s+/g, '').toUpperCase();
+    const idB = (b.asset_id || '').replace(/\s+/g, '').toUpperCase();
+
+    // 3. Extract ONLY the numbers (e.g., "DSK-023" -> 23)
+    const numA = parseInt(idA.replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(idB.replace(/\D/g, ''), 10) || 0;
+
+    // 4. Extract ONLY the text prefix (e.g., "DSK-")
+    const prefixA = idA.replace(/\d/g, '');
+    const prefixB = idB.replace(/\d/g, '');
+
+    // 5. Sort logic: Group identical prefixes together first
+    if (prefixA !== prefixB) {
+      return sortOrder === 'desc' 
+        ? prefixB.localeCompare(prefixA) 
+        : prefixA.localeCompare(prefixB);
+    }
+
+    // 6. If prefixes match, do strict mathematical subtraction
+    return sortOrder === 'desc' ? numB - numA : numA - numB;
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDesktops = processedDesktops.slice(indexOfFirstItem, indexOfLastItem); 
+  const totalPages = Math.ceil(processedDesktops.length / itemsPerPage);
 
   return (
     <div className="inventory-container">
@@ -181,7 +157,7 @@ export default function DesktopInventory() {
             </div>
             <div className="header-text-improved">
               <h1>Desktop Inventory</h1>
-              <p className="subtitle-improved">View desktop PCs and system configurations (Read-only)</p>
+              <p className="subtitle-improved">Workstations & Servers (Read-only)</p>
             </div>
           </div>
           <div className="header-badge-improved">
@@ -191,34 +167,57 @@ export default function DesktopInventory() {
         </div>
       </header>
 
+      {showBanner && (
+        <div style={{ 
+          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', 
+          borderLeft: '4px solid #0284c7', 
+          borderRight: '1px solid #bae6fd',
+          borderTop: '1px solid #bae6fd',
+          borderBottom: '1px solid #bae6fd',
+          padding: '16px', borderRadius: '8px', marginBottom: '24px', 
+          display: 'flex', gap: '16px', alignItems: 'flex-start'
+        }}>
+          <Info size={24} color="#0284c7" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ flex: 1 }}>
+            <h4 style={{ margin: '0 0 4px 0', color: '#075985', fontSize: '15px' }}>IT Deployment View</h4>
+            <p style={{ margin: 0, color: '#0369a1', fontSize: '14px', lineHeight: '1.5' }}>
+              This inventory is strictly read-only for planning. Device statuses update automatically when using the <strong>Deploy Device</strong> or <strong>Returned Devices</strong> portals.
+            </p>
+          </div>
+          <button onClick={() => setShowBanner(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#38bdf8' }}>
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* Stats Section */}
       <div className="inventory-stats-improved">
         <div className="stat-card-improved primary">
           <div className="stat-icon-improved"><HardDrive size={20} /></div>
           <div className="stat-content-improved">
             <span className="stat-value-improved">{desktops.length}</span>
-            <span className="stat-label-improved">Total Desktops</span>
+            <span className="stat-label-improved">Total Fleet</span>
           </div>
         </div>
-        <div className="stat-card-improved available">
+        <div className="stat-card-improved available" style={{ borderLeft: '4px solid #10b981' }}>
+          <div className="stat-icon-improved" style={{ background: '#dcfce7', color: '#10b981' }}><CheckCircle size={20} /></div>
           <div className="stat-content-improved">
-            <span className="stat-value-improved">{desktops.filter((d) => d.status === 'available').length}</span>
-            <span className="stat-label-improved">Available</span>
+            <span className="stat-value-improved" style={{ color: '#10b981' }}>{desktops.filter(d => d.status?.toLowerCase() === 'available').length}</span>
+            <span className="stat-label-improved">Ready to Deploy</span>
           </div>
         </div>
-        <div className="stat-card-improved" style={{ borderLeft: '4px solid #0284c7' }}>
+        <div className="stat-card-improved" style={{ borderLeft: '4px solid #0a0aa6' }}>
+          <div className="stat-icon-improved" style={{ background: '#e0e7ff', color: '#0a0aa6' }}><Users size={20} /></div>
           <div className="stat-content-improved">
-            <span className="stat-value-improved" style={{ color: '#0284c7' }}>
-              {desktops.filter(d => d.device_condition === 'brand_new').length}
-            </span>
-            <span className="stat-label-improved">Brand New</span>
+            <span className="stat-value-improved" style={{ color: '#0a0aa6' }}>{desktops.filter(d => d.status?.toLowerCase() === 'issued').length}</span>
+            <span className="stat-label-improved">Currently Issued</span>
           </div>
         </div>
-        <div className="stat-card-improved" style={{ borderLeft: '4px solid #d97706' }}>
+        <div className="stat-card-improved" style={{ borderLeft: '4px solid #f59e0b' }}>
+          <div className="stat-icon-improved" style={{ background: '#fef3c7', color: '#f59e0b' }}><Wrench size={20} /></div>
           <div className="stat-content-improved">
-            <span className="stat-value-improved" style={{ color: '#d97706' }}>
-              {desktops.filter(d => d.device_condition === 'second_hand').length}
-            </span>
-            <span className="stat-label-improved">Second Hand</span>
+            <span className="stat-value-improved" style={{ color: '#f59e0b' }}>{desktops.filter(d => d.status?.toLowerCase() === 'maintenance').length}</span>
+            <span className="stat-label-improved">In Maintenance</span>
           </div>
         </div>
       </div>
@@ -229,208 +228,143 @@ export default function DesktopInventory() {
             <Search size={18} />
             <input
               type="text"
-              placeholder="Search by asset ID, manufacturer, or model..."
+              placeholder="Search by asset ID, specs..."
               value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
             />
           </div>
         </div>
 
         <div className="filters-improved">
-          <select
-            className="filter-select-improved"
-            value={filters.status}
-            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-          >
+          <select className="filter-select-improved" value={filters.status} onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}>
             <option value="">All Status</option>
             <option value="available">Available</option>
             <option value="issued">Issued</option>
-            <option value="defective">Defective</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="retired">Retired</option>
+          </select>
+          
+          <select className="filter-select-improved" value={filters.build_type} onChange={(e) => setFilters(prev => ({ ...prev, build_type: e.target.value }))}>
+            <option value="">All Builds</option>
+            <option value="branded">Branded / Pre-built</option>
+            <option value="custom">Custom / Assembled</option>
           </select>
 
-          <select
-            className="filter-select-improved"
-            value={filters.brand}
-            onChange={(e) => setFilters((prev) => ({ ...prev, brand: e.target.value }))}
-          >
-            <option value="">All Manufacturers</option>
-            {brandOptions.map((brand) => (
-              <option key={brand} value={brand}>
-                {brand}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="filter-select-improved"
-            value={filters.device_condition}
-            onChange={(e) => setFilters((prev) => ({ ...prev, device_condition: e.target.value }))}
-          >
-            <option value="">All Conditions</option>
-            <option value="brand_new">Brand New</option>
-            <option value="second_hand">Second Hand</option>
-          </select>
+        {/* UPDATED: Clarified Sort Dropdown */}
+        <select
+          className="admin-select"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ borderLeft: '2px solid #cbd5e1', marginLeft: 'auto' }}
+        >
+          <option value="asc">Sort: Asset ID (Ascending)</option>
+          <option value="desc">Sort: Asset ID (Descending)</option>
+        </select>
         </div>
       </div>
 
-      <div className="inventory-table-improved">
+      <div className="inventory-table-improved" style={{ overflowX: 'auto' }}>
         {loading ? (
           <div className="loading-improved">
             <div className="loading-spinner-improved"></div>
             <span>Loading desktops...</span>
           </div>
-        ) : desktops.length === 0 ? (
+        ) : currentDesktops.length === 0 ? (
           <div className="no-data-state-improved">
             <HardDrive size={64} className="no-data-icon-improved" />
             <h3>No Desktops Found</h3>
           </div>
         ) : (
-          <div className="table-container-improved">
+          <div className="table-container-improved" style={{ minWidth: '900px' }}>
             <table className="data-table-improved">
               <thead>
                 <tr>
-                  <th className="col-asset">Asset ID</th>
-                  <th className="col-brand">Brand/Model</th>
-                  <th className="col-serial">Serial No.</th>
+                  <th className="col-asset">Asset Info</th>
+                  <th style={{ width: '220px' }}>Technical Specs</th>
                   <th style={{ width: '120px' }}>Condition</th>
-                  <th className="col-procurement">Supplier</th>
-                  <th className="col-procurement">Purchase Date</th>
-                  <th className="col-warranty">Warranty</th>
-                  <th className="col-status">Status</th>
-                  <th style={{ width: '140px', textAlign: 'right', paddingRight: '24px' }}>Actions</th> {/* NEW COLUMN */}
+                  <th className="col-procurement" style={{ textAlign: 'center' }}>Purchase Date</th>
+                  <th className="col-procurement" style={{ textAlign: 'center' }}>Warranty Date</th>
+                  <th className="col-status" style={{ textAlign: 'center' }}>Status</th>
+                  <th style={{ width: '100px', textAlign: 'right', paddingRight: '24px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {desktops.map((desktop) => {
-                  const warrantyInfo = getWarrantyStatus(desktop.warranty_end);
-                  return (
-                    <tr key={desktop.desktop_id} className="table-row-improved">
-                      <td className="asset-cell-improved">
-                        <span className="asset-id-improved">{desktop.asset_id}</span>
-                      </td>
-                      <td className="brand-cell-improved">
-                        <div className="brand-info">
-                          <strong className="brand-name-improved">
-                            {desktop.system_manufacturer}
-                          </strong>
-                          <span className="model-text-improved" style={{ display: 'block', fontSize: '0.8rem', color: '#6b7280' }}>
-                            {desktop.system_model}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="serial-cell-improved">
-                        <span className="serial-number-improved">
-                          {desktop.serial_number || 'N/A'}
+                {currentDesktops.map((desktop) => (
+                  <tr 
+                    key={desktop.desktop_id} 
+                    className="table-row-improved"
+                    onClick={() => handleViewSpecs(desktop)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td className="asset-cell-improved" style={{ textAlign: 'left', paddingLeft: '16px' }}>
+                      <span className="asset-id-improved" style={{ marginBottom: '4px' }}>{desktop.asset_id}</span>
+                      <div style={{ fontSize: '11px', color: '#6b7280', fontFamily: 'monospace' }}>
+                        S/N: {desktop.serial_number || 'Custom Build'}
+                      </div>
+                    </td>
+                    
+                    <td className="brand-cell-improved" style={{ background: 'transparent', borderLeft: 'none' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontWeight: 700, color: '#1f2937', fontSize: '13px' }}>{desktop.processor || 'Unknown CPU'}</span>
+                        <span style={{ fontSize: '11px', color: '#475569' }}>
+                          {desktop.graphics_card || 'Integrated Graphics'}
                         </span>
-                      </td>
-                      <td>
-                        <span style={{ 
-                          color: getConditionColor(desktop.device_condition),
-                          backgroundColor: `${getConditionColor(desktop.device_condition)}15`,
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {getConditionText(desktop.device_condition)}
-                        </span>
-                      </td>
-                      <td className="procurement-cell-improved">{desktop.supplier || 'N/A'}</td>
-                      <td className="procurement-cell-improved">{formatDate(desktop.purchase_date)}</td>
-                      <td className="warranty-cell-improved">
-                        <span className="warranty-status-improved" style={{ color: warrantyInfo.color }}>
-                          {warrantyInfo.status}
-                        </span>
-                      </td>
-                      <td className="status-cell-improved">
-                        <span
-                          className="status-badge-improved"
-                          style={{
-                            backgroundColor: `${getStatusColor(desktop.status)}20`,
-                            color: getStatusColor(desktop.status),
-                            borderColor: getStatusColor(desktop.status)
-                          }}
+                      </div>
+                    </td>
+
+                    <td>
+                      <span style={{ 
+                        color: getConditionColor(desktop.device_condition),
+                        backgroundColor: `${getConditionColor(desktop.device_condition)}15`,
+                        padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap'
+                      }}>
+                        {desktop.device_condition?.replace(/_/g, ' ') || 'Unknown'}
+                      </span>
+                    </td>
+
+                    <td style={{ color: '#475569', fontSize: '13px', textAlign: 'center' }}>{formatDate(desktop.purchase_date)}</td>
+                    <td style={{ color: '#475569', fontSize: '13px', textAlign: 'center' }}>{formatDate(desktop.warranty_end)}</td>
+
+                    <td className="status-cell-improved" style={{ background: 'transparent', borderLeft: 'none', textAlign: 'center' }}>
+                      <span
+                        className="status-badge-improved"
+                        title={getStatusTooltip(desktop.status)}
+                        style={{ backgroundColor: `${getStatusColor(desktop.status)}15`, color: getStatusColor(desktop.status), border: `1px solid ${getStatusColor(desktop.status)}40`, cursor: 'help' }}
+                      >
+                        {desktop.status || 'AVAILABLE'}
+                      </span>
+                    </td>
+
+                    <td style={{ textAlign: 'right', paddingRight: '16px' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleViewSpecs(desktop); }}
+                          title="View Details"
+                          style={{ border: 'none', background: '#f1f5f9', color: '#64748b', width: '32px', height: '32px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                          onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#334155'; }}
+                          onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
                         >
-                          {desktop.status}
-                        </span>
-                      </td>
-
-                      {/* --- ACTIONS COLUMN --- */}
-                      <td style={{ textAlign: 'right', paddingRight: '16px' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button 
-                            onClick={() => handleViewSpecs(desktop)}
-                            title="View Details"
-                            style={{ 
-                              border: 'none',
-                              background: '#f1f5f9', 
-                              color: '#64748b',
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#334155'; }}
-                            onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
-                          >
-                            <Eye size={16} />
-                          </button>
-
-                          <button 
-                            onClick={() => handlePrint(desktop)}
-                            title="Print Info Sheet"
-                            style={{ 
-                              border: 'none',
-                              background: '#e0e7ff', 
-                              color: '#4f46e5',
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = '#c7d2fe'}
-                            onMouseOut={(e) => e.currentTarget.style.background = '#e0e7ff'}
-                          >
-                            <Printer size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                          <Eye size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      <NewSpecsModal_IT 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        device={selectedDesktop}
-        type="desktop"
-        deploymentDetails={null} 
-      />
-      
-      {desktops.length > 0 && (
-        <div className="results-summary-improved">
-          <div className="summary-content-improved">
-            Showing <strong>{desktops.length}</strong> desktops
-            {Object.values(filters).some(f => f) && (
-              <span className="filter-indicator-improved"> (filtered)</span>
-            )}
-          </div>
+      {!loading && totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'white', borderRadius: '12px', marginTop: '16px', border: '2px solid #f1f5f9' }}>
+          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: currentPage === 1 ? '#f8fafc' : 'white', color: currentPage === 1 ? '#94a3b8' : '#334155', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 500 }}>Previous</button>
+          <span style={{ fontSize: '14px', color: '#64748b' }}>Page <strong style={{ color: '#1e293b' }}>{currentPage}</strong> of <strong style={{ color: '#1e293b' }}>{totalPages}</strong></span>
+          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: currentPage === totalPages ? '#f8fafc' : 'white', color: currentPage === totalPages ? '#94a3b8' : '#334155', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: 500 }}>Next</button>
         </div>
       )}
+
+      <NewSpecsModal_IT isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} device={selectedDesktop} type="desktop" deploymentDetails={null} />
     </div>
   );
 }

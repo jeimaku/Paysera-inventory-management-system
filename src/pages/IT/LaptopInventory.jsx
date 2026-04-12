@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Search, Laptop as LaptopIcon, Eye, Shield, Printer } from 'lucide-react';
+import { 
+  Search, Laptop as LaptopIcon, Eye, Shield, Printer,
+  Info, X, CheckCircle, Users, Wrench 
+} from 'lucide-react';
 import { getLaptops } from '../../services/deviceService';
-import { getDeviceUsageHistory } from '../../services/deploymentService'; // <--- Import for print logic
+import { getDeviceUsageHistory } from '../../services/deploymentService';
 import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
 import '../../styles/read-only-inventory.css';
 import '../../styles/new_modal.css';
@@ -11,6 +14,12 @@ export default function LaptopInventory() {
   const [brandOptions, setBrandOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // --- NEW: Smart Engine States ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [showBanner, setShowBanner] = useState(true);
+
   // --- Modal State ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLaptop, setSelectedLaptop] = useState(null);
@@ -22,8 +31,7 @@ export default function LaptopInventory() {
     device_condition: '',
   });
 
-  const brands = [...new Set(laptops.map((l) => l.brand).filter(Boolean))];
-
+  // --- NEW: Fetch all brands ONCE when the page loads ---
   useEffect(() => {
     const fetchBrands = async () => {
       const allData = await getLaptops({}); 
@@ -34,6 +42,11 @@ export default function LaptopInventory() {
     };
     fetchBrands();
   }, []);
+
+  // --- Reset Pagination on filter or sort change ---
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortOrder]);
 
   useEffect(() => {
     loadLaptops();
@@ -59,19 +72,15 @@ export default function LaptopInventory() {
   // --- PRINT FUNCTIONALITY ---
   const handlePrint = async (laptop) => {
     try {
-      // 1. Fetch current deployment details
       const history = await getDeviceUsageHistory('LAPTOP', laptop.laptop_id);
       const activeDeployment = history.find(h => h.status === 'in_use');
 
-      // 2. Prepare Data
       const employeeName = activeDeployment?.employees?.full_name || 'Not Currently Assigned';
       const department = activeDeployment?.employees?.departments?.department_name || 'N/A';
       const warrantyDate = laptop.warranty_end ? new Date(laptop.warranty_end).toLocaleDateString() : 'No Warranty Date';
       const specs = `${laptop.cpu || 'Unknown CPU'} / ${laptop.memory || '0'}GB RAM / ${laptop.storage || 'Unknown'} Storage`;
 
-      // 3. Open Print Window
       const printWindow = window.open('', '_blank', 'width=800,height=600');
-      
       printWindow.document.write(`
         <html>
           <head>
@@ -130,7 +139,7 @@ export default function LaptopInventory() {
     }
   };
 
-  // --- Condition Helpers ---
+  // --- UI Helpers ---
   const getConditionColor = (condition) => {
     switch (condition?.toLowerCase()) {
       case 'brand_new': return '#0284c7';
@@ -153,9 +162,19 @@ export default function LaptopInventory() {
     switch (status?.toLowerCase()) {
       case 'available': return '#10b981';
       case 'issued': return '#0a0aa6';
-      case 'defective': return '#ef4444';
+      case 'maintenance': return '#ea580c';
       case 'retired': return '#6b7280';
       default: return '#6b7280';
+    }
+  };
+
+  const getStatusTooltip = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'available': return "Ready for deployment.";
+      case 'issued': return "Currently deployed to an employee.";
+      case 'maintenance': return "Currently in repair/maintenance.";
+      case 'retired': return "Device is permanently out of service.";
+      default: return "";
     }
   };
 
@@ -166,16 +185,18 @@ export default function LaptopInventory() {
     });
   };
 
-  const getWarrantyStatus = (warrantyEnd) => {
-    if (!warrantyEnd) return { status: 'Unknown', color: '#6b7280' };
-    const endDate = new Date(warrantyEnd);
-    const today = new Date();
-    const daysLeft = Math.floor((endDate - today) / (1000 * 60 * 60 * 24));
-    
-    if (daysLeft < 0) return { status: 'Expired', color: '#ef4444' };
-    if (daysLeft < 90) return { status: `${daysLeft} days left`, color: '#f59e0b' };
-    return { status: 'Active', color: '#10b981' };
-  };
+  // --- NEW: Smart Sorting & Pagination Logic ---
+  const sortedLaptops = [...laptops].sort((a, b) => {
+    const cleanIdA = (a.asset_id || '').replace(/\s+/g, '');
+    const cleanIdB = (b.asset_id || '').replace(/\s+/g, '');
+    const comparison = cleanIdA.localeCompare(cleanIdB, undefined, { numeric: true, sensitivity: 'base' });
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentLaptops = sortedLaptops.slice(indexOfFirstItem, indexOfLastItem); 
+  const totalPages = Math.ceil(sortedLaptops.length / itemsPerPage);
 
   return (
     <div className="inventory-container">
@@ -187,7 +208,7 @@ export default function LaptopInventory() {
             </div>
             <div className="header-text-improved">
               <h1>Laptop Inventory</h1>
-              <p className="subtitle-improved">View laptop devices and specifications (Read-only)</p>
+              <p className="subtitle-improved">Deployment Planning & Specifications</p>
             </div>
           </div>
           <div className="header-badge-improved">
@@ -197,35 +218,72 @@ export default function LaptopInventory() {
         </div>
       </header>
 
-      {/* --- Stats Section --- */}
+      {/* --- NEW: IT-Specific Banner --- */}
+      {showBanner && (
+        <div style={{ 
+          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', 
+          borderLeft: '4px solid #0284c7', 
+          borderRight: '1px solid #bae6fd',
+          borderTop: '1px solid #bae6fd',
+          borderBottom: '1px solid #bae6fd',
+          padding: '16px', 
+          borderRadius: '8px', 
+          marginBottom: '24px', 
+          display: 'flex', 
+          gap: '16px',
+          alignItems: 'flex-start',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+        }}>
+          <Info size={24} color="#0284c7" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ flex: 1 }}>
+            <h4 style={{ margin: '0 0 4px 0', color: '#075985', fontSize: '15px' }}>IT Deployment View</h4>
+            <p style={{ margin: 0, color: '#0369a1', fontSize: '14px', lineHeight: '1.5' }}>
+              This inventory is strictly read-only for planning. Device statuses (Available, Issued, Maintenance) automatically update when you use the <strong>Deploy Device</strong> or <strong>Returned Devices</strong> portals.
+            </p>
+          </div>
+          <button 
+            onClick={() => setShowBanner(false)} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#38bdf8', padding: '4px' }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* --- NEW: IT-Tailored Stats Section --- */}
       <div className="inventory-stats-improved">
         <div className="stat-card-improved primary">
           <div className="stat-icon-improved"><LaptopIcon size={20} /></div>
           <div className="stat-content-improved">
             <span className="stat-value-improved">{laptops.length}</span>
-            <span className="stat-label-improved">Total</span>
+            <span className="stat-label-improved">Total Fleet</span>
           </div>
         </div>
-        <div className="stat-card-improved available">
-          <div className="stat-content-improved">
-            <span className="stat-value-improved">{laptops.filter(l => l.status === 'available').length}</span>
-            <span className="stat-label-improved">Available</span>
-          </div>
-        </div>
-        <div className="stat-card-improved" style={{ borderLeft: '4px solid #0284c7' }}>
-          <div className="stat-content-improved">
-            <span className="stat-value-improved" style={{ color: '#0284c7' }}>
-              {laptops.filter(l => l.device_condition === 'brand_new').length}
-            </span>
-            <span className="stat-label-improved">Brand New</span>
-          </div>
-        </div>
-        <div className="stat-card-improved" style={{ borderLeft: '4px solid #10b981' }}>
+        <div className="stat-card-improved available" style={{ borderLeft: '4px solid #10b981' }}>
+          <div className="stat-icon-improved" style={{ background: '#dcfce7', color: '#10b981' }}><CheckCircle size={20} /></div>
           <div className="stat-content-improved">
             <span className="stat-value-improved" style={{ color: '#10b981' }}>
-              {laptops.filter(l => l.device_condition === 'good_condition').length}
+              {laptops.filter(l => l.status?.toLowerCase() === 'available').length}
             </span>
-            <span className="stat-label-improved">Good Cond.</span>
+            <span className="stat-label-improved">Ready to Deploy</span>
+          </div>
+        </div>
+        <div className="stat-card-improved" style={{ borderLeft: '4px solid #0a0aa6' }}>
+          <div className="stat-icon-improved" style={{ background: '#e0e7ff', color: '#0a0aa6' }}><Users size={20} /></div>
+          <div className="stat-content-improved">
+            <span className="stat-value-improved" style={{ color: '#0a0aa6' }}>
+              {laptops.filter(l => l.status?.toLowerCase() === 'issued').length}
+            </span>
+            <span className="stat-label-improved">Currently Issued</span>
+          </div>
+        </div>
+        <div className="stat-card-improved" style={{ borderLeft: '4px solid #f59e0b' }}>
+          <div className="stat-icon-improved" style={{ background: '#fef3c7', color: '#f59e0b' }}><Wrench size={20} /></div>
+          <div className="stat-content-improved">
+            <span className="stat-value-improved" style={{ color: '#f59e0b' }}>
+              {laptops.filter(l => l.status?.toLowerCase() === 'maintenance').length}
+            </span>
+            <span className="stat-label-improved">In Maintenance</span>
           </div>
         </div>
       </div>
@@ -247,18 +305,6 @@ export default function LaptopInventory() {
         <div className="filters-improved">
           <select
             className="filter-select-improved"
-            value={filters.status}
-            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-          >
-            <option value="">All Status</option>
-            <option value="available">Available</option>
-            <option value="issued">Issued</option>
-            <option value="defective">Defective</option>
-            <option value="retired">Retired</option>
-          </select>
-
-          <select
-            className="filter-select-improved"
             value={filters.brand}
             onChange={(e) => setFilters(prev => ({ ...prev, brand: e.target.value }))}
           >
@@ -268,6 +314,18 @@ export default function LaptopInventory() {
                 {brand}
               </option>
             ))}
+          </select>
+
+          <select
+            className="filter-select-improved"
+            value={filters.status}
+            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+          >
+            <option value="">All Status</option>
+            <option value="available">Available</option>
+            <option value="issued">Issued</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="retired">Retired</option>
           </select>
           
           <select
@@ -280,114 +338,118 @@ export default function LaptopInventory() {
             <option value="good_condition">Good Condition</option>
             <option value="second_hand">Second Hand</option>
           </select>
+
+          {/* NEW: Smart Sorting Dropdown */}
+          <select
+            className="filter-select-improved"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            style={{ marginLeft: 'auto', borderLeft: '2px solid #cbd5e1' }}
+          >
+            <option value="asc">Sort ID: Lowest to Highest</option>
+            <option value="desc">Sort ID: Highest to Lowest</option>
+          </select>
         </div>
       </div>
 
       {/* --- Table Section --- */}
-      <div className="inventory-table-improved">
+      <div className="inventory-table-improved" style={{ overflowX: 'auto' }}>
         {loading ? (
           <div className="loading-improved">
             <div className="loading-spinner-improved"></div>
             <span>Loading laptops...</span>
           </div>
-        ) : laptops.length === 0 ? (
+        ) : currentLaptops.length === 0 ? (
           <div className="no-data-state-improved">
             <LaptopIcon size={64} className="no-data-icon-improved" />
             <h3>No Laptops Found</h3>
           </div>
         ) : (
-          <div className="table-container-improved">
+          <div className="table-container-improved" style={{ minWidth: '900px' }}>
             <table className="data-table-improved">
               <thead>
                 <tr>
-                  <th className="col-asset">Asset ID</th>
-                  <th className="col-brand">Brand/Model</th>
-                  <th className="col-serial">Serial No.</th>
+                  <th className="col-asset">Asset Info</th>
+                  <th style={{ width: '220px' }}>Technical Specs</th>
                   <th style={{ width: '120px' }}>Condition</th>
                   <th className="col-procurement">Purchase Date</th>
                   <th className="col-procurement">Warranty Date</th>
-                  <th className="col-warranty">Status</th>
-                  <th className="col-status">Asset Status</th>
-                  <th style={{ width: '140px', textAlign: 'right', paddingRight: '24px' }}>Actions</th> {/* NEW COLUMN */}
+                  <th className="col-status">Status</th>
+                  <th style={{ width: '100px', textAlign: 'right', paddingRight: '24px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {laptops.map((laptop) => {
-                  const warrantyInfo = getWarrantyStatus(laptop.warranty_end);
-                  
+                {currentLaptops.map((laptop) => {
                   return (
-                    <tr key={laptop.laptop_id} className="table-row-improved">
-                      <td className="asset-cell-improved">
-                        <span className="asset-id-improved">{laptop.asset_id}</span>
+                    <tr 
+                      key={laptop.laptop_id} 
+                      className="table-row-improved"
+                      onClick={() => handleViewSpecs(laptop)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {/* Asset Info Consolidated */}
+                      <td className="asset-cell-improved" style={{ textAlign: 'left', paddingLeft: '16px' }}>
+                        <span className="asset-id-improved" style={{ marginBottom: '4px' }}>{laptop.asset_id}</span>
+                        <div style={{ fontSize: '11px', color: '#6b7280', fontFamily: 'monospace' }}>
+                          S/N: {laptop.brand?.toLowerCase().includes('acer') && laptop.snid ? laptop.snid : (laptop.serial_number || 'N/A')}
+                        </div>
                       </td>
-                      <td className="brand-cell-improved">
-                        <div className="brand-info">
-                          <strong className="brand-name-improved">{laptop.brand}</strong>
-                          <span className="model-text-improved" style={{ display: 'block', fontSize: '0.8rem', color: '#6b7280' }}>
-                            {laptop.model}
+                      
+                      {/* Tech Specs Consolidated */}
+                      <td className="brand-cell-improved" style={{ background: 'transparent', borderLeft: 'none' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontWeight: 700, color: '#1f2937', fontSize: '13px' }}>{laptop.brand} {laptop.model}</span>
+                          <span style={{ fontSize: '11px', color: '#475569' }}>
+                            {laptop.cpu || 'N/A'} • {laptop.memory || 0}GB RAM
                           </span>
                         </div>
                       </td>
-                      <td className="serial-cell-improved">
-                        <span className="serial-number-improved">{laptop.serial_number || 'N/A'}</span>
-                      </td>
 
+                      {/* Condition */}
                       <td>
                         <span style={{ 
                           color: getConditionColor(laptop.device_condition),
                           backgroundColor: `${getConditionColor(laptop.device_condition)}15`,
                           padding: '4px 8px',
                           borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
+                          fontSize: '11px',
+                          fontWeight: '700',
                           whiteSpace: 'nowrap'
                         }}>
                           {getConditionText(laptop.device_condition)}
                         </span>
                       </td>
 
-                      <td className="procurement-cell-improved">{formatDate(laptop.purchase_date)}</td>
-                      
-                      <td className="procurement-cell-improved" style={{ fontWeight: 500, color: '#475569' }}>
-                        {formatDate(laptop.warranty_end)}
-                      </td>
+                      {/* Dates */}
+                      <td style={{ color: '#475569', fontSize: '13px' }}>{formatDate(laptop.purchase_date)}</td>
+                      <td style={{ color: '#475569', fontSize: '13px' }}>{formatDate(laptop.warranty_end)}</td>
 
-                      <td className="warranty-cell-improved">
-                        <span className="warranty-status-improved" style={{ color: warrantyInfo.color }}>
-                          {warrantyInfo.status}
-                        </span>
-                      </td>
-
-                      <td className="status-cell-improved">
+                      {/* Unified Status with Tooltip */}
+                      <td className="status-cell-improved" style={{ background: 'transparent', borderLeft: 'none', textAlign: 'left' }}>
                         <span
                           className="status-badge-improved"
+                          title={getStatusTooltip(laptop.status)}
                           style={{
-                            backgroundColor: `${getStatusColor(laptop.status)}20`,
+                            backgroundColor: `${getStatusColor(laptop.status)}15`,
                             color: getStatusColor(laptop.status),
-                            borderColor: getStatusColor(laptop.status)
+                            border: `1px solid ${getStatusColor(laptop.status)}40`,
+                            cursor: 'help'
                           }}
                         >
-                          {laptop.status}
+                          {laptop.status || 'AVAILABLE'}
                         </span>
                       </td>
 
-                      {/* --- ACTIONS COLUMN (VIEW & PRINT) --- */}
+                      {/* Actions */}
                       <td style={{ textAlign: 'right', paddingRight: '16px' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button 
-                            onClick={() => handleViewSpecs(laptop)}
+                            onClick={(e) => { e.stopPropagation(); handleViewSpecs(laptop); }}
                             title="View Details"
                             style={{ 
-                              border: 'none',
-                              background: '#f1f5f9', 
-                              color: '#64748b',
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
+                              border: 'none', background: '#f1f5f9', color: '#64748b',
+                              width: '32px', height: '32px', borderRadius: '6px',
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                               transition: 'all 0.2s'
                             }}
                             onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#334155'; }}
@@ -397,19 +459,12 @@ export default function LaptopInventory() {
                           </button>
 
                           <button 
-                            onClick={() => handlePrint(laptop)}
+                            onClick={(e) => { e.stopPropagation(); handlePrint(laptop); }}
                             title="Print Info Sheet"
                             style={{ 
-                              border: 'none',
-                              background: '#e0e7ff', 
-                              color: '#4f46e5',
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
+                              border: 'none', background: '#e0e7ff', color: '#4f46e5',
+                              width: '32px', height: '32px', borderRadius: '6px',
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                               transition: 'all 0.2s'
                             }}
                             onMouseOver={(e) => e.currentTarget.style.background = '#c7d2fe'}
@@ -428,6 +483,45 @@ export default function LaptopInventory() {
         )}
       </div>
       
+      {/* --- NEW: Pagination Controls --- */}
+      {!loading && totalPages > 1 && (
+        <div style={{ 
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+          padding: '16px 20px', background: 'white', borderRadius: '12px', 
+          marginTop: '16px', border: '2px solid #f1f5f9' 
+        }}>
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+            style={{ 
+              padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', 
+              background: currentPage === 1 ? '#f8fafc' : 'white', 
+              color: currentPage === 1 ? '#94a3b8' : '#334155',
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              fontWeight: 500
+            }}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: '14px', color: '#64748b' }}>
+            Page <strong style={{ color: '#1e293b' }}>{currentPage}</strong> of <strong style={{ color: '#1e293b' }}>{totalPages}</strong>
+          </span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+            style={{ 
+              padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', 
+              background: currentPage === totalPages ? '#f8fafc' : 'white', 
+              color: currentPage === totalPages ? '#94a3b8' : '#334155',
+              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              fontWeight: 500
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       <NewSpecsModal_IT 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 

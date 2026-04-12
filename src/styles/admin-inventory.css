@@ -107,17 +107,19 @@
   cursor: pointer;
 }
 
-/* --- The Data Grid (Table) --- */
+/* Update these two classes in admin-inventory.css */
+
 .admin-table-wrapper {
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
+  overflow-x: auto; /* CHANGED: from 'hidden' to 'auto' to enable horizontal scroll */
   border: 1px solid #e2e8f0;
 }
 
 .admin-table {
   width: 100%;
+  min-width: 900px; /* NEW: Forces the table to stay wide enough to be readable, triggering the scrollbar on small screens */
   border-collapse: collapse;
   text-align: left;
 }
@@ -305,6 +307,16 @@
 .btn-delete-modern:hover { 
   background: #b91c1c; 
   transform: translateY(-1px);
+}
+
+/* --- Restore Button Style --- */
+.btn-restore { 
+  background: #ecfdf5; 
+  color: #10b981; 
+  border-color: #a7f3d0; 
+}
+.btn-restore:hover { 
+  background: #d1fae5; 
 }
 
 
@@ -516,4 +528,47 @@
   color: #64748b;
   margin-top: 6px;
   line-height: 1.4;
+}
+
+/* --- Pagination Controls --- */
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: white;
+  border-radius: 12px;
+  margin-top: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.admin-pagination span {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.admin-pagination strong {
+  color: #1e293b;
+}
+
+.admin-pagination button {
+  padding: 8px 16px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #334155;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-pagination button:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.admin-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

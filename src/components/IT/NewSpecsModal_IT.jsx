@@ -3,6 +3,7 @@ import {
   X, HardDrive, Monitor, Server, Laptop, 
   Cpu, Wifi, Hash, Layers, ShoppingCart, DollarSign, User, Clock, History
 } from 'lucide-react';
+import { supabase } from '../../supabase/client'; // <--- NEW: Add this import
 import '../../styles/new_modal.css';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
 
@@ -19,11 +20,14 @@ const NewSpecsModal_IT = ({
   const [historyLogs, setHistoryLogs] = useState([]);
   const [currentDeployment, setCurrentDeployment] = useState(null);
 
-  // Fetch history and active user automatically
+// Fetch history and active user automatically
   useEffect(() => {
     if (isOpen && device) {
+      // Clear previous state to prevent ghost data from showing
+      setCurrentDeployment(null);
+      setHistoryLogs([]);
+
       const fetchData = async () => {
-        // Use passed deploymentDetails if available, otherwise fetch
         if (deploymentDetails) {
           setCurrentDeployment(deploymentDetails);
         }
@@ -33,12 +37,62 @@ const NewSpecsModal_IT = ({
                    type?.toLowerCase() === 'monitor' ? device.monitor_id : null;
 
         if (id && type) {
-          const logs = await getDeviceUsageHistory(type.toUpperCase(), id);
-          setHistoryLogs(logs);
+          let logs = [];
 
-          // If no deploymentDetails were passed, try to find it from logs
-          if (!deploymentDetails && logs.length > 0 && !logs[0].date_returned) {
-            setCurrentDeployment(logs[0]);
+          // --- NEW: Custom Fetch Logic for Monitors ---
+          if (type.toLowerCase() === 'monitor') {
+            try {
+              // 1. Fetch standalone deployments (if any exist)
+              const standaloneLogs = await getDeviceUsageHistory('MONITOR', id) || [];
+              
+              // 2. Fetch attached deployments (joined via the employee_monitors bridge)
+              const { data: attachedDeployments, error } = await supabase
+                .from('employee_monitors')
+                .select(`
+                  employee_devices (
+                    employee_device_id,
+                    date_issued,
+                    date_returned,
+                    status,
+                    employees (
+                      full_name,
+                      employee_code,
+                      departments (
+                        department_name
+                      )
+                    )
+                  )
+                `)
+                .eq('monitor_id', id);
+
+              let attachedLogs = [];
+              if (!error && attachedDeployments) {
+                // Extract the nested employee_devices data
+                attachedLogs = attachedDeployments.map(md => md.employee_devices).filter(Boolean);
+              }
+
+              // Combine logs, remove duplicates, and sort newest-to-oldest
+              const allLogs = [...standaloneLogs, ...attachedLogs];
+              const uniqueLogs = Array.from(new Map(allLogs.map(log => [log.employee_device_id, log])).values());
+              logs = uniqueLogs.sort((a, b) => new Date(b.date_issued) - new Date(a.date_issued));
+
+            } catch (err) {
+              console.error("Failed to fetch extended monitor history:", err);
+              logs = await getDeviceUsageHistory('MONITOR', id) || [];
+            }
+          } 
+          // --- Standard Fetch for Laptops and Desktops ---
+          else {
+            logs = await getDeviceUsageHistory(type.toUpperCase(), id) || [];
+          }
+
+          setHistoryLogs(logs);
+          
+          if (!deploymentDetails) {
+            const activeLog = logs.find(log => log.status === 'in_use');
+            if (activeLog) {
+              setCurrentDeployment(activeLog);
+            }
           }
         }
       };

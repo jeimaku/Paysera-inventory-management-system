@@ -29,6 +29,16 @@ export default function EmployeeDevices() {
     department: '',
   });
 
+  // --- 1. ADD THESE STATES AND EFFECT ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [sortOrder, setSortOrder] = useState('newest');
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortOrder]);
+  // ------------------------------------
+
   const departments = [...new Set(deployments.map(d => d.employees?.departments?.department_name).filter(Boolean))];
 
   useEffect(() => {
@@ -138,6 +148,18 @@ export default function EmployeeDevices() {
     return matchesSearch && matchesDeviceType && matchesDepartment;
   });
 
+  // --- 2. ADD SORTING AND PAGINATION MATH ---
+  const sortedDeployments = [...filteredDeployments].sort((a, b) => {
+    if (sortOrder === 'newest') return new Date(b.date_issued) - new Date(a.date_issued);
+    if (sortOrder === 'oldest') return new Date(a.date_issued) - new Date(b.date_issued);
+    return 0;
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDeployments = sortedDeployments.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedDeployments.length / itemsPerPage);
+
   // Get deployment statistics
   const stats = {
     total: deployments.length,
@@ -235,16 +257,6 @@ export default function EmployeeDevices() {
         
         <select 
           className="it-filter-select" 
-          value={filters.deviceType} 
-          onChange={(e) => setFilters({ ...filters, deviceType: e.target.value })}
-        >
-          <option value="">All Device Types</option>
-          <option value="LAPTOP">Laptops</option>
-          <option value="DESKTOP">Desktops</option>
-        </select>
-
-        <select 
-          className="it-filter-select" 
           value={filters.department} 
           onChange={(e) => setFilters({ ...filters, department: e.target.value })}
         >
@@ -252,6 +264,17 @@ export default function EmployeeDevices() {
           {departments.map(dept => (
             <option key={dept} value={dept}>{dept}</option>
           ))}
+        </select>
+
+        {/* --- 3. ADD SORTING DROPDOWN --- */}
+        <select 
+          className="it-filter-select" 
+          value={sortOrder} 
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ marginLeft: 'auto', borderLeft: '2px solid #e2e8f0' }}
+        >
+          <option value="newest">Sort: Most Recent</option>
+          <option value="oldest">Sort: Earliest</option>
         </select>
       </div>
 
@@ -268,10 +291,11 @@ export default function EmployeeDevices() {
             </tr>
           </thead>
           <tbody>
-            {filteredDeployments.length === 0 ? (
+            {/* Change to currentDeployments */}
+            {currentDeployments.length === 0 ? (
               <tr><td colSpan="5" className="it-empty-state">No active deployments found.</td></tr>
             ) : (
-              filteredDeployments.map((deployment) => {
+              currentDeployments.map((deployment) => {
                 const daysDeployed = getDaysDeployed(deployment.date_issued);
                 const monitors = deployment.employee_monitors || [];
                 
@@ -358,6 +382,27 @@ export default function EmployeeDevices() {
           </tbody>
         </table>
       </div>
+
+      {/* --- 4. ADD PAGINATION CONTROLS --- */}
+      {!loading && totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'white', borderRadius: '12px', marginTop: '16px', border: '1px solid #e2e8f0' }}>
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+            style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: currentPage === 1 ? '#f8fafc' : 'white', color: currentPage === 1 ? '#94a3b8' : '#334155', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 500 }}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: '14px', color: '#64748b' }}>Page <strong style={{ color: '#1e293b' }}>{currentPage}</strong> of <strong style={{ color: '#1e293b' }}>{totalPages}</strong></span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+            style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: currentPage === totalPages ? '#f8fafc' : 'white', color: currentPage === totalPages ? '#94a3b8' : '#334155', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: 500 }}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* Specs Modal */}
       <NewSpecsModal_Admin 

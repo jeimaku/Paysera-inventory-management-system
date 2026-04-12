@@ -281,13 +281,17 @@
 .col-asset {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   border-left: 3px solid #0a0aa6;
-  width: 120px;
+  width: 140px;
 }
 
 .col-brand {
   background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
   border-left: 3px solid #059669;
-  width: 120px;
+  width: 180px;
+}
+
+.col-procurement {
+  width: 120px; /* Reduced from 140px to tighten the gap */
 }
 
 .col-model {
@@ -327,7 +331,7 @@
 .col-status {
   background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
   border-left: 3px solid #374151;
-  width: 100px;
+  width: 110px;
 }
 
 /* Enhanced Table Rows */
@@ -343,7 +347,7 @@
 }
 
 .data-table-improved td {
-  padding: 16px 12px;
+  padding: 12px 10px;
   vertical-align: middle;
   border-right: 1px solid #f8fafc;
 }
@@ -737,4 +741,16 @@
   background: #fee2e2;
   color: #b91c1c;
   transform: translateY(-1px);
+}
+
+/* Center the dates to distribute white space better */
+.data-table-improved td:nth-child(4), /* Purchase Date column */
+.data-table-improved td:nth-child(5)  /* Warranty Date column */ {
+  text-align: center;
+}
+
+/* Ensure the status badge is also centered in its column */
+.status-cell-improved {
+  text-align: center;
+  border-left: none;
 }

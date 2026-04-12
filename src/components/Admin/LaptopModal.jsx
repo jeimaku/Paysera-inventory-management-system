@@ -189,7 +189,7 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                   <input name="serial_number" value={formData.serial_number} onChange={handleChange} required />
                 </div>
 
-                {/* CONDITIONAL SNID FIELD - Shows if brand includes 'acer' */}
+                {/* CONDITIONAL SNID FIELD */}
                 {isAcerBrand && (
                   <div className="form-group" style={{ animation: 'fadeIn 0.3s' }}>
                     <label style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -213,6 +213,31 @@ export default function LaptopModal({ isOpen, onClose, onSubmit, laptop }) {
                     <option value="good_condition">Good Condition</option>
                     <option value="used">Used</option>
                     <option value="second_hand">Second Hand</option>
+                  </select>
+                </div>
+
+                {/* NEW: Protected Status Dropdown */}
+                <div className="form-group">
+                  <label>Current Status</label>
+                  <select 
+                    name="status" 
+                    value={formData.status} 
+                    onChange={handleChange}
+                    // Disable entirely if the laptop is currently issued
+                    disabled={laptop?.status?.toLowerCase() === 'issued'}
+                    title={laptop?.status?.toLowerCase() === 'issued' ? "Status locked. Return device via Deployments page first." : ""}
+                    style={laptop?.status?.toLowerCase() === 'issued' ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed' } : {}}
+                  >
+                    <option value="available">Available</option>
+                    
+                    {/* Only render "Issued" as an option if it's ALREADY issued. 
+                        Prevents manual bypassing of the deployment system. */}
+                    {(laptop?.status?.toLowerCase() === 'issued' || formData.status === 'issued') && (
+                      <option value="issued">Issued</option>
+                    )}
+                    
+                    <option value="maintenance">Maintenance</option>
+                    <option value="retired">Retired</option>
                   </select>
                 </div>
               </div>

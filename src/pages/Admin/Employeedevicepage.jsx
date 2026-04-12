@@ -16,18 +16,30 @@ export default function AdminEmployeeDevices() {
   const [viewSpecsType, setViewSpecsType] = useState('');
   const [selectedDeployment, setSelectedDeployment] = useState(null);
 
-  // Filters
+  // Filters 
   const [filters, setFilters] = useState({
     search: '',
     deviceType: '',
     department: '',
   });
 
+  // --- 1. ADD THESE TWO LINES HERE ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // --- ADD THIS LINE BELOW ---
+  const [sortOrder, setSortOrder] = useState('newest');
+
   const departments = [...new Set(deployments.map(d => d.employees?.departments?.department_name).filter(Boolean))];
 
   useEffect(() => {
     loadDeployments();
   }, []);
+
+  // --- 2. ADD THIS EFFECT ---
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortOrder]);
 
   const loadDeployments = async () => {
     setLoading(true);
@@ -107,17 +119,39 @@ export default function AdminEmployeeDevices() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const filteredDeployments = deployments.filter(deployment => {
-    const matchesSearch = !filters.search || 
-      deployment.employees?.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      deployment.employees?.employee_code?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      deployment.device_asset_id?.toLowerCase().includes(filters.search.toLowerCase());
+  // --- 1. ADD THIS MISSING FILTER LOGIC BACK IN ---
+  const filteredDeployments = deployments.filter(d => {
+    // Note: Adjust the search string variables if you use a different asset ID path
+    const searchString = `${d.employees?.full_name} ${d.employees?.employee_code} ${d.device_asset_id || ''}`.toLowerCase();
+    const matchesSearch = searchString.includes(filters.search.toLowerCase());
+    const matchesType = !filters.deviceType || d.device_type === filters.deviceType;
+    const matchesDept = !filters.department || d.employees?.departments?.department_name === filters.department;
     
-    const matchesDeviceType = !filters.deviceType || deployment.device_type === filters.deviceType;
-    const matchesDepartment = !filters.department || deployment.employees?.departments?.department_name === filters.department;
-    
-    return matchesSearch && matchesDeviceType && matchesDepartment;
+    return matchesSearch && matchesType && matchesDept;
   });
+  // ------------------------------------------------
+
+  // --- NEW: Smart Sort Logic (Includes PPB ID and Date) ---
+  const sortedDeployments = [...filteredDeployments].sort((a, b) => {
+    // 1. Sort by Date
+    if (sortOrder === 'newest') return new Date(b.date_issued) - new Date(a.date_issued);
+    if (sortOrder === 'oldest') return new Date(a.date_issued) - new Date(b.date_issued);
+    
+    // 2. Sort by Employee Code (Smart Alphanumeric so PPB-2 comes before PPB-10)
+    const codeA = (a.employees?.employee_code || '').replace(/\s+/g, '');
+    const codeB = (b.employees?.employee_code || '').replace(/\s+/g, '');
+    if (sortOrder === 'ppb_desc') return codeB.localeCompare(codeA, undefined, { numeric: true, sensitivity: 'base' });
+    if (sortOrder === 'ppb_asc') return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+
+    return 0;
+  });
+
+// --- 3. UPDATED SLICING MATH HERE ---
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  // Notice we use sortedDeployments now instead of filteredDeployments
+  const currentDeployments = sortedDeployments.slice(indexOfFirstItem, indexOfLastItem); 
+  const totalPages = Math.ceil(sortedDeployments.length / itemsPerPage);
 
   const stats = {
     total: deployments.length,
@@ -193,16 +227,7 @@ export default function AdminEmployeeDevices() {
           />
         </div>
         
-        <select 
-          className="admin-select" 
-          value={filters.deviceType} 
-          onChange={(e) => setFilters({ ...filters, deviceType: e.target.value })}
-        >
-          <option value="">All Device Types</option>
-          <option value="LAPTOP">Laptops</option>
-          <option value="DESKTOP">Desktops</option>
-        </select>
-
+        {/* Your existing Departments dropdown ends here... */}
         <select 
           className="admin-select" 
           value={filters.department} 
@@ -213,6 +238,34 @@ export default function AdminEmployeeDevices() {
             <option key={dept} value={dept}>{dept}</option>
           ))}
         </select>
+
+        {/* --- NEW: Sorting Dropdown --- */}
+        <select 
+          className="admin-select"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ borderLeft: '2px solid #cbd5e1', marginLeft: 'auto' }}
+        >
+          <option value="newest">Sort: Most Recent</option>
+          <option value="oldest">Sort: Oldest</option>
+          <option value="ppb_desc">Sort: Highest PPB ID</option>
+          <option value="ppb_asc">Sort: Lowest PPB ID</option>
+        </select>
+
+        {/* --- NEW: Clear Filters Button (Only shows when filters are active) --- */}
+        {(filters.search !== '' || filters.department !== '' || filters.deviceType !== '') && (
+          <button 
+            onClick={() => setFilters({ search: '', deviceType: '', department: '' })}
+            style={{ 
+              background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5', 
+              padding: '0 16px', borderRadius: '6px', fontSize: '0.875rem', 
+              fontWeight: 500, cursor: 'pointer', height: '38px', display: 'flex', alignItems: 'center'
+            }}
+            title="Clear all filters"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       <div className="admin-table-wrapper">
@@ -232,12 +285,12 @@ export default function AdminEmployeeDevices() {
             ) : filteredDeployments.length === 0 ? (
               <tr><td colSpan="5" className="admin-empty-state">No active deployments found.</td></tr>
             ) : (
-              filteredDeployments.map((deployment) => {
-                const daysDeployed = getDaysDeployed(deployment.date_issued);
-                const monitors = deployment.employee_monitors || [];
+              currentDeployments.map((dep) => {
+                const daysDeployed = getDaysDeployed(dep.date_issued);
+                const monitors = dep.employee_monitors || [];
                 
                 return (
-                  <tr key={deployment.employee_device_id}>
+                  <tr key={dep.employee_device_id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ 
@@ -248,9 +301,9 @@ export default function AdminEmployeeDevices() {
                           <Users size={18} />
                         </div>
                         <div>
-                          <div className="col-main-text">{deployment.employees?.full_name}</div>
+                          <div className="col-main-text">{dep.employees?.full_name}</div>
                           <div className="col-sub-text">
-                            {deployment.employees?.employee_code} • {deployment.employees?.departments?.department_name}
+                            {dep.employees?.employee_code} • {dep.employees?.departments?.department_name}
                           </div>
                         </div>
                       </div>
@@ -258,14 +311,14 @@ export default function AdminEmployeeDevices() {
                     
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {deployment.device_type === 'LAPTOP' ? 
+                        {dep.device_type === 'LAPTOP' ? 
                           <Laptop size={16} style={{ color: '#10b981' }} /> : 
                           <HardDrive size={16} style={{ color: '#f59e0b' }} />
                         }
                         <div>
-                          <div className="col-main-text">{deployment.device_asset_id || 'Unknown'}</div>
+                          <div className="col-main-text">{dep.device_asset_id || 'Unknown'}</div>
                           <div className="col-sub-text">
-                            {deployment.device_type}
+                            {dep.device_type}
                             {monitors.length > 0 && (
                               <span> • {monitors.length} Monitor{monitors.length > 1 ? 's' : ''}</span>
                             )}
@@ -278,7 +331,7 @@ export default function AdminEmployeeDevices() {
                       <div>
                         <div className="col-main-text">
                           <Calendar size={14} style={{ display: 'inline', marginRight: '4px', color: '#64748b' }} />
-                          {new Date(deployment.date_issued).toLocaleDateString()}
+                          {new Date(dep.date_issued).toLocaleDateString()}
                         </div>
                         <div className="col-sub-text">Deployed by IT</div>
                       </div>
@@ -294,14 +347,14 @@ export default function AdminEmployeeDevices() {
                       <div className="admin-actions">
                         <button 
                           className="action-btn btn-view" 
-                          onClick={() => handleViewSpecs(deployment)}
+                          onClick={() => handleViewSpecs(dep)}
                           title="View Device Specs"
                         >
                           <Eye size={16} />
                         </button>
                         <button 
                           className="action-btn btn-delete" 
-                          onClick={() => handleDeleteClick(deployment)}
+                          onClick={() => handleDeleteClick(dep)}
                           title="Terminate Deployment"
                         >
                           <Trash2 size={16} />
@@ -315,6 +368,25 @@ export default function AdminEmployeeDevices() {
           </tbody>
         </table>
       </div>
+
+      {/* --- 5. ADD THE PAGINATION UI HERE --- */}
+      {!loading && totalPages > 1 && (
+        <div className="admin-pagination">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+          >
+            Previous
+          </button>
+          <span>Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       <NewSpecsModal_Admin 
         isOpen={isSpecModalOpen} 

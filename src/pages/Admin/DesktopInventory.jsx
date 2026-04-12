@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, Edit2, Trash2, Search, HardDrive, Eye, AlertTriangle, 
-  Printer, FileSpreadsheet, FileText 
+  Printer, FileSpreadsheet, FileText, 
+  Archive, RefreshCw, Info, X // <-- Added new icons
 } from 'lucide-react';
 import DesktopModal from '../../components/Admin/DesktopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
@@ -22,11 +23,24 @@ export default function DesktopInventory() {
   const [specsModalOpen, setSpecsModalOpen] = useState(false);
   const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
 
+  // --- NEW: Smart Engine States ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [showBanner, setShowBanner] = useState(true);
+  const [restoreConfirm, setRestoreConfirm] = useState(null);
+
   const [filters, setFilters] = useState({
     search: '',
     status: '',
     device_condition: '',
+    build_type: '', // <-- NEW: Added build_type
   });
+
+  // Reset pagination on filter or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortOrder]);
 
   useEffect(() => { loadDesktops(); }, [filters]);
 
@@ -60,9 +74,10 @@ export default function DesktopInventory() {
     }
   };
 
+  // --- UPDATED: Soft Delete (Retire) instead of Hard Delete ---
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
-      const result = await deleteDesktop(deleteConfirm.desktop_id);
+      const result = await updateDesktop(deleteConfirm.desktop_id, { status: 'retired' });
       
       if (result.success) {
         setDeleteConfirm(null);
@@ -74,7 +89,22 @@ export default function DesktopInventory() {
     }
   };
 
-  // --- EXPORT FUNCTIONALITY ---
+  // --- NEW: Restore functionality ---
+  const handleRestoreConfirm = async (newStatus) => {
+    if (restoreConfirm) {
+      const result = await updateDesktop(restoreConfirm.desktop_id, { status: newStatus });
+      
+      if (result.success) {
+        setRestoreConfirm(null);
+        loadDesktops();
+      } else {
+        alert(`Failed to restore device: ${result.error}`);
+        setRestoreConfirm(null);
+      }
+    }
+  };
+
+  // --- EXPORT FUNCTIONALITY (Kept exactly as you wrote it) ---
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
@@ -99,7 +129,7 @@ export default function DesktopInventory() {
     }
   };
 
-  // --- PRINT FUNCTIONALITY (DESKTOP) ---
+  // --- PRINT FUNCTIONALITY (Kept exactly as you wrote it) ---
   const handlePrint = async (desktop) => {
     try {
       const history = await getDeviceUsageHistory('DESKTOP', desktop.desktop_id);
@@ -209,6 +239,47 @@ export default function DesktopInventory() {
     }
   };
 
+  // --- NEW: Tooltip Helper ---
+  const getStatusTooltip = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'available': return "Device is in storage and ready for deployment.";
+      case 'issued': return "Device is currently deployed to an employee.";
+      case 'maintenance': return "Device is currently being repaired or inspected.";
+      case 'retired': return "Device is permanently out of service but kept for records.";
+      default: return "";
+    }
+  };
+
+// --- NEW: Client-Side Build Type Filtering & Smart Sorting Logic ---
+  const processedDesktops = desktops.filter(desktop => {
+    // 1. If no build filter is selected, show all
+    if (!filters.build_type) return true;
+    
+    // 2. Determine if the device is custom based on the serial number
+    // (This matches how your DesktopModal determines custom vs branded)
+    const hasSerial = desktop.serial_number && 
+                      desktop.serial_number.trim() !== '' && 
+                      !desktop.serial_number.toLowerCase().includes('custom');
+                      
+    // 3. Apply the filter
+    if (filters.build_type === 'branded') return hasSerial;
+    if (filters.build_type === 'custom') return !hasSerial;
+    
+    return true;
+  }).sort((a, b) => {
+    // Sort by Asset ID (DSK-XXX)
+    const cleanIdA = (a.asset_id || '').replace(/\s+/g, '');
+    const cleanIdB = (b.asset_id || '').replace(/\s+/g, '');
+    const comparison = cleanIdA.localeCompare(cleanIdB, undefined, { numeric: true, sensitivity: 'base' });
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  // --- UPDATED: Pagination Logic (Using processedDesktops) ---
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDesktops = processedDesktops.slice(indexOfFirstItem, indexOfLastItem); 
+  const totalPages = Math.ceil(processedDesktops.length / itemsPerPage);
+
   return (
     <div className="admin-inventory-container">
       <div className="admin-header-card">
@@ -243,6 +314,34 @@ export default function DesktopInventory() {
         </div>
       </div>
 
+      {/* --- NEW: Quick Guide Info Banner --- */}
+      {showBanner && (
+        <div className="info-banner">
+          <div className="info-banner-icon">
+            <Info size={24} />
+          </div>
+          <div className="info-banner-content" style={{ flex: 1 }}>
+            <h4>Quick Guide: Device Lifecycle</h4>
+            <p style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+              <span><strong style={{ color: '#166534' }}>Available:</strong> Ready to deploy.</span>
+              <span><strong style={{ color: '#1e40af' }}>Issued:</strong> Assigned to a user.</span>
+              <span><strong style={{ color: '#9a3412' }}>Maintenance:</strong> Being repaired.</span>
+              <span>
+                <strong style={{ color: '#475569' }}>Retired:</strong> Removed from active fleet. 
+                (Use <Archive size={14} style={{ verticalAlign: 'middle', margin: '0 2px' }}/> to retire, and <RefreshCw size={14} style={{ verticalAlign: 'middle', margin: '0 2px' }}/> to restore)
+              </span>
+            </p>
+          </div>
+          <button 
+            onClick={() => setShowBanner(false)} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#60a5fa', padding: '4px' }}
+            title="Dismiss Guide"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
       <div className="admin-filters-bar">
         <div className="filter-input-wrapper">
           <Search className="filter-icon" size={18} />
@@ -254,6 +353,7 @@ export default function DesktopInventory() {
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
         </div>
+        
         <select className="admin-select" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
           <option value="">All Statuses</option>
           <option value="available">Available</option>
@@ -261,11 +361,30 @@ export default function DesktopInventory() {
           <option value="maintenance">Maintenance</option>
           <option value="retired">Retired</option>
         </select>
+        
         <select className="admin-select" value={filters.device_condition} onChange={(e) => setFilters({ ...filters, device_condition: e.target.value })}>
           <option value="">All Conditions</option>
           <option value="brand_new">Brand New</option>
-          <option value="good_condition">Good</option>
-          <option value="minor_issues">Minor Issues</option>
+          <option value="good_condition">Good Condition</option>
+          <option value="second_hand">Second Hand</option>
+        </select>
+
+        {/* --- NEW: Build Type Filter --- */}
+        <select className="admin-select" value={filters.build_type} onChange={(e) => setFilters({ ...filters, build_type: e.target.value })}>
+          <option value="">All Builds</option>
+          <option value="branded">Branded / Pre-built</option>
+          <option value="custom">Custom / Assembled</option>
+        </select>
+        
+        {/* UPDATED: Clarified Sort Dropdown */}
+        <select
+          className="admin-select"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ borderLeft: '2px solid #cbd5e1', marginLeft: 'auto' }}
+        >
+          <option value="asc">Sort Asset ID: Lowest to Highest</option>
+          <option value="desc">Sort Asset ID: Highest to Lowest</option>
         </select>
       </div>
 
@@ -285,11 +404,15 @@ export default function DesktopInventory() {
               <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> 
             ) : fetchError ? (
               <tr><td colSpan="5" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
-            ) : desktops.length === 0 ? (
+            ) : currentDesktops.length === 0 ? (
               <tr><td colSpan="5" className="admin-empty-state">No desktops found.</td></tr> 
             ) : (
-              desktops.map((desktop) => (
-                <tr key={desktop.desktop_id}>
+              currentDesktops.map((desktop) => (
+                <tr 
+                  key={desktop.desktop_id}
+                  onClick={() => { setViewSpecsDevice(desktop); setSpecsModalOpen(true); }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <td>
                     <div className="col-asset">{desktop.asset_id}</div>
                     <div className="col-sub-text">
@@ -305,10 +428,14 @@ export default function DesktopInventory() {
                   </td>
                   <td>
                     <div className="col-main-text">{desktop.supplier || 'N/A'}</div>
-                    <div className="col-sub-text">Purchased: {desktop.purchase_date || 'N/A'}</div>
+                    <div className="col-sub-text">Purchased: {desktop.purchase_date ? new Date(desktop.purchase_date).toLocaleDateString() : 'N/A'}</div>
                   </td>
                   <td>
-                    <span className={`admin-badge badge-${desktop.status}`}>
+                    <span 
+                      className={`admin-badge badge-${desktop.status?.toLowerCase() || 'available'}`}
+                      title={getStatusTooltip(desktop.status)}
+                      style={{ cursor: 'help' }}
+                    >
                       {desktop.status}
                     </span>
                   </td>
@@ -316,7 +443,7 @@ export default function DesktopInventory() {
                     <div className="admin-actions">
                       <button 
                         className="action-btn btn-view" 
-                        onClick={() => { setViewSpecsDevice(desktop); setSpecsModalOpen(true); }}
+                        onClick={(e) => { e.stopPropagation(); setViewSpecsDevice(desktop); setSpecsModalOpen(true); }}
                         title="View Specs"
                       >
                         <Eye size={16} />
@@ -324,7 +451,7 @@ export default function DesktopInventory() {
 
                       <button 
                         className="action-btn btn-print" 
-                        onClick={() => handlePrint(desktop)} 
+                        onClick={(e) => { e.stopPropagation(); handlePrint(desktop); }} 
                         title="Print Info Sheet"
                       >
                         <Printer size={16} />
@@ -332,19 +459,39 @@ export default function DesktopInventory() {
 
                       <button 
                         className="action-btn btn-edit" 
-                        onClick={() => { setSelectedDesktop(desktop); setIsModalOpen(true); }}
+                        onClick={(e) => { e.stopPropagation(); setSelectedDesktop(desktop); setIsModalOpen(true); }}
                         title="Edit"
                       >
                         <Edit2 size={16} />
                       </button>
 
-                      <button 
-                        className="action-btn btn-delete" 
-                        onClick={() => setDeleteConfirm(desktop)}
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {/* --- PROTECTED STATE MACHINE ACTIONS --- */}
+                      {desktop.status?.toLowerCase() === 'issued' ? (
+                        <button 
+                          className="action-btn btn-delete" 
+                          style={{ opacity: 0.4, cursor: 'not-allowed', background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}
+                          onClick={(e) => { e.stopPropagation(); }} 
+                          title="Cannot retire: Device is currently deployed. Terminate deployment first."
+                        >
+                          <Archive size={16} />
+                        </button>
+                      ) : desktop.status?.toLowerCase() === 'retired' ? (
+                        <button 
+                          className="action-btn btn-restore" 
+                          onClick={(e) => { e.stopPropagation(); setRestoreConfirm(desktop); }} 
+                          title="Restore Device"
+                        >
+                          <RefreshCw size={16} />
+                        </button>
+                      ) : (
+                        <button 
+                          className="action-btn btn-delete" 
+                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(desktop); }}
+                          title="Retire Device"
+                        >
+                          <Archive size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -354,23 +501,78 @@ export default function DesktopInventory() {
         </table>
       </div>
 
+      {/* NEW: Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="admin-pagination">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+          >
+            Previous
+          </button>
+          <span>Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       <DesktopModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleModalSubmit} desktop={selectedDesktop} />
       <NewSpecsModal_Admin isOpen={specsModalOpen} onClose={() => setSpecsModalOpen(false)} device={viewSpecsDevice} type="desktop" />
       
+      {/* Retire Confirm Modal */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="confirm-icon-wrapper">
-              <AlertTriangle size={32} />
+              <Archive size={32} />
             </div>
-            <h3 className="confirm-title">Delete Device?</h3>
+            <h3 className="confirm-title">Retire Device?</h3>
             <p className="confirm-desc">
-              You are about to permanently delete <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong>. 
-              This action cannot be undone.
+              You are about to mark <strong>{deleteConfirm.asset_id || deleteConfirm.brand}</strong> as <strong>Retired</strong>. 
+              This will remove it from the active fleet but preserve its history.
             </p>
             <div className="confirm-actions">
               <button className="btn-cancel-modern" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Delete</button>
+              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Retire Device</button>
+            </div>
+          </div> 
+        </div>
+      )}
+
+      {/* Restore Device Modal */}
+      {restoreConfirm && (
+        <div className="modal-overlay" onClick={() => setRestoreConfirm(null)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-icon-wrapper" style={{ background: '#ecfdf5', color: '#10b981' }}>
+              <RefreshCw size={32} />
+            </div>
+            <h3 className="confirm-title">Restore Device?</h3>
+            <p className="confirm-desc">
+              You are about to restore <strong>{restoreConfirm.asset_id || restoreConfirm.brand}</strong>. 
+              Which status should it be assigned to?
+            </p>
+            <div className="confirm-actions" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              <button className="btn-cancel-modern" onClick={() => setRestoreConfirm(null)}>Cancel</button>
+              
+              <button 
+                className="btn-delete-modern" 
+                style={{ background: '#10b981', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)' }} 
+                onClick={() => handleRestoreConfirm('available')}
+              >
+                Available
+              </button>
+              
+              <button 
+                className="btn-delete-modern" 
+                style={{ background: '#f59e0b', boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.3)' }} 
+                onClick={() => handleRestoreConfirm('maintenance')}
+              >
+                Maintenance
+              </button>
             </div>
           </div> 
         </div>
