@@ -308,27 +308,24 @@ export async function updateDeviceStatus(deviceType, deviceId, status) {
   }
 }
 
-// Mark repair as complete and ready for admin approval
-export async function completeRepair(maintenanceId, completionData) {
+// --- NEW: PHASE 3 (IT Action) ---
+// IT marks the device as fixed and sends it to the Admin for confirmation
+export async function completeRepair(maintenanceId, resolutionNotes) {
   try {
     const updateData = {
-      status: 'awaiting_approval',
-      date_completed: new Date().toISOString().split('T')[0],
-      resolution_description: completionData.resolution_description,
-      parts_replaced: completionData.parts_replaced || [],
-      labor_hours: completionData.labor_hours || 0,
+      status: 'awaiting_approval', // Hands it over to the Admin
+      date_completed: new Date().toISOString(),
+      resolution_description: resolutionNotes,
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('device_maintenance')
       .update(updateData)
-      .eq('maintenance_id', maintenanceId)
-      .select()
-      .single();
+      .eq('maintenance_id', maintenanceId);
 
     if (error) throw error;
-    return { success: true, data };
+    return { success: true };
   } catch (error) {
     console.error('Error completing repair:', error);
     return { success: false, error: error.message };
@@ -409,52 +406,17 @@ export async function getRepairsAwaitingApproval() {
 }
 
 
+// --- NEW: PHASE 4 (Admin Action) ---
+// Admin confirms the fix. If approved, it gets the badge and goes back to inventory.
 export async function processRepairApproval(maintenanceId, decision, notes, deviceType, deviceId) {
   try {
     const isApproved = decision === 'approved';
-    
-    // 1. Fetch current record to check if it's a warranty case
-    const { data: currentRecord, error: fetchError } = await supabase
-      .from('device_maintenance')
-      .select('repair_location')
-      .eq('maintenance_id', maintenanceId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    // 2. Logic: What happens to the device status?
-    // If Approved -> 'available' (It's being fixed, so it will be available eventually)
-    // If Rejected -> 'retired' (It's broken and we aren't fixing it)
     const newDeviceStatus = isApproved ? 'available' : 'retired'; 
+    const newMaintStatus = isApproved ? 'completed' : 'cancelled';
 
-    // 3. Prepare Maintenance Updates
-    const updates = {
-      admin_approval_status: decision,
-      admin_approval_date: new Date().toISOString(),
-      admin_approval_notes: notes,
-      can_redeploy: isApproved
-    };
-
-    // --- SMART STATUS AUTOMATION ---
-    if (decision === 'rejected') {
-      updates.status = 'cancelled';
-    } else if (isApproved && currentRecord.repair_location === 'warranty') {
-      // If Admin approves a Warranty claim, AUTO-UPDATE status to 'warranty_sent'
-      updates.status = 'warranty_sent'; 
-    }
-    // -------------------------------
-
-    const { error: maintenanceError } = await supabase
-      .from('device_maintenance')
-      .update(updates)
-      .eq('maintenance_id', maintenanceId);
-
-    if (maintenanceError) throw maintenanceError;
-
-    // 4. Update the Device Inventory Status
+    // 1. Update the Device Inventory Status & Increment Repair Count
     let tableName = '';
     let idColumn = '';
-    
     switch (deviceType?.toUpperCase()) {
       case 'LAPTOP': tableName = 'laptops'; idColumn = 'laptop_id'; break;
       case 'DESKTOP': tableName = 'desktops'; idColumn = 'desktop_id'; break;
@@ -462,12 +424,39 @@ export async function processRepairApproval(maintenanceId, decision, notes, devi
       default: throw new Error('Unknown device type');
     }
 
+    let updatePayload = { status: newDeviceStatus };
+
+    // 🌟 THE MAGIC BADGE INCREMENT 🌟
+    if (isApproved) {
+      const { data: devData } = await supabase
+        .from(tableName)
+        .select('repair_count')
+        .eq(idColumn, deviceId)
+        .single();
+        
+      updatePayload.repair_count = (devData?.repair_count || 0) + 1;
+    }
+
     const { error: deviceError } = await supabase
       .from(tableName)
-      .update({ status: newDeviceStatus })
+      .update(updatePayload)
       .eq(idColumn, deviceId);
 
     if (deviceError) throw deviceError;
+
+    // 2. Close the Maintenance Ticket
+    const { error: maintenanceError } = await supabase
+      .from('device_maintenance')
+      .update({
+        admin_approval_status: decision,
+        admin_approval_date: new Date().toISOString(),
+        admin_approval_notes: notes,
+        status: newMaintStatus,
+        can_redeploy: isApproved
+      })
+      .eq('maintenance_id', maintenanceId);
+
+    if (maintenanceError) throw maintenanceError;
 
     return { success: true };
   } catch (error) {
@@ -490,6 +479,48 @@ export async function overrideWarrantyStatus(maintenanceId, newStatus) {
     return { success: true };
   } catch (error) {
     console.error('Error overriding warranty:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// --- NEW: SIMPLIFIED MAINTENANCE WORKFLOW ---
+export async function createQuickRepair(deviceType, deviceId, maintenanceType, issueDescription) {
+  try {
+    // 1. Create the repair ticket
+    const { error: ticketError } = await supabase
+      .from('device_maintenance')
+      .insert([{
+        device_type: deviceType.toUpperCase(),
+        device_id: deviceId,
+        maintenance_type: maintenanceType,
+        issue_description: issueDescription,
+        status: 'pending', 
+        priority: 'medium',
+        admin_approval_status: 'pending',
+        date_reported: new Date().toISOString()
+      }]);
+
+    if (ticketError) throw ticketError;
+
+    // 2. Change the device status to 'maintenance'
+    let tableName = '';
+    let idColumn = '';
+    switch (deviceType.toUpperCase()) {
+      case 'LAPTOP': tableName = 'laptops'; idColumn = 'laptop_id'; break;
+      case 'DESKTOP': tableName = 'desktops'; idColumn = 'desktop_id'; break;
+      case 'MONITOR': tableName = 'monitors'; idColumn = 'monitor_id'; break;
+    }
+
+    const { error: deviceError } = await supabase
+      .from(tableName)
+      .update({ status: 'maintenance' })
+      .eq(idColumn, deviceId);
+
+    if (deviceError) throw deviceError;
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating quick repair:', error);
     return { success: false, error: error.message };
   }
 }

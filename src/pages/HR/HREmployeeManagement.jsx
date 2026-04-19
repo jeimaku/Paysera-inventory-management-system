@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/client';
-// NEW IMPORTS: Added Users, UserCheck, UserX for stats, and ArrowDown, ArrowUp for sorting
 import { Plus, Edit2, Trash2, Search, User, AlertTriangle, Users, UserCheck, UserX, ArrowDown, ArrowUp } from 'lucide-react';
 import EmployeeModal from '../../components/Admin/EmployeeModal';
 import {
@@ -26,64 +25,61 @@ export default function HREmployeeManagement() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [fetchError, setFetchError] = useState(null);
 
-  // NEW: State to track sorting order (default is 'desc' - highest to lowest)
   const [sortOrder, setSortOrder] = useState('desc');
+  
+  // --- NEW: Pagination States ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const [filters, setFilters] = useState({
     search: '',
+    department: '',
+    position: '',
     status: '',
-    department_id: '',
-    position_id: '',
   });
 
+  // Reset Pagination on Filter/Sort Change
   useEffect(() => {
-    loadData();
-  }, [filters]);
+    setCurrentPage(1);
+  }, [filters, sortOrder]);
 
-  const loadData = async () => {
+  useEffect(() => {
+    fetchInitialData();
+
+    // --- NEW: Real-time Updates ---
+    const channel = supabase
+      .channel('hr-employees-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'employees' },
+        () => fetchInitialData() // Refresh instantly on database change
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchInitialData = async () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const [employeesData, departmentsData, positionsData] = await Promise.all([
-        getEmployees(filters), // Pass filters here
+      // Fetching all data without backend filters to handle it lightning-fast on the client-side
+      const [empData, deptData, posData] = await Promise.all([
+        getEmployees(), 
         getDepartments(),
-        getPositions(),
+        getPositions()
       ]);
-      setEmployees(employeesData);
-      setDepartments(departmentsData);
-      setPositions(positionsData); // Store positions for the dropdown
+      
+      setEmployees(empData || []);
+      setDepartments(deptData || []);
+      setPositions(posData || []);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error("Failed to load initial data:", error);
       setFetchError("Unable to load data. Please check your connection.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAddEmployee = () => {
-    setSelectedEmployee(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditEmployee = (employee) => {
-    setSelectedEmployee(employee);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteClick = (employee) => {
-    setDeleteConfirm(employee);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (deleteConfirm) {
-      const result = await deleteEmployee(deleteConfirm.employee_id);
-      if (result.success) {
-        setDeleteConfirm(null);
-        loadData();
-      } else {
-        setDeleteConfirm(null);
-        alert(result.error);
-      }
     }
   };
 
@@ -97,121 +93,139 @@ export default function HREmployeeManagement() {
 
     if (result.success) {
       setIsModalOpen(false);
-      loadData();
+      fetchInitialData(); 
     } else {
       alert(`Unable to save: ${result.error}`);
     }
   };
 
-  // --- NEW: CALCULATION LOGIC ---
-  const totalEmployees = employees.length;
-  const activeEmployees = employees.filter(emp => emp.status === 'active').length;
-  const inactiveEmployees = employees.filter(emp => emp.status === 'inactive' || emp.status === 'resigned').length;
+  const handleDeleteConfirm = async () => {
+    if (deleteConfirm) {
+      const result = await deleteEmployee(deleteConfirm.employee_id);
+      if (result.success) {
+        setDeleteConfirm(null);
+        fetchInitialData();
+      } else {
+        alert(`Action failed: ${result.error}`);
+        setDeleteConfirm(null);
+      }
+    }
+  };
 
-  // --- NEW: SORTING LOGIC ---
-  const sortedEmployees = [...employees].sort((a, b) => {
-    // Fallback to empty string if no ID exists to prevent crashes
-    const idA = a.employee_code || '';
-    const idB = b.employee_code || '';
-    
-    // numeric: true allows "EMP-10" to be correctly placed higher than "EMP-2"
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+  };
+
+  // --- 1. Client-Side Filtering ---
+  const filteredEmployees = employees.filter(emp => {
+    const searchString = `${emp.full_name} ${emp.employee_code}`.toLowerCase();
+    const matchesSearch = searchString.includes(filters.search.toLowerCase());
+    const matchesDept = !filters.department || emp.department_id === filters.department;
+    const matchesPos = !filters.position || emp.position_id === filters.position;
+    const matchesStatus = !filters.status || emp.status === filters.status;
+
+    return matchesSearch && matchesDept && matchesPos && matchesStatus;
+  });
+
+  // --- 2. Numeric Sorting ---
+  const sortedEmployees = [...filteredEmployees].sort((a, b) => {
+    const numA = parseInt((a.employee_code || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt((b.employee_code || '').replace(/\D/g, ''), 10) || 0;
+
     if (sortOrder === 'asc') {
-      return idA.localeCompare(idB, undefined, { numeric: true });
+      return numA - numB;
     } else {
-      return idB.localeCompare(idA, undefined, { numeric: true });
+      return numB - numA; 
     }
   });
+
+  // --- 3. Pagination ---
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentEmployees = sortedEmployees.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedEmployees.length / itemsPerPage);
+
+  // Stats calculation
+  const totalEmployees = employees.length;
+  const activeEmployees = employees.filter(e => e.status === 'active').length;
+  const inactiveEmployees = employees.filter(e => e.status === 'inactive' || e.status === 'resigned').length;
 
   return (
     <div className="admin-inventory-container">
       
-      {/* Header */}
       <div className="admin-header-card">
         <div className="header-title-group">
           <h1>Employee Directory</h1>
           <div className="header-meta">Manage staff profiles, roles, and status</div>
         </div>
-        <button className="btn-add-device" onClick={handleAddEmployee}>
+        <button 
+          className="btn-add-device" 
+          onClick={() => { setSelectedEmployee(null); setIsModalOpen(true); }}
+        >
           <Plus size={20} /> Add Employee
         </button>
       </div>
 
-      {/* --- NEW: SUMMARY STATS ROW --- */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '12px', borderRadius: '50%', display: 'flex' }}>
-            <Users size={24} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>Total Employees</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>{totalEmployees}</div>
-          </div>
-        </div>
-        
-        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ background: '#dcfce7', color: '#22c55e', padding: '12px', borderRadius: '50%', display: 'flex' }}>
-            <UserCheck size={24} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>Active Staff</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>{activeEmployees}</div>
-          </div>
-        </div>
-
-        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ background: '#fee2e2', color: '#ef4444', padding: '12px', borderRadius: '50%', display: 'flex' }}>
-            <UserX size={24} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>Inactive Staff</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>{inactiveEmployees}</div>
-          </div>
-        </div>
+      {/* Sleek Stats Cards (Matching Admin) */}
+      <div className="inventory-stats-improved" style={{ marginBottom: '24px' }}>
+         <div className="stat-card-improved primary">
+           <div className="stat-icon-improved"><Users size={20} /></div>
+           <div className="stat-content-improved">
+             <span className="stat-value-improved">{totalEmployees}</span>
+             <span className="stat-label-improved">Total Personnel</span>
+           </div>
+         </div>
+         <div className="stat-card-improved available" style={{ borderLeft: '4px solid #10b981' }}>
+           <div className="stat-icon-improved" style={{ background: '#dcfce7', color: '#10b981' }}><UserCheck size={20} /></div>
+           <div className="stat-content-improved">
+             <span className="stat-value-improved" style={{ color: '#10b981' }}>{activeEmployees}</span>
+             <span className="stat-label-improved">Active Employees</span>
+           </div>
+         </div>
+         <div className="stat-card-improved warning" style={{ borderLeft: '4px solid #f59e0b' }}>
+           <div className="stat-icon-improved" style={{ background: '#fef3c7', color: '#f59e0b' }}><UserX size={20} /></div>
+           <div className="stat-content-improved">
+             <span className="stat-value-improved" style={{ color: '#f59e0b' }}>{inactiveEmployees}</span>
+             <span className="stat-label-improved">Inactive / Resigned</span>
+           </div>
+         </div>
       </div>
 
-      {/* Filters */}
-      <div className="admin-filters-bar">
+      <div className="admin-filters-bar" style={{ flexWrap: 'wrap' }}>
         <div className="filter-input-wrapper">
           <Search className="filter-icon" size={18} />
           <input
             type="text"
             className="admin-search-input"
-            placeholder="Search name or ID..."
+            placeholder="Search by Name or ID..."
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
         </div>
-
-        {/* Department Filter */}
-        <select
+        
+        <select 
           className="admin-select"
-          value={filters.department_id}
-          onChange={(e) => setFilters({ ...filters, department_id: e.target.value })}
+          value={filters.department}
+          onChange={(e) => setFilters({ ...filters, department: e.target.value })}
         >
           <option value="">All Departments</option>
-          {departments.map((dept) => (
-            <option key={dept.department_id} value={dept.department_id}>
-              {dept.department_name}
-            </option>
+          {departments.map(d => (
+            <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
           ))}
         </select>
 
-        {/* NEW: Position Filter */}
-        <select
+        <select 
           className="admin-select"
-          value={filters.position_id}
-          onChange={(e) => setFilters({ ...filters, position_id: e.target.value })}
+          value={filters.position}
+          onChange={(e) => setFilters({ ...filters, position: e.target.value })}
         >
           <option value="">All Positions</option>
-          {positions.map((pos) => (
-            <option key={pos.position_id} value={pos.position_id}>
-              {pos.position_name}
-            </option>
+          {positions.map(p => (
+            <option key={p.position_id} value={p.position_id}>{p.position_name}</option>
           ))}
         </select>
 
-        {/* Status Filter */}
-        <select
+        <select 
           className="admin-select"
           value={filters.status}
           onChange={(e) => setFilters({ ...filters, status: e.target.value })}
@@ -220,87 +234,76 @@ export default function HREmployeeManagement() {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
+
+        <button 
+          onClick={toggleSortOrder}
+          className="admin-select"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', background: '#f8fafc', borderLeft: '2px solid #cbd5e1' }}
+          title={`Currently sorting ID ${sortOrder === 'desc' ? 'Highest to Lowest' : 'Lowest to Highest'}`}
+        >
+          Sort ID: {sortOrder === 'desc' ? <ArrowDown size={16}/> : <ArrowUp size={16}/>}
+        </button>
       </div>
 
-      {/* Table */}
       <div className="admin-table-wrapper">
         <table className="admin-table">
           <thead>
             <tr>
-              {/* NEW: Clickable sorting header */}
-              <th 
-                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                title="Click to sort by ID"
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  Employee Profile
-                  {sortOrder === 'desc' ? <ArrowDown size={14} style={{ color: '#64748b'}} /> : <ArrowUp size={14} style={{ color: '#64748b'}} />}
-                </div>
-              </th>
-              <th>Role & Department</th>
-              <th>Deployment Date</th>
+              <th>Employee Profile</th>
+              <th>Department</th>
+              <th>Position</th>
               <th>Status</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr>
+              <tr><td colSpan="5" className="admin-empty-state">Loading...</td></tr> 
             ) : fetchError ? (
               <tr><td colSpan="5" className="admin-empty-state" style={{ color: '#dc2626' }}>{fetchError}</td></tr>
-            ) : sortedEmployees.length === 0 ? (
-              <tr><td colSpan="5" className="admin-empty-state">No employees found.</td></tr>
+            ) : currentEmployees.length === 0 ? (
+              <tr><td colSpan="5" className="admin-empty-state">No employees found.</td></tr> 
             ) : (
-              // NEW: We are mapping over sortedEmployees instead of employees
-              sortedEmployees.map((employee) => (
-                <tr key={employee.employee_id}>
+              currentEmployees.map((emp) => (
+                <tr key={emp.employee_id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ 
-                        width: '36px', height: '36px', borderRadius: '50%', 
-                        background: '#e0e7ff', color: '#4f46e5', 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center' 
-                      }}>
-                        <User size={18} />
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontWeight: '600' }}>
+                        {emp.full_name.charAt(0)}
                       </div>
                       <div>
-                        <div className="col-main-text">{employee.full_name}</div>
-                        <div className="col-asset">{employee.employee_code}</div>
+                        <div className="col-main-text">{emp.full_name}</div>
+                        <div className="col-sub-text" style={{ color: '#4f46e5', fontWeight: 500 }}>
+                          {emp.employee_code || 'No ID'}
+                        </div>
                       </div>
                     </div>
                   </td>
                   <td>
-                    <div className="col-main-text">
-                      {employee.positions?.position_name || 'No Position'} 
-                    </div>
-                    <div className="col-sub-text">
-                      {employee.departments?.department_name || 'No Department'}
-                    </div>
+                    <div className="col-main-text">{emp.departments?.department_name || 'N/A'}</div>
                   </td>
                   <td>
-                    <div className="col-main-text">
-                      {employee.date_deployed ? new Date(employee.date_deployed).toLocaleDateString() : '-'}
-                    </div>
+                    <div className="col-main-text">{emp.positions?.position_name || 'N/A'}</div>
                   </td>
                   <td>
-                    <span className={`admin-badge badge-${employee.status === 'resigned' ? 'retired' : (employee.status === 'active' ? 'available' : 'maintenance')}`}>
-                      {employee.status}
+                    <span className={`admin-badge ${emp.status === 'active' ? 'badge-available' : 'badge-retired'}`}>
+                      {emp.status}
                     </span>
                   </td>
                   <td>
                     <div className="admin-actions">
-                      <button
-                        className="action-btn btn-edit"
-                        onClick={() => handleEditEmployee(employee)}
-                        title="Edit Profile"
+                      <button 
+                        className="action-btn btn-edit" 
+                        onClick={() => { setSelectedEmployee(emp); setIsModalOpen(true); }}
+                        title="Edit Employee"
                       >
                         <Edit2 size={16} />
                       </button>
-                      <button
-                        className="action-btn btn-delete"
-                        onClick={() => handleDeleteClick(employee)}
-                        title="Delete"
+                      
+                      <button 
+                        className="action-btn btn-delete" 
+                        onClick={() => setDeleteConfirm(emp)}
+                        title="Deactivate"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -312,6 +315,25 @@ export default function HREmployeeManagement() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="admin-pagination">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+          >
+            Previous
+          </button>
+          <span>Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* Modal */}
       <EmployeeModal

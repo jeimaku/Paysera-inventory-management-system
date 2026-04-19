@@ -3,6 +3,7 @@ import {
   Search, Monitor as MonitorIcon, Eye, Shield, Printer,
   Info, X, CheckCircle, Users, Wrench 
 } from 'lucide-react';
+import { supabase } from '../../supabase/client';
 import { getMonitors } from '../../services/deviceService';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
 import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
@@ -49,8 +50,21 @@ export default function MonitorInventory() {
   }, [filters, sortOrder]);
 
   useEffect(() => {
-    loadMonitors();
-  }, [filters]);
+    loadMonitors(); // or loadDesktops();
+
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'monitors' }, // change to 'desktops' for that file
+        () => loadMonitors()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [filters]); // Keep filters here so search still works
 
   const loadMonitors = async () => {
     setLoading(true);

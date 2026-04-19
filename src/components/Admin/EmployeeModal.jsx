@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, User, Building2, Briefcase, Calendar, Hash, Activity } from 'lucide-react';
+import { X, Users } from 'lucide-react';
 
-export default function EmployeeModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  employee,
-  departments,
-  positions,
-}) {
+export default function EmployeeModal({ isOpen, onClose, onSubmit, employee, departments, positions }) {
   const [formData, setFormData] = useState({
     employee_code: '',
     full_name: '',
@@ -34,13 +27,8 @@ export default function EmployeeModal({
       });
     } else {
       setFormData({
-        employee_code: '',
-        full_name: '',
-        department_id: '',
-        position_id: '',
-        date_deployed: '',
-        date_left: '',
-        status: 'active',
+        employee_code: '', full_name: '', department_id: '', position_id: '',
+        date_deployed: '', date_left: '', status: 'active',
       });
     }
   }, [employee]);
@@ -72,151 +60,116 @@ export default function EmployeeModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div 
-        className="modal-content" 
-        onClick={(e) => e.stopPropagation()}
-        style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden', maxWidth: '600px' }}
-      >
-        <div className="modal-header" style={{ flexShrink: 0 }}>
+    <div className="nm-overlay" onClick={onClose}>
+      <div className="nm-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ width: '600px', height: 'auto', maxHeight: '90vh' }}>
+        
+        <div className="nm-modal-header">
           <h2>{employee ? 'Edit Employee' : 'Add New Employee'}</h2>
-          <button className="modal-close" onClick={onClose}>
-            <X size={20} />
-          </button>
+          <button type="button" className="nm-close-btn" onClick={onClose}><X size={20} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          
-          <div className="form-scroll-area" style={{ padding: '24px' }}>
+        <form onSubmit={handleSubmit} className="nm-modal-form">
+          <div className="nm-form-scroll-area">
             
-            {/* SECTION 1: IDENTITY (Highlighted) */}
-            <div className="modal-section-highlight">
-              <span className="modal-section-title">Identity Information</span>
-              
-              <div className="form-row">
-                <div className="form-group" style={{ flex: '0 0 140px' }}>
-                  <label>Employee Code</label>
-                  <div style={{ position: 'relative' }}>
-                    <Hash size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <input
-                      type="text"
-                      name="employee_code"
-                      value={formData.employee_code}
-                      onChange={handleChange}
-                      className={errors.employee_code ? 'error' : ''}
-                      placeholder="EMP-001"
-                      style={{ paddingLeft: '36px' }}
-                    />
-                  </div>
+            {/* SECTION 1: IDENTITY */}
+            <div className="nm-section-card">
+              <h3 className="nm-section-title">Identity Information</h3>
+              <div className="nm-grid-2">
+                <div className="nm-input-group">
+                  <label>Employee Code <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    type="text"
+                    name="employee_code"
+                    value={formData.employee_code}
+                    onChange={handleChange}
+                    placeholder="EMP-001"
+                    style={{ borderColor: errors.employee_code ? '#ef4444' : '' }}
+                  />
+                  {errors.employee_code && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.employee_code}</span>}
                 </div>
 
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>Full Name</label>
-                  <div style={{ position: 'relative' }}>
-                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <input
-                      type="text"
-                      name="full_name"
-                      value={formData.full_name}
-                      onChange={handleChange}
-                      className={errors.full_name ? 'error' : ''}
-                      placeholder="e.g. John Doe"
-                      style={{ paddingLeft: '36px' }}
-                    />
-                  </div>
+                <div className="nm-input-group">
+                  <label>Full Name <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    type="text"
+                    name="full_name"
+                    value={formData.full_name}
+                    onChange={handleChange}
+                    placeholder="e.g. John Doe"
+                    style={{ borderColor: errors.full_name ? '#ef4444' : '' }}
+                  />
+                  {errors.full_name && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.full_name}</span>}
                 </div>
               </div>
             </div>
 
-            {/* SECTION 2: ROLE & ASSIGNMENT */}
-            <div style={{ marginTop: '16px' }}>
-              <span className="modal-section-title" style={{ marginBottom: '8px', display: 'block' }}>Role & Assignment</span>
-              
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Department</label>
-                  <div style={{ position: 'relative' }}>
-                    <Building2 size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <select
-                      name="department_id"
-                      value={formData.department_id}
-                      onChange={handleChange}
-                      className={errors.department_id ? 'error' : ''}
-                      style={{ paddingLeft: '36px' }}
-                    >
-                      <option value="">Select Department</option>
-                      {departments.map((dept) => (
-                        <option key={dept.department_id} value={dept.department_id}>
-                          {dept.department_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            {/* SECTION 2: ROLE */}
+            <div className="nm-section-card">
+              <h3 className="nm-section-title">Role & Assignment</h3>
+              <div className="nm-grid-2">
+                <div className="nm-input-group">
+                  <label>Department <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select
+                    name="department_id"
+                    value={formData.department_id}
+                    onChange={handleChange}
+                    style={{ borderColor: errors.department_id ? '#ef4444' : '' }}
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.department_id} value={dept.department_id}>{dept.department_name}</option>
+                    ))}
+                  </select>
+                  {errors.department_id && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.department_id}</span>}
                 </div>
 
-                <div className="form-group">
-                  <label>Position</label>
-                  <div style={{ position: 'relative' }}>
-                    <Briefcase size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <select
-                      name="position_id"
-                      value={formData.position_id}
-                      onChange={handleChange}
-                      className={errors.position_id ? 'error' : ''}
-                      style={{ paddingLeft: '36px' }}
-                    >
-                      <option value="">Select Position</option>
-                      {positions.map((pos) => (
-                        <option key={pos.position_id} value={pos.position_id}>
-                          {pos.position_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="nm-input-group">
+                  <label>Position <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select
+                    name="position_id"
+                    value={formData.position_id}
+                    onChange={handleChange}
+                    style={{ borderColor: errors.position_id ? '#ef4444' : '' }}
+                  >
+                    <option value="">Select Position</option>
+                    {positions.map((pos) => (
+                      <option key={pos.position_id} value={pos.position_id}>{pos.position_name}</option>
+                    ))}
+                  </select>
+                  {errors.position_id && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.position_id}</span>}
                 </div>
               </div>
             </div>
 
-            {/* SECTION 3: STATUS & TIMELINE */}
-            <div style={{ marginTop: '8px' }}>
-              <div className="form-row">
-                <div className="form-group">
+            {/* SECTION 3: STATUS */}
+            <div className="nm-section-card">
+              <h3 className="nm-section-title">Status & Timeline</h3>
+              <div className="nm-grid-2">
+                <div className="nm-input-group">
                   <label>Date Deployed</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="date"
-                      name="date_deployed"
-                      value={formData.date_deployed}
-                      onChange={handleChange}
-                      style={{ paddingLeft: '12px' }} 
-                    />
-                  </div>
+                  <input
+                    type="date"
+                    name="date_deployed"
+                    value={formData.date_deployed}
+                    onChange={handleChange}
+                  />
                 </div>
 
-                <div className="form-group">
+                <div className="nm-input-group">
                   <label>Status</label>
-                  <div style={{ position: 'relative' }}>
-                    <Activity size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <select 
-                      name="status" 
-                      value={formData.status} 
-                      onChange={handleChange}
-                      style={{ paddingLeft: '36px' }}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                      {/* <option value="resigned">Resigned</option> */}
-                    </select>
-                  </div>
+                  <select name="status" value={formData.status} onChange={handleChange}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
                 </div>
               </div>
             </div>
 
           </div>
 
-          <div className="modal-actions fixed-footer">
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">{employee ? 'Update Employee' : 'Add Employee'}</button>
+          <div className="nm-modal-footer">
+            <button type="button" className="nm-btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="submit" className="nm-btn-save">{employee ? 'Update Employee' : 'Add Employee'}</button>
           </div>
         </form>
       </div>

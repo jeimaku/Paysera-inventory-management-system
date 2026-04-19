@@ -747,3 +747,10 @@
   outline: none;
   box-shadow: 0 0 0 4px rgba(29, 181, 132, 0.2);
 }
+
+/* --- NEW: Future Badge (For devices deployed on a future date) --- */
+.duration-badge.future {
+  background: linear-gradient(135deg, #E0E7FF 0%, #C7D2FE 100%);
+  color: #4338CA;
+  border: 1px solid #A5B4FC;
+}

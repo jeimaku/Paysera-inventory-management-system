@@ -1,19 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, Briefcase } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export default function PositionModal({ isOpen, onClose, onSubmit, position }) {
-  const [formData, setFormData] = useState({
-    position_name: '',
-  });
-
+  const [formData, setFormData] = useState({ position_name: '' });
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    if (position) {
-      setFormData({ position_name: position.position_name || '' });
-    } else {
-      setFormData({ position_name: '' });
-    }
+    if (position) setFormData({ position_name: position.position_name || '' });
+    else setFormData({ position_name: '' });
   }, [position]);
 
   const handleChange = (e) => {
@@ -34,35 +28,39 @@ export default function PositionModal({ isOpen, onClose, onSubmit, position }) {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-        <div className="modal-header">
+    <div className="nm-overlay" onClick={onClose}>
+      <div className="nm-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ width: '450px', height: 'auto' }}>
+        
+        <div className="nm-modal-header">
           <h2>{position ? 'Edit Position' : 'Add New Position'}</h2>
-          <button className="modal-close" onClick={onClose}><X size={20} /></button>
+          <button type="button" className="nm-close-btn" onClick={onClose}><X size={20} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form" style={{ padding: '24px' }}>
-          <div className="form-group">
-            <label>Position Name <span className="required">*</span></label>
-            <div style={{ position: 'relative' }}>
-              <Briefcase size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-              <input
-                type="text"
-                name="position_name"
-                value={formData.position_name}
-                onChange={handleChange}
-                placeholder="e.g. Software Engineer"
-                className={errors.position_name ? 'error' : ''}
-                style={{ paddingLeft: '36px' }}
-                autoFocus
-              />
+        <form onSubmit={handleSubmit} className="nm-modal-form">
+          <div className="nm-form-scroll-area">
+            
+            <div className="nm-section-card">
+              <h3 className="nm-section-title">Position Details</h3>
+              <div className="nm-input-group">
+                <label>Position Title <span style={{ color: '#ef4444' }}>*</span></label>
+                <input
+                  type="text"
+                  name="position_name"
+                  value={formData.position_name}
+                  onChange={handleChange}
+                  placeholder="e.g. Software Engineer"
+                  style={{ borderColor: errors.position_name ? '#ef4444' : '' }}
+                  autoFocus
+                />
+                {errors.position_name && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errors.position_name}</span>}
+              </div>
             </div>
-            {errors.position_name && <span className="error-message">{errors.position_name}</span>}
+
           </div>
 
-          <div className="modal-actions" style={{ marginTop: '16px' }}>
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">{position ? 'Update' : 'Add Position'}</button>
+          <div className="nm-modal-footer">
+            <button type="button" className="nm-btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="submit" className="nm-btn-save">{position ? 'Update' : 'Add Position'}</button>
           </div>
         </form>
       </div>

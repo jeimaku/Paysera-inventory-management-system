@@ -73,10 +73,11 @@ export async function getAvailableDevices(deviceType) {
   }
 }
 
-// Deploy device to employee (UPDATED: Snapshots owner name)
+// Deploy device to employee
 export async function deployDevice(deploymentData) {
   try {
-    const { employeeId, deviceType, deviceId, monitorIds = [] } = deploymentData;
+    // NEW: Added dateIssued to the expected data
+    const { employeeId, deviceType, deviceId, monitorIds = [], dateIssued } = deploymentData;
 
     // STEP 1: Fetch the employee's name to snapshot it
     const { data: employee, error: empError } = await supabase
@@ -87,16 +88,17 @@ export async function deployDevice(deploymentData) {
 
     if (empError) throw new Error('Employee not found for deployment');
     
-    // STEP 2: Create employee_device record WITH the snapshot name
+    // STEP 2: Create employee_device record WITH the snapshot name and custom date
     const { data: employeeDevice, error: deployError } = await supabase
       .from('employee_devices')
       .insert({
         employee_id: employeeId,
         device_type: deviceType,
         device_id: deviceId,
-        date_issued: new Date().toISOString().split('T')[0],
+        // NEW: Uses the selected date, or falls back to today if missing
+        date_issued: dateIssued || new Date().toISOString().split('T')[0], 
         status: 'in_use',
-        archived_owner_name: employee.full_name // <--- Saves name permanently
+        archived_owner_name: employee.full_name 
       })
       .select()
       .single();
@@ -178,23 +180,36 @@ export async function getCurrentDeployments() {
     if (error) throw error;
 
     // ENRICHMENT STEP: Fetch Asset ID for every device
+    // ENRICHMENT STEP: Fetch Asset ID for every device
     const enrichedData = await Promise.all(
       (data || []).map(async (deployment) => {
         try {
-          const tableName = deployment.device_type === 'LAPTOP' ? 'laptops' : 'desktops';
-          const idField = deployment.device_type === 'LAPTOP' ? 'laptop_id' : 'desktop_id';
-          
-          const { data: deviceData, error: deviceError } = await supabase
-            .from(tableName)
-            .select('asset_id')
-            .eq(idField, deployment.device_id)
-            .single();
+          // --- NEW: Properly route all 3 device types ---
+          let tableName = '';
+          let idField = '';
 
-          if (!deviceError && deviceData) {
-            return { 
-              ...deployment, 
-              device_asset_id: deviceData.asset_id 
-            };
+          if (deployment.device_type === 'LAPTOP') {
+            tableName = 'laptops';
+            idField = 'laptop_id';
+          } else if (deployment.device_type === 'DESKTOP') {
+            tableName = 'desktops';
+            idField = 'desktop_id';
+          } else if (deployment.device_type === 'MONITOR') {
+            tableName = 'monitors';
+            idField = 'monitor_id';
+          }
+
+          // Only fetch if we matched a valid table
+          if (tableName && idField) {
+            const { data: deviceData, error: deviceError } = await supabase
+              .from(tableName)
+              .select('asset_id')
+              .eq(idField, deployment.device_id)
+              .single();
+
+            if (!deviceError && deviceData) {
+              deployment.device_asset_id = deviceData.asset_id;
+            }
           }
         } catch (err) {
           console.warn('Could not fetch asset_id for device:', deployment.device_id);

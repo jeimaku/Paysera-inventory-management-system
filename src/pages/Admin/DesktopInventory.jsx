@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { 
   Plus, Edit2, Trash2, Search, HardDrive, Eye, AlertTriangle, 
   Printer, FileSpreadsheet, FileText, 
-  Archive, RefreshCw, Info, X // <-- Added new icons
+  Archive, RefreshCw, Info, X, Wrench
 } from 'lucide-react';
+import { supabase } from '../../supabase/client';
 import DesktopModal from '../../components/Admin/DesktopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
+import QuickRepairModal from '../../components/Admin/QuickRepairModal';
 import { getDesktops, createDesktop, updateDesktop, deleteDesktop } from '../../services/deviceService';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
 import { exportDesktopsToExcel, exportDesktopsToPDF } from '../../utils/desktopExportUtils';
@@ -22,6 +24,7 @@ export default function DesktopInventory() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [specsModalOpen, setSpecsModalOpen] = useState(false);
   const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
+  const [repairDevice, setRepairDevice] = useState(null);
 
   // --- NEW: Smart Engine States ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,7 +37,7 @@ export default function DesktopInventory() {
     search: '',
     status: '',
     device_condition: '',
-    build_type: '', // <-- NEW: Added build_type
+    build_type: '', 
   });
 
   // Reset pagination on filter or sort change
@@ -42,8 +45,23 @@ export default function DesktopInventory() {
     setCurrentPage(1);
   }, [filters, sortOrder]);
 
-  useEffect(() => { loadDesktops(); }, [filters]);
+  useEffect(() => {
+    loadDesktops(); 
 
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'desktops' }, 
+        () => loadDesktops()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [filters]); 
+  
   const loadDesktops = async () => {
     setLoading(true);
     setFetchError(null); 
@@ -74,7 +92,6 @@ export default function DesktopInventory() {
     }
   };
 
-  // --- UPDATED: Soft Delete (Retire) instead of Hard Delete ---
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
       const result = await updateDesktop(deleteConfirm.desktop_id, { status: 'retired' });
@@ -89,7 +106,6 @@ export default function DesktopInventory() {
     }
   };
 
-  // --- NEW: Restore functionality ---
   const handleRestoreConfirm = async (newStatus) => {
     if (restoreConfirm) {
       const result = await updateDesktop(restoreConfirm.desktop_id, { status: newStatus });
@@ -104,7 +120,6 @@ export default function DesktopInventory() {
     }
   };
 
-  // --- EXPORT FUNCTIONALITY (Kept exactly as you wrote it) ---
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
@@ -129,7 +144,6 @@ export default function DesktopInventory() {
     }
   };
 
-  // --- PRINT FUNCTIONALITY (Kept exactly as you wrote it) ---
   const handlePrint = async (desktop) => {
     try {
       const history = await getDeviceUsageHistory('DESKTOP', desktop.desktop_id);
@@ -239,7 +253,6 @@ export default function DesktopInventory() {
     }
   };
 
-  // --- NEW: Tooltip Helper ---
   const getStatusTooltip = (status) => {
     switch(status?.toLowerCase()) {
       case 'available': return "Device is in storage and ready for deployment.";
@@ -250,31 +263,21 @@ export default function DesktopInventory() {
     }
   };
 
-// --- NEW: Client-Side Build Type Filtering & Smart Sorting Logic ---
   const processedDesktops = desktops.filter(desktop => {
-    // 1. If no build filter is selected, show all
     if (!filters.build_type) return true;
-    
-    // 2. Determine if the device is custom based on the serial number
-    // (This matches how your DesktopModal determines custom vs branded)
     const hasSerial = desktop.serial_number && 
                       desktop.serial_number.trim() !== '' && 
                       !desktop.serial_number.toLowerCase().includes('custom');
-                      
-    // 3. Apply the filter
     if (filters.build_type === 'branded') return hasSerial;
     if (filters.build_type === 'custom') return !hasSerial;
-    
     return true;
   }).sort((a, b) => {
-    // Sort by Asset ID (DSK-XXX)
     const cleanIdA = (a.asset_id || '').replace(/\s+/g, '');
     const cleanIdB = (b.asset_id || '').replace(/\s+/g, '');
     const comparison = cleanIdA.localeCompare(cleanIdB, undefined, { numeric: true, sensitivity: 'base' });
     return sortOrder === 'asc' ? comparison : -comparison;
   });
 
-  // --- UPDATED: Pagination Logic (Using processedDesktops) ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentDesktops = processedDesktops.slice(indexOfFirstItem, indexOfLastItem); 
@@ -288,7 +291,6 @@ export default function DesktopInventory() {
           <div className="header-meta">Workstations, Servers, and PC Units</div>
         </div>
         
-        {/* Export Action Buttons */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button 
             onClick={handleExportExcel} 
@@ -314,7 +316,6 @@ export default function DesktopInventory() {
         </div>
       </div>
 
-      {/* --- NEW: Quick Guide Info Banner --- */}
       {showBanner && (
         <div className="info-banner">
           <div className="info-banner-icon">
@@ -369,14 +370,12 @@ export default function DesktopInventory() {
           <option value="second_hand">Second Hand</option>
         </select>
 
-        {/* --- NEW: Build Type Filter --- */}
         <select className="admin-select" value={filters.build_type} onChange={(e) => setFilters({ ...filters, build_type: e.target.value })}>
           <option value="">All Builds</option>
           <option value="branded">Branded / Pre-built</option>
           <option value="custom">Custom / Assembled</option>
         </select>
         
-        {/* UPDATED: Clarified Sort Dropdown */}
         <select
           className="admin-select"
           value={sortOrder}
@@ -414,7 +413,15 @@ export default function DesktopInventory() {
                   style={{ cursor: 'pointer' }}
                 >
                   <td>
-                    <div className="col-asset">{desktop.asset_id}</div>
+                    <div className="col-asset" style={{ display: 'flex', alignItems: 'center' }}>
+                      {desktop.asset_id}
+                      {/* NEW: Permanent Repair Badge */}
+                      {desktop.repair_count > 0 && (
+                        <span title={`${desktop.repair_count} previous repairs`} style={{ background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', marginLeft: '8px' }}>
+                          <Wrench size={10} /> {desktop.repair_count}
+                        </span>
+                      )}
+                    </div>
                     <div className="col-sub-text">
                       <span style={{ color: '#64748b' }}>S/N: </span>
                       <span style={{ color: '#0369a1', fontWeight: 500 }}>
@@ -456,6 +463,18 @@ export default function DesktopInventory() {
                       >
                         <Printer size={16} />
                       </button>
+
+                      {/* ---> NEW: Quick Repair Button <--- */}
+                      {desktop.status?.toLowerCase() !== 'maintenance' && desktop.status?.toLowerCase() !== 'retired' && (
+                        <button 
+                          className="action-btn" 
+                          onClick={(e) => { e.stopPropagation(); setRepairDevice(desktop); }} 
+                          title="Send to Maintenance"
+                          style={{ color: '#d97706', borderColor: '#fde68a', backgroundColor: '#fffbeb' }}
+                        >
+                          <Wrench size={16} />
+                        </button>
+                      )}
 
                       <button 
                         className="action-btn btn-edit" 
@@ -501,7 +520,6 @@ export default function DesktopInventory() {
         </table>
       </div>
 
-      {/* NEW: Pagination Controls */}
       {!loading && totalPages > 1 && (
         <div className="admin-pagination">
           <button 
@@ -523,7 +541,15 @@ export default function DesktopInventory() {
       <DesktopModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleModalSubmit} desktop={selectedDesktop} />
       <NewSpecsModal_Admin isOpen={specsModalOpen} onClose={() => setSpecsModalOpen(false)} device={viewSpecsDevice} type="desktop" />
       
-      {/* Retire Confirm Modal */}
+      {/* Quick Repair Modal */}
+      <QuickRepairModal 
+        isOpen={!!repairDevice} 
+        onClose={() => setRepairDevice(null)} 
+        device={repairDevice} 
+        deviceType="DESKTOP" 
+        onSuccess={() => { setRepairDevice(null); loadDesktops(); }} 
+      />
+
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
@@ -543,7 +569,6 @@ export default function DesktopInventory() {
         </div>
       )}
 
-      {/* Restore Device Modal */}
       {restoreConfirm && (
         <div className="modal-overlay" onClick={() => setRestoreConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>

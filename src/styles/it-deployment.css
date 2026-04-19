@@ -713,3 +713,114 @@
   color: var(--it-error);
   padding-left: 4px;
 }
+
+/* --- NEW: Visual List Styles (Replaces old select dropdowns) --- */
+.searchable-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: white;
+  border: 1px solid var(--it-gray-200);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: var(--it-shadow-sm);
+}
+
+.visual-options-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+/* Custom Scrollbar for the list */
+.visual-options-list::-webkit-scrollbar {
+  width: 6px;
+}
+.visual-options-list::-webkit-scrollbar-track {
+  background: var(--it-gray-100);
+  border-radius: 4px;
+}
+.visual-options-list::-webkit-scrollbar-thumb {
+  background: var(--it-gray-300);
+  border-radius: 4px;
+}
+
+.visual-option-card {
+  padding: 12px 16px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--it-gray-50);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.visual-option-card:hover {
+  background: var(--it-gray-100);
+  border-color: var(--it-gray-300);
+}
+
+.visual-option-card.selected {
+  background: #E8F8F3;
+  border-color: var(--it-primary);
+}
+
+.option-primary {
+  font-weight: 600;
+  color: var(--it-gray-900);
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.option-secondary {
+  font-size: 0.85rem;
+  color: var(--it-gray-600);
+}
+
+.no-results-text {
+  text-align: center;
+  padding: 20px;
+  color: var(--it-gray-500);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* --- NEW: Date Picker Styles --- */
+.it-date-input {
+  width: 100%;
+  max-width: 300px;
+  padding: 12px 16px;
+  border: 2px solid var(--it-gray-300);
+  border-radius: 10px;
+  font-size: 1rem;
+  color: var(--it-gray-800);
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.it-date-input:focus {
+  outline: none;
+  border-color: var(--it-primary);
+  box-shadow: 0 0 0 3px rgba(29, 181, 132, 0.1);
+}
+
+/* --- NEW: Device Count Badge --- */
+.device-count-badge {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--it-primary-dark);
+  background: #E8F8F3;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(29, 181, 132, 0.2);
+  transition: all 0.2s ease;
+}
+
+/* Make the badge look inverted when the user selects the card */
+.device-type-card.selected .device-count-badge {
+  background: white;
+  border-color: var(--it-primary);
+}

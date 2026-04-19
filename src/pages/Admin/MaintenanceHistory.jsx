@@ -1,535 +1,262 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Wrench, Search, Calendar, AlertCircle, 
-  CheckCircle, Clock, DollarSign, FileText,
-  ArrowLeft, CheckSquare, ShieldAlert,
-  FileSpreadsheet // <-- Added for Excel Icon
-} from 'lucide-react';
-
-import MaintenanceActionModal from '../../components/Admin/MaintenanceActionModal';
-import RepairDetailsModal from '../../components/IT/RepairDetailsModal';
-
-import {
-  getDeviceMaintenanceHistory,
-  getDeviceMaintenanceSummary,
-  getMaintenanceStatistics
-} from '../../services/maintenanceService';
-
-import { 
-  processRepairApproval, 
-  overrideWarrantyStatus,
-  getAllRepairRecords 
-} from '../../services/repairService';
-
-import { getDetailedDeviceSpecs } from '../../services/deploymentService';
-import { exportMaintenanceToExcel, exportMaintenanceToPDF } from '../../utils/maintenanceExportUtils'; // <-- Export Utils
-import '../../styles/maintenance.css';
+import { ShieldCheck, CheckCircle, XCircle, Search, AlertCircle, Clock, X, FileText, Info, RefreshCw } from 'lucide-react';
+import { getAllRepairRecords, processRepairApproval } from '../../services/repairService';
+import '../../styles/admin.css'; 
+import '../../styles/new_modal.css';
+import { supabase } from '../../supabase/client';
 
 export default function MaintenanceHistory() {
-  const { deviceType, deviceId } = useParams();
-  const navigate = useNavigate();
-  
-  const [maintenanceRecords, setMaintenanceRecords] = useState([]);
-  const [maintenanceSummary, setMaintenanceSummary] = useState({});
-  const [statistics, setStatistics] = useState({});
-  const [deviceDetails, setDeviceDetails] = useState(null);
+  const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false); // <-- Export State
+  const [activeTab, setActiveTab] = useState('awaiting'); 
+  const [showBanner, setShowBanner] = useState(true);
   
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
-  const [selectedMaintenance, setSelectedMaintenance] = useState(null);
-
-  const [filters, setFilters] = useState({
-    search: '',
-    maintenance_type: '',
-    status: '',
-    priority: '',
-    date_from: '',
-    date_to: '',
-    admin_approval: 'pending'
-  });
-
-  const [view, setView] = useState('device');
+  const [approvalModal, setApprovalModal] = useState(null);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, [deviceType, deviceId, filters]);
+    loadRepairs();
 
-  const loadData = async () => {
+    const channel = supabase
+      .channel('admin-maint-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'device_maintenance' },
+        () => loadRepairs()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const loadRepairs = async () => {
     setLoading(true);
-    try {
-      if (deviceType && deviceId) {
-        setView('device');
-        const [records, summary, specs] = await Promise.all([
-          getDeviceMaintenanceHistory(deviceType, deviceId),
-          getDeviceMaintenanceSummary(deviceType, deviceId),
-          getDetailedDeviceSpecs(deviceType.toUpperCase(), parseInt(deviceId))
-        ]);
-        
-        setMaintenanceRecords(records);
-        setMaintenanceSummary(summary);
-        setDeviceDetails(specs);
-      } else {
-        setView('all');
-        const [records, stats] = await Promise.all([
-          getAllRepairRecords(filters),
-          getMaintenanceStatistics()
-        ]);
-        
-        setMaintenanceRecords(records);
-        setStatistics(stats);
-      }
-    } catch (error) {
-      console.error('Error loading maintenance data:', error);
-    } finally {
-      setLoading(false);
-    }
+    const data = await getAllRepairRecords({});
+    setRepairs(data || []);
+    setLoading(false);
   };
 
-  const handleViewDetails = (maintenance) => {
-    setSelectedMaintenance(maintenance);
-    setIsDetailModalOpen(true);
-  };
-
-  const handleOpenAction = (maintenance) => {
-    setSelectedMaintenance(maintenance);
-    setIsActionModalOpen(true);
-  };
-
-  const handleProcess = async (record, decision, notes) => {
+  const handleProcessApproval = async (decision) => {
+    setIsSubmitting(true);
     const result = await processRepairApproval(
-      record.maintenance_id, 
+      approvalModal.maintenance_id, 
       decision, 
-      notes, 
-      record.device_type, 
-      record.device_id
+      adminNotes, 
+      approvalModal.device_type, 
+      approvalModal.device_id
     );
-    
+    setIsSubmitting(false);
+
     if (result.success) {
-      loadData(); 
+      setApprovalModal(null);
+      setAdminNotes('');
+      loadRepairs();
     } else {
-      alert('Error processing request: ' + result.error);
+      alert("Failed to process approval: " + result.error);
     }
   };
 
-  const handleOverride = async (maintenanceId, newStatus) => {
-    const result = await overrideWarrantyStatus(maintenanceId, newStatus);
-    if (result.success) {
-      loadData(); 
-    } else {
-      alert('Failed to override warranty');
-    }
-  };
+  const awaitingRepairs = repairs.filter(r => r.status === 'awaiting_approval');
+  const historyRepairs = repairs.filter(r => r.status === 'completed' || r.status === 'cancelled');
 
-  // --- EXPORT FUNCTIONALITY ---
-  const handleExportExcel = () => {
-    setIsExporting(true);
-    try {
-      exportMaintenanceToExcel(maintenanceRecords, deviceDetails);
-    } catch (error) {
-      console.error("Excel Export Error:", error);
-      alert(`Failed to export to Excel. Error: ${error.message || 'Check console'}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleExportPDF = () => {
-    setIsExporting(true);
-    try {
-      exportMaintenanceToPDF(maintenanceRecords, deviceDetails);
-    } catch (error) {
-      console.error("PDF Export Error:", error);
-      alert(`Failed to export to PDF. Error: ${error.message || 'Check console'}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'completed': return '#10b981';
-      case 'in_progress': return '#3b82f6';
-      case 'pending': return '#f59e0b';
-      case 'cancelled': return '#ef4444';
-      default: return '#6b7280';
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'urgent': return '#ef4444';
-      case 'high': return '#f97316';
-      case 'medium': return '#eab308';
-      case 'low': return '#10b981';
-      default: return '#6b7280';
-    }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const formatTimelineEntry = (dateString, label, color) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    
-    const time = date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit', 
-      hour12: true 
-    });
-    
-    const day = date.toLocaleDateString('en-US', { 
-      month: 'numeric', 
-      day: 'numeric', 
-      year: '2-digit' 
-    });
-
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: color, marginBottom: '4px' }}>
-        <span style={{ fontWeight: '600' }}>{time} {day}</span>
-        <span style={{ color: '#64748b' }}>– {label}</span>
-      </div>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="maintenance-container">
-        <div className="loading">Loading maintenance data...</div>
-      </div>
-    );
-  }
+  const displayedRepairs = activeTab === 'awaiting' ? awaitingRepairs : historyRepairs;
 
   return (
-    <div className="maintenance-container">
-      {/* Modified Header: 
-        Added flex wrap layout to beautifully stack the title and buttons on smaller screens, 
-        and float them to the edges on larger screens.
-      */}
-      <header className="maintenance-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {view === 'device' && (
-            <button 
-              className="back-button" 
-              onClick={() => navigate(-1)}
-              title="Go Back"
-            >
-              <ArrowLeft size={20} />
-            </button>
-          )}
-          <Wrench size={32} className="header-icon" />
-          <div>
-            <h1 style={{ margin: 0 }}>
-              {view === 'device' 
-                ? `Maintenance History - ${deviceDetails?.asset_id || `${deviceType} ${deviceId}`}`
-                : 'All Maintenance Records'
-              }
-            </h1>
-            <p className="subtitle" style={{ margin: 0 }}>
-              {view === 'device' 
-                ? 'Device repair and maintenance history'
-                : 'Complete maintenance and repair tracking'
-              }
+    <div className="admin-dash-wrapper">
+      
+      <div className="admin-dash-header">
+        <div className="admin-dash-title-block">
+          <h1>Maintenance Approvals</h1>
+          <p>Review and confirm repairs completed by the IT department</p>
+        </div>
+        <div className="admin-header-badge">
+          <ShieldCheck size={18} /> Admin Access
+        </div>
+      </div>
+
+      {/* --- NEW: Admin Workflow Instructions --- */}
+      {showBanner && (
+        <div className="info-banner" style={{ background: '#eff6ff', borderColor: '#bfdbfe', marginBottom: '24px' }}>
+          <div className="info-banner-icon" style={{ color: '#2563eb' }}>
+            <Info size={24} />
+          </div>
+          <div className="info-banner-content" style={{ flex: 1, color: '#1e3a8a' }}>
+            <h4 style={{ color: '#1e3a8a' }}>Maintenance Workflow: Administrator Approval</h4>
+            <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              When the IT Department finishes fixing a device, it is sent here for your final review. 
+              <br/>• <strong>Approve:</strong> Device becomes available in inventory and gains a Repair Badge.
+              <br/>• <strong>Reject:</strong> Device is permanently marked as Retired.
             </p>
           </div>
-        </div>
-
-        {/* Export Buttons Container */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button 
-            onClick={handleExportExcel} 
-            disabled={isExporting || maintenanceRecords.length === 0}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || maintenanceRecords.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || maintenanceRecords.length === 0) ? 0.6 : 1, fontWeight: 500 }}
+            onClick={() => setShowBanner(false)} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', padding: '4px' }}
           >
-            <FileSpreadsheet size={18} />
-            {isExporting ? 'Exporting...' : 'Export Excel'}
-          </button>
-          
-          <button 
-            onClick={handleExportPDF} 
-            disabled={isExporting || maintenanceRecords.length === 0}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#ef4444', color: 'white', borderRadius: '6px', border: 'none', cursor: (isExporting || maintenanceRecords.length === 0) ? 'not-allowed' : 'pointer', opacity: (isExporting || maintenanceRecords.length === 0) ? 0.6 : 1, fontWeight: 500 }}
-          >
-            <FileText size={18} />
-            {isExporting ? 'Exporting...' : 'Export PDF'}
+            <X size={20} />
           </button>
         </div>
-      </header>
+      )}
 
-      {view === 'device' ? (
-        <div className="maintenance-stats">
-          <div className="stat-card">
-            <div className="stat-icon"><Wrench size={20} /></div>
-            <div className="stat-content">
-              <span className="stat-value">{maintenanceSummary.total_maintenance_count || 0}</span>
-              <span className="stat-label">Total Services</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"><AlertCircle size={20} /></div>
-            <div className="stat-content">
-              <span className="stat-value">{maintenanceSummary.repair_count || 0}</span>
-              <span className="stat-label">Repairs</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"><Clock size={20} /></div>
-            <div className="stat-content">
-              <span className="stat-value">{maintenanceSummary.reformat_count || 0}</span>
-              <span className="stat-label">Reformats</span>
-            </div>
-          </div>
+      {/* Tabs & Refresh */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', alignItems: 'center' }}>
+        <button 
+          onClick={() => setActiveTab('awaiting')}
+          style={{ padding: '12px 24px', borderRadius: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: activeTab === 'awaiting' ? '#2563eb' : 'white', color: activeTab === 'awaiting' ? 'white' : '#64748b', boxShadow: activeTab === 'awaiting' ? '0 4px 12px rgba(37,99,235,0.3)' : '0 1px 3px rgba(0,0,0,0.1)' }}
+        >
+          Awaiting Approval ({awaitingRepairs.length})
+        </button>
+        <button 
+          onClick={() => setActiveTab('history')}
+          style={{ padding: '12px 24px', borderRadius: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: activeTab === 'history' ? '#2563eb' : 'white', color: activeTab === 'history' ? 'white' : '#64748b', boxShadow: activeTab === 'history' ? '0 4px 12px rgba(37,99,235,0.3)' : '0 1px 3px rgba(0,0,0,0.1)' }}
+        >
+          Approval History
+        </button>
+
+        {/* --- NEW: Manual Refresh Button --- */}
+        <button 
+          onClick={loadRepairs}
+          title="Force Refresh Data"
+          style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', background: 'white', border: '1px solid #cbd5e1', padding: '10px 16px', borderRadius: '8px', color: '#475569', fontWeight: 600, cursor: 'pointer' }}
+        >
+          <RefreshCw size={16} className={loading ? 'spin-animation' : ''} />
+          Refresh Data
+        </button>
+      </div>
+
+      <div className="admin-panel" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="admin-compact-table-wrapper">
+          <table className="admin-compact-table" style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>Original Issue</th>
+                <th>IT Resolution</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan="5" className="admin-empty-table">Loading records...</td></tr>
+              ) : displayedRepairs.length === 0 ? (
+                <tr><td colSpan="5" className="admin-empty-table">No records found in this view.</td></tr>
+              ) : (
+                displayedRepairs.map((repair) => (
+                  <tr key={repair.maintenance_id}>
+                    <td>
+                      <div style={{ fontWeight: 600, color: '#1e293b' }}>{repair.device_asset_id}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{repair.device_type}</div>
+                    </td>
+                    <td style={{ maxWidth: '200px' }}>
+                      <div style={{ fontSize: '0.85rem', color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={repair.issue_description}>
+                        {repair.issue_description}
+                      </div>
+                    </td>
+                    <td style={{ maxWidth: '250px' }}>
+                      <div style={{ fontSize: '0.85rem', color: '#166534', background: '#f0fdf4', padding: '4px 8px', borderRadius: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={repair.resolution_description}>
+                        <CheckCircle size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }}/> 
+                        {repair.resolution_description || 'No notes provided by IT.'}
+                      </div>
+                    </td>
+                    <td>
+                      {repair.admin_approval_status === 'pending' ? (
+                        <span className="admin-mini-badge" style={{ background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a' }}>Needs Review</span>
+                      ) : repair.admin_approval_status === 'approved' ? (
+                        <span className="admin-mini-badge" style={{ background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}>Approved</span>
+                      ) : (
+                        <span className="admin-mini-badge" style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}>Rejected/Retired</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {activeTab === 'awaiting' && (
+                        <button 
+                          onClick={() => setApprovalModal(repair)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#2563eb', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                          <ShieldCheck size={16} /> Review
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      ) : (
-        <div className="maintenance-stats">
-          <div className="stat-card">
-            <div className="stat-content">
-              <span className="stat-value">{statistics.totalRecords || 0}</span>
-              <span className="stat-label">Total Records</span>
+      </div>
+
+      {approvalModal && (
+        <div className="nm-overlay" onClick={() => setApprovalModal(null)}>
+          <div className="nm-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ width: '550px', height: 'auto', maxHeight: '90vh' }}>
+            <div className="nm-modal-header" style={{ background: '#eff6ff', borderBottom: '1px solid #dbeafe' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e40af' }}>
+                <ShieldCheck size={20} /> Review IT Repair
+              </h2>
+              <button type="button" className="nm-close-btn" style={{ background: 'transparent' }} onClick={() => setApprovalModal(null)}>
+                <X size={20} />
+              </button>
             </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-content">
-              <span className="stat-value">{statistics.pendingRecords || 0}</span>
-              <span className="stat-label">Pending</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-content">
-              <span className="stat-value">{statistics.inProgressRecords || 0}</span>
-              <span className="stat-label">In Progress</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-content">
-              <span className="stat-value">{statistics.completedThisMonth || 0}</span>
-              <span className="stat-label">This Month</span>
+            
+            <div className="nm-modal-form" style={{ padding: '24px' }}>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Target Device</span>
+                  <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '1.1rem', marginTop: '4px' }}>{approvalModal.device_asset_id}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{approvalModal.device_type}</div>
+                </div>
+                <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid #fde68a' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#d97706', textTransform: 'uppercase', fontWeight: 700 }}>Reported Issue</span>
+                  <div style={{ fontWeight: '500', color: '#92400e', fontSize: '0.9rem', marginTop: '4px' }}>"{approvalModal.issue_description}"</div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '24px', background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                <span style={{ fontSize: '0.75rem', color: '#166534', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CheckCircle size={14} /> IT Resolution Notes
+                </span>
+                <div style={{ fontWeight: '500', color: '#14532d', fontSize: '0.95rem', marginTop: '8px', lineHeight: 1.5 }}>
+                  "{approvalModal.resolution_description}"
+                </div>
+              </div>
+
+              <div className="nm-input-group" style={{ marginBottom: '32px' }}>
+                <label>Admin Notes <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span></label>
+                <textarea 
+                  rows="3" 
+                  placeholder="Add any internal admin notes regarding this approval..."
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => handleProcessApproval('rejected')} 
+                  disabled={isSubmitting} 
+                  style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', padding: '12px', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+                >
+                  <XCircle size={18} /> Reject & Retire Device
+                </button>
+                
+                <button 
+                  type="button" 
+                  onClick={() => handleProcessApproval('approved')} 
+                  disabled={isSubmitting} 
+                  style={{ background: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}
+                >
+                  <CheckCircle size={18} /> Approve & Return
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-
-      <div className="maintenance-controls">
-        <div className="search-box">
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="Search maintenance records..."
-            value={filters.search}
-            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-          />
-        </div>
-
-        <div className="filters">
-          <select
-            value={filters.maintenance_type}
-            onChange={(e) => setFilters(prev => ({ ...prev, maintenance_type: e.target.value }))}
-          >
-            <option value="">All Types</option>
-            <option value="repair">Repair</option>
-            <option value="reformat">Reformat</option>
-            <option value="upgrade">Upgrade</option>
-            <option value="cleaning">Cleaning</option>
-          </select>
-
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-          >
-            <option value="">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-
-          <select
-            value={filters.admin_approval}
-            onChange={(e) => setFilters(prev => ({ ...prev, admin_approval: e.target.value }))}
-            style={{ fontWeight: '600', color: filters.admin_approval === 'pending' ? '#d97706' : '#374151' }}
-          >
-            <option value="">All Approvals</option>
-            <option value="pending">Pending Approval</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="maintenance-table-card">
-        {maintenanceRecords.length === 0 ? (
-          <div className="no-data-state">
-            <Wrench size={64} className="no-data-icon" />
-            <h3>No Maintenance Records</h3>
-            <p>No maintenance or repair records found.</p>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  {view === 'all' && <th>Device</th>}
-                  <th>Type</th>
-                  <th>Issue Description</th>
-                  <th>Warranty</th>
-                  <th>Status</th>
-                  <th>Approval</th>
-                  <th>Priority</th>
-                  <th>Technician</th>
-                  <th>Repair Timeline</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {maintenanceRecords.map((maintenance) => (
-                  <tr key={maintenance.maintenance_id}>
-                    {view === 'all' && (
-                      <td className="device-cell">
-                        <div>
-                          <span className="asset-id">{maintenance.device_asset_id}</span>
-                          <br />
-                          <small>{maintenance.device_type}</small>
-                        </div>
-                      </td>
-                    )}
-                    <td>
-                      <span className={`maintenance-type-badge ${maintenance.maintenance_type}`}>
-                        {maintenance.maintenance_type}
-                      </span>
-                    </td>
-                    <td className="issue-description">
-                      {maintenance.issue_description || 'No description'}
-                    </td>
-                    <td>
-                      <span style={{ 
-                        color: maintenance.warranty_status_at_repair === 'active' ? '#059669' : '#dc2626',
-                        fontWeight: '500', fontSize: '13px'
-                      }}>
-                        {maintenance.warranty_status_at_repair === 'active' ? 'Active' : 'Expired'}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className="status-badge"
-                        style={{
-                          backgroundColor: `${getStatusColor(maintenance.status)}20`,
-                          color: getStatusColor(maintenance.status)
-                        }}
-                      >
-                        {maintenance.status}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="priority-badge" style={{
-                          background: maintenance.admin_approval_status === 'pending' ? '#fff7ed' : 
-                                      maintenance.admin_approval_status === 'approved' ? '#f0fdf4' : '#fef2f2',
-                          color: maintenance.admin_approval_status === 'pending' ? '#c2410c' : 
-                                maintenance.admin_approval_status === 'approved' ? '#15803d' : '#b91c1c'
-                      }}>
-                        {maintenance.admin_approval_status || 'PENDING'}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className="priority-badge"
-                        style={{
-                          backgroundColor: `${getPriorityColor(maintenance.priority)}20`,
-                          color: getPriorityColor(maintenance.priority)
-                        }}
-                      >
-                        {maintenance.priority}
-                      </span>
-                    </td>
-                    <td>{maintenance.technician_name || 'Unassigned'}</td>
-                    
-                    {/* COMPREHENSIVE REPAIR TIMELINE */}
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {/* 1. Reported Date */}
-                        {formatTimelineEntry(maintenance.date_reported, 'Reported', '#64748b')}
-                        
-                        {/* 2. Started Date */}
-                        {maintenance.date_started && 
-                          formatTimelineEntry(maintenance.date_started, 'Started', '#3b82f6')
-                        }
-                        
-                        {/* 3. Completed Date (IT Finished Work) */}
-                        {maintenance.date_completed && 
-                          formatTimelineEntry(maintenance.date_completed, 'Work Done', '#10b981')
-                        }
-
-                        {/* 4. Admin Decision */}
-                        {maintenance.admin_approval_date && (
-                          <>
-                            {maintenance.admin_approval_status === 'approved' && 
-                              formatTimelineEntry(maintenance.admin_approval_date, 'Approved', '#059669')
-                            }
-                            {maintenance.admin_approval_status === 'rejected' && 
-                              formatTimelineEntry(maintenance.admin_approval_date, 'Rejected', '#dc2626')
-                            }
-                          </>
-                        )}
-
-                        {/* 5. Cancelled State */}
-                        {maintenance.status === 'cancelled' && maintenance.admin_approval_status !== 'rejected' && 
-                          <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', marginTop: '4px' }}>
-                            ⛔ Cancelled
-                          </div>
-                        }
-                      </div>
-                    </td>
-
-                    <td>
-                      <div className="action-buttons">
-                        <button
-                          className="btn-icon btn-view"
-                          onClick={() => handleViewDetails(maintenance)}
-                          title="View Details"
-                        >
-                          <FileText size={16} />
-                        </button>
-
-                        {maintenance.admin_approval_status === 'pending' && (
-                          <button 
-                            className="btn-icon" 
-                            onClick={() => handleOpenAction(maintenance)}
-                            style={{ color: '#7c3aed', borderColor: '#7c3aed' }}
-                            title="Process Request"
-                          >
-                            <CheckSquare size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <RepairDetailsModal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        record={selectedMaintenance}
-      />
-
-      <MaintenanceActionModal 
-        isOpen={isActionModalOpen}
-        onClose={() => setIsActionModalOpen(false)}
-        record={selectedMaintenance}
-        onProcess={handleProcess}
-        onOverrideWarranty={handleOverride}
-      />
     </div>
   );
 }

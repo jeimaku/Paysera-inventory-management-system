@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Search, Laptop as LaptopIcon, 
   Eye, Filter, AlertTriangle, Printer, FileSpreadsheet, FileText,
- Archive, RefreshCw, Info, X
+ Archive, RefreshCw, Info, X, Wrench
 } from 'lucide-react';
+import { supabase } from '../../supabase/client';
+import QuickRepairModal from '../../components/Admin/QuickRepairModal';
+
 import LaptopModal from '../../components/Admin/LaptopModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 import { getLaptops, createLaptop, updateLaptop, deleteLaptop } from '../../services/deviceService';
@@ -20,6 +23,7 @@ export default function LaptopInventory() {
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [repairDevice, setRepairDevice] = useState(null);
   const [selectedLaptop, setSelectedLaptop] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -77,8 +81,21 @@ export default function LaptopInventory() {
   }, [filters, sortOrder]); // <-- Added sortOrder here
 
   useEffect(() => {
-    loadLaptops();
-  }, [filters]);
+    loadLaptops(); // or loadDesktops();
+
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'laptops' }, // change to 'desktops' for that file
+        () => loadLaptops()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [filters]); // Keep filters here so search still works
 
   const loadLaptops = async () => {
     setLoading(true);
@@ -449,7 +466,15 @@ export default function LaptopInventory() {
                 >
                   {/* --- RESTORED DATA COLUMNS --- */}
                   <td>
-                    <div className="col-asset">{laptop.asset_id}</div>
+                    <div className="col-asset" style={{ display: 'flex', alignItems: 'center' }}>
+                      {laptop.asset_id}
+                      {/* NEW: Permanent Repair Badge */}
+                      {laptop.repair_count > 0 && (
+                        <span title={`${laptop.repair_count} previous repairs`} style={{ background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', marginLeft: '8px' }}>
+                          <Wrench size={10} /> {laptop.repair_count}
+                        </span>
+                      )}
+                    </div>
                     <div className="col-sub-text">
                       S/N: {laptop.brand?.toLowerCase().includes('acer') && laptop.snid ? laptop.snid : (laptop.serial_number || 'N/A')}
                     </div>
@@ -497,6 +522,18 @@ export default function LaptopInventory() {
                         <Printer size={16} />
                       </button>
 
+                      {/* ---> STEP E: THE NEW QUICK REPAIR BUTTON IS HERE <--- */}
+                      {laptop.status?.toLowerCase() !== 'maintenance' && laptop.status?.toLowerCase() !== 'retired' && (
+                        <button 
+                          className="action-btn" 
+                          onClick={(e) => { e.stopPropagation(); setRepairDevice(laptop); }} 
+                          title="Send to Maintenance"
+                          style={{ color: '#d97706', borderColor: '#fde68a', backgroundColor: '#fffbeb' }}
+                        >
+                          <Wrench size={16} />
+                        </button>
+                      )}
+
                       <button 
                         className="action-btn btn-edit" 
                         onClick={(e) => { e.stopPropagation(); handleEditClick(laptop); }} 
@@ -505,7 +542,7 @@ export default function LaptopInventory() {
                         <Edit2 size={16} />
                       </button>
 
-                      {/* --- NEW: Protected Lifecycle Buttons --- */}
+                      {/* --- Protected Lifecycle Buttons --- */}
                       {laptop.status?.toLowerCase() === 'issued' ? (
                         <button 
                           className="action-btn btn-delete" 
@@ -624,6 +661,14 @@ export default function LaptopInventory() {
           </button>
         </div>
       )}
+      {/* Quick Repair Modal */}
+      <QuickRepairModal 
+        isOpen={!!repairDevice} 
+        onClose={() => setRepairDevice(null)} 
+        device={repairDevice} 
+        deviceType="LAPTOP" 
+        onSuccess={() => { setRepairDevice(null); loadLaptops(); }} 
+      />
     </div>
   );
 }

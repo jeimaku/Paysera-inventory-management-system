@@ -425,3 +425,286 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 40px; color: #94a3b8;
 }
+
+/* =========================================
+   FORM MODAL STYLING (For Create/Edit Modals)
+   ========================================= */
+
+.nm-modal-dialog {
+  background: #ffffff;
+  width: 650px;
+  max-width: 95vw;
+  height: 85vh; /* Fixed height to allow scrolling inside */
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: nmSlideUp 0.3s ease-out;
+}
+
+.nm-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  z-index: 10;
+}
+
+.nm-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.nm-close-btn {
+  background: #f1f5f9;
+  border: none;
+  color: #64748b;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nm-close-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.nm-modal-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; /* Important for flex child scrolling */
+}
+
+.nm-form-scroll-area {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.nm-modal-footer {
+  padding: 16px 24px;
+  background: white;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  z-index: 10;
+}
+
+/* Form Sections */
+.nm-section-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.nm-section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #475569;
+  margin: 0 0 16px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+}
+
+/* Grids & Inputs */
+.nm-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.nm-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nm-input-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nm-input-group input,
+.nm-input-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #0f172a;
+  background: white;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.nm-input-group input:focus,
+.nm-input-group select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Dynamic Lists (RAM/Storage) */
+.nm-dynamic-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.nm-dynamic-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 12px;
+}
+
+.nm-dynamic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.nm-dynamic-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.nm-dynamic-row input,
+.nm-dynamic-row select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.flex-1 { flex: 1; }
+
+.nm-input-with-suffix {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 110px;
+}
+
+.nm-input-with-suffix input {
+  width: 100%;
+  padding-right: 32px !important;
+}
+
+.nm-input-with-suffix .suffix {
+  position: absolute;
+  right: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.nm-add-link-btn {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.nm-add-link-btn:hover {
+  background: #eff6ff;
+}
+
+.nm-icon-btn-danger {
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fca5a5;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nm-icon-btn-danger:hover {
+  background: #fee2e2;
+}
+
+/* Utilities */
+.text-amber { color: #d97706 !important; }
+.border-amber { border-color: #fcd34d !important; }
+.bg-amber-light { background: #fffbeb !important; }
+.disabled-input { background: #f1f5f9 !important; color: #94a3b8 !important; cursor: not-allowed; }
+
+/* Buttons */
+.nm-btn-cancel {
+  padding: 10px 20px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nm-btn-cancel:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.nm-btn-save {
+  padding: 10px 24px;
+  background: #3b82f6;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nm-btn-save:hover {
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+@media (max-width: 640px) {
+  .nm-grid-2 { grid-template-columns: 1fr; }
+  .nm-modal-dialog { height: 100vh; max-height: 100vh; border-radius: 0; width: 100vw; max-width: 100vw; }
+}

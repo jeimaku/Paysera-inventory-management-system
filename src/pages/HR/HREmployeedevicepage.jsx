@@ -1,20 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Users, Eye, Trash2, Search, Monitor as MonitorIcon, Laptop, HardDrive, Calendar, AlertTriangle, Building2 } from 'lucide-react';
+import { Users, Eye, Search, Monitor as MonitorIcon, Laptop, HardDrive, Calendar, Building2, ArrowDown, ArrowUp } from 'lucide-react';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
-import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
+import { getCurrentDeployments, getDetailedDeviceSpecs } from '../../services/deploymentService';
+import { supabase } from '../../supabase/client';
 import '../../styles/admin-inventory.css'; 
 import '../../styles/new_modal.css';
 
 export default function HREmployeeDevices() {
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
   
   // Specs Modal States
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
   const [viewSpecsType, setViewSpecsType] = useState('');
   const [selectedDeployment, setSelectedDeployment] = useState(null);
+
+  // Pagination & Sorting States
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [sortOrder, setSortOrder] = useState('newest');
 
   // Filters
   const [filters, setFilters] = useState({
@@ -27,7 +32,26 @@ export default function HREmployeeDevices() {
 
   useEffect(() => {
     loadDeployments();
+
+    // Real-time listener for deployment changes
+    const channel = supabase
+      .channel('hr-deployments-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'employee_devices' },
+        () => loadDeployments() 
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  // Reset Pagination on Filter/Sort Change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortOrder]);
 
   const loadDeployments = async () => {
     setLoading(true);
@@ -42,29 +66,17 @@ export default function HREmployeeDevices() {
   };
 
   const handleViewSpecs = async (deployment) => {
-    // 1. Fetch main device specs (Laptop/Desktop)
     const deviceSpecs = await getDetailedDeviceSpecs(deployment.device_type, deployment.device_id);
     
-    // 2. ENRICHMENT STEP: Fetch full details for attached monitors
     let enrichedDeployment = { ...deployment };
     
     if (deployment.employee_monitors && deployment.employee_monitors.length > 0) {
       try {
         const enrichedMonitors = await Promise.all(
           deployment.employee_monitors.map(async (em) => {
-            // Ensure we have a valid monitor ID to query
-            if (!em.monitor_id) {
-              console.warn("Monitor ID missing for employee_monitor record:", em);
-              return em;
-            }
-
-            // Fetch detailed specs from monitors table via the updated service
+            if (!em.monitor_id) return em;
             const response = await getDetailedDeviceSpecs('MONITOR', em.monitor_id);
-            
-            // Normalize: If Supabase returns an array, take the first item
             const fullSpecs = Array.isArray(response) ? response[0] : response;
-
-            // If fetch returned valid data, use it. Otherwise fallback to existing data.
             return {
               ...em,
               monitors: fullSpecs || em.monitors
@@ -83,22 +95,6 @@ export default function HREmployeeDevices() {
     setIsSpecModalOpen(true);
   };
 
-  const handleDeleteClick = (deployment) => {
-    setDeleteConfirm(deployment);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (deleteConfirm) {
-      const result = await returnDevice(deleteConfirm.employee_device_id, 'Admin Override - Deployment Terminated');
-      if (result.success) {
-        setDeleteConfirm(null);
-        loadDeployments();
-      } else {
-        alert(`Failed to terminate deployment: ${result.error}`);
-      }
-    }
-  };
-
   const getDaysDeployed = (dateIssued) => {
     if (!dateIssued) return 0;
     const issued = new Date(dateIssued);
@@ -107,17 +103,34 @@ export default function HREmployeeDevices() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const filteredDeployments = deployments.filter(deployment => {
-    const matchesSearch = !filters.search || 
-      deployment.employees?.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      deployment.employees?.employee_code?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      deployment.device_asset_id?.toLowerCase().includes(filters.search.toLowerCase());
+  // 1. Filtering
+  const filteredDeployments = deployments.filter(d => {
+    const searchString = `${d.employees?.full_name} ${d.employees?.employee_code} ${d.device_asset_id || ''}`.toLowerCase();
+    const matchesSearch = searchString.includes(filters.search.toLowerCase());
+    const matchesType = !filters.deviceType || d.device_type === filters.deviceType;
+    const matchesDept = !filters.department || d.employees?.departments?.department_name === filters.department;
     
-    const matchesDeviceType = !filters.deviceType || deployment.device_type === filters.deviceType;
-    const matchesDepartment = !filters.department || deployment.employees?.departments?.department_name === filters.department;
-    
-    return matchesSearch && matchesDeviceType && matchesDepartment;
+    return matchesSearch && matchesType && matchesDept;
   });
+
+  // 2. Sorting
+  const sortedDeployments = [...filteredDeployments].sort((a, b) => {
+    if (sortOrder === 'newest') return new Date(b.date_issued) - new Date(a.date_issued);
+    if (sortOrder === 'oldest') return new Date(a.date_issued) - new Date(b.date_issued);
+    
+    const codeA = (a.employees?.employee_code || '').replace(/\s+/g, '');
+    const codeB = (b.employees?.employee_code || '').replace(/\s+/g, '');
+    if (sortOrder === 'ppb_desc') return codeB.localeCompare(codeA, undefined, { numeric: true, sensitivity: 'base' });
+    if (sortOrder === 'ppb_asc') return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+
+    return 0;
+  });
+
+  // 3. Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDeployments = sortedDeployments.slice(indexOfFirstItem, indexOfLastItem); 
+  const totalPages = Math.ceil(sortedDeployments.length / itemsPerPage);
 
   const stats = {
     total: deployments.length,
@@ -131,21 +144,9 @@ export default function HREmployeeDevices() {
       <div className="admin-header-card">
         <div className="header-title-group">
           <h1>Employee Devices</h1>
-          <div className="header-meta">Manage device assignments and deployments</div>
+          <div className="header-meta">View current device assignments across the organization</div>
         </div>
       </div>
-
-      {/* <div className="info-banner">
-        <Building2 className="info-banner-icon" size={20} />
-        <div className="info-banner-content">
-          <h4>Admin Role: View & Manage Deployments</h4>
-          <p>
-            As an Administrator, you can view all device deployments and terminate them if needed. 
-            <strong>Device deployment</strong> is handled by the IT team through their deployment interface. 
-            Use this page to monitor assignments and remove devices when employees leave or change roles.
-          </p>
-        </div>
-      </div> */}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
@@ -213,6 +214,32 @@ export default function HREmployeeDevices() {
             <option key={dept} value={dept}>{dept}</option>
           ))}
         </select>
+
+        <select 
+          className="admin-select"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          style={{ borderLeft: '2px solid #cbd5e1', marginLeft: 'auto' }}
+        >
+          <option value="newest">Sort: Most Recent</option>
+          <option value="oldest">Sort: Oldest</option>
+          <option value="ppb_desc">Sort: Highest ID</option>
+          <option value="ppb_asc">Sort: Lowest ID</option>
+        </select>
+
+        {(filters.search !== '' || filters.department !== '' || filters.deviceType !== '') && (
+          <button 
+            onClick={() => setFilters({ search: '', deviceType: '', department: '' })}
+            style={{ 
+              background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5', 
+              padding: '0 16px', borderRadius: '6px', fontSize: '0.875rem', 
+              fontWeight: 500, cursor: 'pointer', height: '38px', display: 'flex', alignItems: 'center'
+            }}
+            title="Clear all filters"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       <div className="admin-table-wrapper">
@@ -229,10 +256,10 @@ export default function HREmployeeDevices() {
           <tbody>
             {loading ? (
               <tr><td colSpan="5" className="admin-empty-state">Loading deployments...</td></tr>
-            ) : filteredDeployments.length === 0 ? (
+            ) : currentDeployments.length === 0 ? (
               <tr><td colSpan="5" className="admin-empty-state">No active deployments found.</td></tr>
             ) : (
-              filteredDeployments.map((deployment) => {
+              currentDeployments.map((deployment) => {
                 const daysDeployed = getDaysDeployed(deployment.date_issued);
                 const monitors = deployment.employee_monitors || [];
                 
@@ -299,13 +326,6 @@ export default function HREmployeeDevices() {
                         >
                           <Eye size={16} />
                         </button>
-                        <button 
-                          className="action-btn btn-delete" 
-                          onClick={() => handleDeleteClick(deployment)}
-                          title="Terminate Deployment"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -316,6 +336,24 @@ export default function HREmployeeDevices() {
         </table>
       </div>
 
+      {!loading && totalPages > 1 && (
+        <div className="admin-pagination">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+          >
+            Previous
+          </button>
+          <span>Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></span>
+          <button 
+            disabled={currentPage === totalPages} 
+            onClick={() => setCurrentPage(p => p + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       <NewSpecsModal_Admin 
         isOpen={isSpecModalOpen} 
         onClose={() => setIsSpecModalOpen(false)} 
@@ -323,25 +361,6 @@ export default function HREmployeeDevices() {
         type={viewSpecsType}
         deployment={selectedDeployment}
       />
-
-      {deleteConfirm && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-icon-wrapper">
-              <AlertTriangle size={32} />
-            </div>
-            <h3 className="confirm-title">Terminate Deployment?</h3>
-            <p className="confirm-desc">
-              You are about to terminate the deployment for <strong>{deleteConfirm.employees?.full_name}</strong>.
-              <br />This will return the device to available inventory and cannot be undone.
-            </p>
-            <div className="confirm-actions">
-              <button className="btn-cancel-modern" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn-delete-modern" onClick={handleDeleteConfirm}>Terminate</button>
-            </div>
-          </div> 
-        </div>
-      )}
     </div>
   );
 }

@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, Laptop, Monitor, HardDrive, Wrench, 
-  Activity, ArrowUpRight, AlertTriangle, Clock, 
-  Package, TrendingUp, Zap, CheckCircle2
+  Activity, ArrowRight, AlertTriangle, 
+  Package, TrendingUp, Zap, CheckCircle2, ShieldAlert, RotateCcw
 } from 'lucide-react';
+
 
 // Services
 import { getDashboardStats } from '../../services/adminService';
 import { getCurrentDeployments } from '../../services/deploymentService';
-import { getMaintenanceStatistics } from '../../services/maintenanceService';
+import { getRepairStatistics } from '../../services/repairService';
 import { getLaptops, getDesktops, getMonitors } from '../../services/deviceService';
 import '../../styles/it.css';
 
@@ -29,10 +30,9 @@ export default function IT() {
     total: 0
   });
 
-  const [maintenanceStats, setMaintenanceStats] = useState({
-    totalRecords: 0,
-    pendingRecords: 0,
-    inProgressRecords: 0,
+  const [repairStats, setRepairStats] = useState({
+    pendingRepairs: 0,
+    awaitingApproval: 0,
     completedThisMonth: 0
   });
 
@@ -47,11 +47,9 @@ export default function IT() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Load basic deployment stats
       const basicStats = await getDashboardStats();
       setStats(basicStats);
 
-      // Load device availability
       const [laptops, desktops, monitors] = await Promise.all([
         getLaptops({ status: 'available' }),
         getDesktops({ status: 'available' }),
@@ -67,21 +65,20 @@ export default function IT() {
         total: totalAvailable
       });
 
-      // Load maintenance data
-      const maintenanceData = await getMaintenanceStatistics();
-      setMaintenanceStats(maintenanceData);
+      // NEW: Fetching the updated repair workflow stats
+      const repairData = await getRepairStatistics();
+      setRepairStats(repairData);
 
-      // Load recent deployments for activity tracking
       const deployments = await getCurrentDeployments();
-      setRecentDeployments(deployments.slice(0, 6));
+      setRecentDeployments(deployments.slice(0, 5));
 
-      // Create maintenance alerts
       const alertsList = [];
-      if (maintenanceData.pendingRecords > 5) {
+      // NEW: Alert IT if they have pending repairs
+      if (repairData.pendingRepairs > 0) {
         alertsList.push({
           type: 'warning',
-          message: `${maintenanceData.pendingRecords} devices pending maintenance`,
-          action: 'View Repairs',
+          message: `${repairData.pendingRepairs} device(s) waiting for IT to fix`,
+          action: 'Fix Now',
           link: '/it/repairs'
         });
       }
@@ -89,8 +86,8 @@ export default function IT() {
       if (totalAvailable < 5) {
         alertsList.push({
           type: 'alert',
-          message: 'Low device inventory - consider procurement',
-          action: 'View Inventory',
+          message: 'Low overall device inventory',
+          action: 'Check Stock',
           link: '/it/laptops'
         });
       }
@@ -104,312 +101,196 @@ export default function IT() {
     }
   };
 
-  const handleQuickDeploy = () => {
-    navigate('/it/deploy');
-  };
-
-  const getStatusColor = (count, threshold) => {
-    if (count === 0) return 'critical';
-    if (count <= threshold) return 'warning';
-    return 'good';
-  };
-
   if (loading) {
-    return <div className="it-loading-screen">Loading IT Dashboard...</div>;
+    return (
+      <div className="it-dash-loading">
+        <div className="it-spinner"></div>
+        <p>Loading IT Operations Center...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="it-dashboard-container">
+    <div className="it-dash-wrapper">
       
-      {/* --- HEADER --- */}
-      <header className="it-header">
-        <div>
-          <h1 className="it-title">IT Operations Dashboard</h1>
-          <p className="it-subtitle">Device Management & Deployment Center</p>
+      {/* HEADER */}
+      <div className="it-dash-header">
+        <div className="it-dash-title-block">
+          <h1>IT Operations Center</h1>
+          <p>Overview of fleet inventory, deployments, and system health</p>
         </div>
-        <div className="header-actions">
-          <button 
-            className="quick-deploy-btn"
-            onClick={handleQuickDeploy}
-          >
-            <Zap size={18} />
-            Deploy Device
-          </button>
-        </div>
-      </header>
+        <button className="it-btn-primary" onClick={() => navigate('/it/deploy')}>
+          <Zap size={18} /> Deploy Device
+        </button>
+      </div>
 
-      {/* --- TOP METRICS (KPIs) --- */}
-      <div className="it-kpi-grid">
-        {/* Active Deployments */}
-        <div className="it-kpi-card" onClick={() => navigate('/it/employee-devices')}>
-          <div className="it-kpi-icon-wrapper purple">
-            <Package size={24} />
+      {/* TOP ROW: KEY METRICS */}
+      <div className="it-metrics-row">
+        <div className="it-metric-card" onClick={() => navigate('/it/employee-devices')}>
+          <div className="it-metric-icon bg-primary-light">
+            <Package size={24} className="text-primary" />
           </div>
-          <div className="it-kpi-content">
-            <span className="it-kpi-label">Active Deployments</span>
-            <span className="it-kpi-value">{stats.laptopsDeployed + stats.pcsDeployed}</span>
+          <div className="it-metric-info">
+            <span className="it-metric-title">Active Deployments</span>
+            <span className="it-metric-value">{stats.laptopsDeployed + stats.pcsDeployed}</span>
           </div>
-          <Activity className="it-kpi-arrow" size={20} />
         </div>
 
-        {/* Available Devices */}
-        <div className="it-kpi-card" onClick={() => navigate('/it/laptops')}>
-          <div className="it-kpi-icon-wrapper cyan">
-            <HardDrive size={24} />
+        <div className="it-metric-card" onClick={() => navigate('/it/laptops')}>
+          <div className="it-metric-icon bg-accent-light">
+            <HardDrive size={24} className="text-accent" />
           </div>
-          <div className="it-kpi-content">
-            <span className="it-kpi-label">Available Devices</span>
-            <span className="it-kpi-value">{deviceAvailability.total}</span>
+          <div className="it-metric-info">
+            <span className="it-metric-title">Total Available Stock</span>
+            <span className="it-metric-value">{deviceAvailability.total}</span>
           </div>
-          <TrendingUp className="it-kpi-arrow" size={20} />
         </div>
 
-        {/* Pending Repairs */}
-        <div className="it-kpi-card" onClick={() => navigate('/it/repairs')}>
-          <div className="it-kpi-icon-wrapper orange">
-            <Wrench size={24} />
+        <div className="it-metric-card" onClick={() => navigate('/it/repairs')}>
+          <div className="it-metric-icon bg-warning-light">
+            <Wrench size={24} className="text-warning" />
           </div>
-          <div className="it-kpi-content">
-            <span className="it-kpi-label">Pending Repairs</span>
-            <span className="it-kpi-value">{maintenanceStats.pendingRecords}</span>
+          <div className="it-metric-info">
+            <span className="it-metric-title">Active Repair Queue</span>
+            <span className="it-metric-value">{repairStats.pendingRepairs}</span>
           </div>
-          {maintenanceStats.pendingRecords > 0 && (
-            <span className="it-kpi-badge pulse">Action Needed</span>
+          {repairStats.pendingRepairs > 0 && <span className="it-status-dot pulse-warning"></span>}
+        </div>
+
+        <div className="it-metric-card">
+          <div className="it-metric-icon bg-secondary-light">
+            <Users size={24} className="text-secondary" />
+          </div>
+          <div className="it-metric-info">
+            <span className="it-metric-title">Active Employees</span>
+            <span className="it-metric-value">{stats.activeEmployees}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* MIDDLE ROW: TOOLS & INVENTORY OVERVIEW */}
+      <div className="it-middle-row">
+        
+        {/* Quick Tools */}
+        <div className="it-panel">
+          <div className="it-panel-header">
+            <h3>Quick Actions</h3>
+          </div>
+          <div className="it-tools-grid">
+            <button className="it-tool-btn" onClick={() => navigate('/it/deploy')}>
+              <Zap size={20} className="text-primary" />
+              <span>Deploy</span>
+            </button>
+            <button className="it-tool-btn" onClick={() => navigate('/it/returned-devices')}>
+              <RotateCcw size={20} className="text-accent" />
+              <span>Return</span>
+            </button>
+            <button className="it-tool-btn" onClick={() => navigate('/it/repairs')}>
+              <Wrench size={20} className="text-warning" />
+              <span>Repair</span>
+            </button>
+            <button className="it-tool-btn" onClick={() => navigate('/it/deployment-history')}>
+              <Activity size={20} className="text-secondary" />
+              <span>History</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Inventory Overview & Alerts */}
+        <div className="it-panel">
+          <div className="it-panel-header">
+            <h3>Live Inventory & Health</h3>
+            <button className="it-link-text" onClick={() => navigate('/it/laptops')}>View Full Fleet <ArrowRight size={14}/></button>
+          </div>
+          
+          <div className="it-inventory-overview">
+            <div className="it-inv-item">
+              <div className="it-inv-label"><Laptop size={16}/> Laptops</div>
+              <div className="it-inv-track">
+                <div className="it-inv-bar bg-primary" style={{ width: `${Math.min((deviceAvailability.laptops / 20) * 100, 100)}%` }}></div>
+              </div>
+              <div className="it-inv-count">{deviceAvailability.laptops} ready</div>
+            </div>
+            
+            <div className="it-inv-item">
+              <div className="it-inv-label"><HardDrive size={16}/> Desktops</div>
+              <div className="it-inv-track">
+                <div className="it-inv-bar bg-accent" style={{ width: `${Math.min((deviceAvailability.desktops / 20) * 100, 100)}%` }}></div>
+              </div>
+              <div className="it-inv-count">{deviceAvailability.desktops} ready</div>
+            </div>
+
+            <div className="it-inv-item">
+              <div className="it-inv-label"><Monitor size={16}/> Monitors</div>
+              <div className="it-inv-track">
+                <div className="it-inv-bar bg-secondary" style={{ width: `${Math.min((deviceAvailability.monitors / 50) * 100, 100)}%` }}></div>
+              </div>
+              <div className="it-inv-count">{deviceAvailability.monitors} ready</div>
+            </div>
+          </div>
+
+          {/* Condensed Alerts */}
+          {maintenanceAlerts.length > 0 && (
+            <div className="it-alerts-mini">
+              {maintenanceAlerts.map((alert, i) => (
+                <div key={i} className={`it-alert-pill ${alert.type}`}>
+                  <ShieldAlert size={14} />
+                  <span>{alert.message}</span>
+                  <button onClick={() => navigate(alert.link)}>{alert.action}</button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      <div className="it-main-grid">
-        
-        {/* --- LEFT COLUMN: DEVICE AVAILABILITY & QUICK ACTIONS --- */}
-        <div className="it-column">
-          
-          {/* Device Availability */}
-          <div className="it-section-card">
-            <div className="it-section-header">
-              <h2 className="it-section-title">Device Availability</h2>
-              <span className="it-badge stock">Stock</span>
-            </div>
-            
-            <div className="device-availability-list">
-              {/* Laptops */}
-              <div className="device-availability-item">
-                <div className="device-info">
-                  <div className="device-icon-wrapper blue">
-                    <Laptop size={20} />
-                  </div>
-                  <div className="device-details">
-                    <span className="device-name">Laptops</span>
-                    <span className="device-count">{deviceAvailability.laptops} available</span>
-                  </div>
-                </div>
-                <div className={`status-indicator ${getStatusColor(deviceAvailability.laptops, 3)}`}>
-                  <span className="status-dot"></span>
-                </div>
-              </div>
-
-              {/* Desktops */}
-              <div className="device-availability-item">
-                <div className="device-info">
-                  <div className="device-icon-wrapper indigo">
-                    <HardDrive size={20} />
-                  </div>
-                  <div className="device-details">
-                    <span className="device-name">Desktops</span>
-                    <span className="device-count">{deviceAvailability.desktops} available</span>
-                  </div>
-                </div>
-                <div className={`status-indicator ${getStatusColor(deviceAvailability.desktops, 2)}`}>
-                  <span className="status-dot"></span>
-                </div>
-              </div>
-
-              {/* Monitors */}
-              <div className="device-availability-item">
-                <div className="device-info">
-                  <div className="device-icon-wrapper teal">
-                    <Monitor size={20} />
-                  </div>
-                  <div className="device-details">
-                    <span className="device-name">Monitors</span>
-                    <span className="device-count">{deviceAvailability.monitors} available</span>
-                  </div>
-                </div>
-                <div className={`status-indicator ${getStatusColor(deviceAvailability.monitors, 5)}`}>
-                  <span className="status-dot"></span>
-                </div>
-              </div>
-            </div>
-
-            <button 
-              className="it-view-all-btn"
-              onClick={() => navigate('/it/laptops')}
-            >
-              View Full Inventory
-              <ArrowUpRight size={16} />
-            </button>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="it-section-card">
-            <div className="it-section-header">
-              <h2 className="it-section-title">Quick Actions</h2>
-              <span className="it-badge tools">Tools</span>
-            </div>
-            
-            <div className="quick-actions-grid">
-              <button 
-                className="quick-action-btn deploy"
-                onClick={() => navigate('/it/deploy')}
-              >
-                <div className="action-icon">
-                  <Zap size={20} />
-                </div>
-                <span>Deploy Device</span>
-              </button>
-              
-              <button 
-                className="quick-action-btn return"
-                onClick={() => navigate('/it/returned-devices')}
-              >
-                <div className="action-icon">
-                  <Package size={20} />
-                </div>
-                <span>Process Returns</span>
-              </button>
-              
-              <button 
-                className="quick-action-btn maintenance"
-                onClick={() => navigate('/it/repairs')}
-              >
-                <div className="action-icon">
-                  <Wrench size={20} />
-                </div>
-                <span>Maintenance</span>
-              </button>
-              
-              <button 
-                className="quick-action-btn history"
-                onClick={() => navigate('/it/deployment-history')}
-              >
-                <div className="action-icon">
-                  <Activity size={20} />
-                </div>
-                <span>History</span>
-              </button>
-            </div>
-          </div>
-
-          {/* System Alerts */}
-          <div className="it-section-card">
-            <div className="it-section-header">
-              <h2 className="it-section-title">System Alerts</h2>
-              <span className={`it-badge ${maintenanceAlerts.length > 0 ? 'alert' : 'success'}`}>
-                {maintenanceAlerts.length}
-              </span>
-            </div>
-            
-            <div className="alerts-container">
-              {maintenanceAlerts.length > 0 ? (
-                maintenanceAlerts.map((alert, index) => (
-                  <div key={index} className={`alert-item ${alert.type}`}>
-                    <div className="alert-icon">
-                      <AlertTriangle size={18} />
-                    </div>
-                    <div className="alert-content">
-                      <p className="alert-message">{alert.message}</p>
-                      <button 
-                        className="alert-action-btn"
-                        onClick={() => navigate(alert.link)}
-                      >
-                        {alert.action}
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="no-alerts">
-                  <CheckCircle2 size={48} style={{ color: '#10b981', marginBottom: '8px' }} />
-                  <p>All systems operational</p>
-                </div>
-              )}
-            </div>
-          </div>
+      {/* BOTTOM ROW: COMPACT RECENT DEPLOYMENTS */}
+      <div className="it-panel it-recent-panel">
+        <div className="it-panel-header">
+          <h3>Recent Deployments</h3>
+          <button className="it-link-text" onClick={() => navigate('/it/deployment-history')}>View History <ArrowRight size={14}/></button>
         </div>
-
-        {/* --- RIGHT COLUMN: RECENT ACTIVITY --- */}
-        <div className="it-column">
-          
-          {/* Recent Deployments */}
-          <div className="it-section-card full-height">
-            <div className="it-section-header-with-action">
-              <h2 className="it-section-title">Recent Deployments</h2>
-              <div className="header-right">
-                <span className="today-badge">
-                  Today: {recentDeployments.filter(d => 
-                    new Date(d.date_issued).toDateString() === new Date().toDateString()
-                  ).length}
-                </span>
-                <button 
-                  className="it-link-btn"
-                  onClick={() => navigate('/it/deployment-history')}
-                >
-                  View All
-                </button>
-              </div>
-            </div>
-
-            <div className="deployment-timeline">
-              {recentDeployments.length > 0 ? (
-                recentDeployments.map((deployment) => (
-                  <div key={deployment.employee_device_id} className="timeline-item">
-                    <div className="timeline-marker">
-                      <div className={`timeline-icon ${deployment.device_type === 'LAPTOP' ? 'blue' : 'indigo'}`}>
-                        {deployment.device_type === 'LAPTOP' ? (
-                          <Laptop size={14} />
-                        ) : (
-                          <HardDrive size={14} />
-                        )}
-                      </div>
-                    </div>
-                    <div className="timeline-content">
-                      <div className="deployment-header">
-                        <span className="employee-name">
-                          {deployment.employees?.full_name}
-                        </span>
-                        {deployment.employee_monitors?.length > 0 && (
-                          <span className="monitor-count">
-                            +{deployment.employee_monitors.length} <Monitor size={12} />
-                          </span>
-                        )}
-                      </div>
-                      <div className="deployment-details">
-                        <span className="department">
-                          {deployment.employees?.departments?.department_name || 'No Department'}
-                        </span>
-                        <span className="deployment-date">
-                          {new Date(deployment.date_issued).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
+        
+        <div className="it-compact-table-wrapper">
+          <table className="it-compact-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Department</th>
+                <th>Device</th>
+                <th>Date Issued</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentDeployments.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="it-empty-table">No recent deployments.</td>
+                </tr>
               ) : (
-                <div className="no-deployments">
-                  <Package size={48} style={{ color: '#cbd5e1', marginBottom: '12px' }} />
-                  <p>No recent deployments</p>
-                  <button 
-                    className="deploy-first-btn"
-                    onClick={handleQuickDeploy}
-                  >
-                    Deploy First Device
-                  </button>
-                </div>
+                recentDeployments.map((dep) => (
+                  <tr key={dep.employee_device_id}>
+                    <td className="font-medium">{dep.employees?.full_name || 'Unknown'}</td>
+                    <td className="text-subtle">{dep.employees?.departments?.department_name || 'N/A'}</td>
+                    <td>
+                      <div className="it-table-device">
+                        {dep.device_type === 'LAPTOP' ? <Laptop size={14} className="text-primary"/> : <HardDrive size={14} className="text-accent"/>}
+                        {dep.device_asset_id || dep.device_type}
+                        {dep.employee_monitors?.length > 0 && <span className="it-mini-badge">+{dep.employee_monitors.length} Mon</span>}
+                      </div>
+                    </td>
+                    <td className="text-subtle">{new Date(dep.date_issued).toLocaleDateString()}</td>
+                    <td>
+                      <span className="it-status-pill success"><CheckCircle2 size={12}/> Active</span>
+                    </td>
+                  </tr>
+                ))
               )}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
+      
     </div>
   );
 }

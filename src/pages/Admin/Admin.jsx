@@ -1,23 +1,21 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, Laptop, Monitor, HardDrive, Wrench, 
-  Activity, ArrowUpRight, AlertCircle, Clock, 
-  Package, TrendingUp, CheckCircle
+  Activity, ArrowRight, ShieldCheck, 
+  Package, TrendingUp, Building2, Server
 } from 'lucide-react';
 
-// Services - Replace these with your actual service imports
+// Services
 import { getDashboardStats } from '../../services/adminService';
 import { getLaptops, getDesktops, getMonitors } from '../../services/deviceService';
-import { getMaintenanceStatistics } from '../../services/maintenanceService';
+import { getRepairStatistics } from '../../services/repairService';
 import { getCurrentDeployments } from '../../services/deploymentService';
 import './../../styles/admin.css';
 
 export default function Admin() {
-  const navigate = (path) => {
-    // Replace with your actual navigation logic
-    // For React Router: const navigate = useNavigate(); then navigate(path);
-    console.log('Navigate to:', path);
-  };
+  // Activated actual React Router navigation!
+  const navigate = useNavigate();
   
   const [stats, setStats] = useState({
     activeEmployees: 0,
@@ -26,24 +24,18 @@ export default function Admin() {
   });
   
   const [inventoryStats, setInventoryStats] = useState({
-    totalLaptops: 0,
-    availableLaptops: 0,
-    issuedLaptops: 0,
-    maintenanceLaptops: 0,
-    totalDesktops: 0,
-    availableDesktops: 0,
-    issuedDesktops: 0,
-    maintenanceDesktops: 0,
-    totalMonitors: 0,
-    availableMonitors: 0,
-    issuedMonitors: 0,
-    maintenanceMonitors: 0
+    totalLaptops: 0, availableLaptops: 0, issuedLaptops: 0, maintenanceLaptops: 0,
+    totalDesktops: 0, availableDesktops: 0, issuedDesktops: 0, maintenanceDesktops: 0,
+    totalMonitors: 0, availableMonitors: 0, issuedMonitors: 0, maintenanceMonitors: 0
   });
 
   const [maintenanceStats, setMaintenanceStats] = useState({
-    totalRecords: 0,
-    pendingRecords: 0,
-    inProgressRecords: 0,
+    totalRecords: 0, pendingRecords: 0, inProgressRecords: 0, completedThisMonth: 0
+  });
+
+  const [repairStats, setRepairStats] = useState({
+    pendingRepairs: 0, 
+    awaitingApproval: 0, 
     completedThisMonth: 0
   });
 
@@ -57,40 +49,35 @@ export default function Admin() {
   const loadDashboardData = async () => {
     try {
       const [
-        dashboardStats,
-        laptops,
-        desktops,
-        monitors,
-        maintenance,
-        deployments
+        dashboardStats, laptops, desktops, monitors, repairs, deployments
       ] = await Promise.all([
         getDashboardStats(),
-        getLaptops({}),
-        getDesktops({}),
-        getMonitors({}),
-        getMaintenanceStatistics(),
-        getCurrentDeployments({ limit: 5 }) 
+        getLaptops({}), getDesktops({}), getMonitors({}),
+        getRepairStatistics(), // <-- NEW: Fetching the updated workflow stats
+        getCurrentDeployments()
       ]);
 
       setStats(dashboardStats);
 
       setInventoryStats({
         totalLaptops: laptops.length,
-        availableLaptops: laptops.filter(d => d.status === 'available').length,
-        issuedLaptops: laptops.filter(d => d.status === 'issued').length,
-        maintenanceLaptops: laptops.filter(d => d.status === 'maintenance' || d.status === 'under_repair').length,
+        availableLaptops: laptops.filter(d => d.status?.toLowerCase() === 'available').length,
+        issuedLaptops: laptops.filter(d => d.status?.toLowerCase() === 'issued').length,
+        maintenanceLaptops: laptops.filter(d => ['maintenance', 'under_repair'].includes(d.status?.toLowerCase())).length,
+        
         totalDesktops: desktops.length,
-        availableDesktops: desktops.filter(d => d.status === 'available').length,
-        issuedDesktops: desktops.filter(d => d.status === 'issued').length,
-        maintenanceDesktops: desktops.filter(d => d.status === 'maintenance' || d.status === 'under_repair').length,
+        availableDesktops: desktops.filter(d => d.status?.toLowerCase() === 'available').length,
+        issuedDesktops: desktops.filter(d => d.status?.toLowerCase() === 'issued').length,
+        maintenanceDesktops: desktops.filter(d => ['maintenance', 'under_repair'].includes(d.status?.toLowerCase())).length,
+        
         totalMonitors: monitors.length,
-        availableMonitors: monitors.filter(d => d.status === 'available').length,
-        issuedMonitors: monitors.filter(d => d.status === 'issued').length,
-        maintenanceMonitors: monitors.filter(d => d.status === 'maintenance' || d.status === 'under_repair').length,
+        availableMonitors: monitors.filter(d => d.status?.toLowerCase() === 'available').length,
+        issuedMonitors: monitors.filter(d => d.status?.toLowerCase() === 'issued').length,
+        maintenanceMonitors: monitors.filter(d => ['maintenance', 'under_repair'].includes(d.status?.toLowerCase())).length,
       });
 
-      setMaintenanceStats(maintenance);
-      setRecentActivity(deployments);
+      setRepairStats(repairs);
+      setRecentActivity(deployments.slice(0, 5));
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -104,389 +91,229 @@ export default function Admin() {
   };
 
   if (loading) {
-    return <div className="admin-loading-screen">Initializing Dashboard...</div>;
+    return (
+      <div className="admin-dash-loading">
+        <div className="admin-spinner"></div>
+        <p>Loading Executive Dashboard...</p>
+      </div>
+    );
   }
 
+  const totalFleet = inventoryStats.totalLaptops + inventoryStats.totalDesktops + inventoryStats.totalMonitors;
+
   return (
-    <div className="admin-dashboard-container">
+    <div className="admin-dash-wrapper">
       
-      {/* --- HEADER --- */}
-      <header className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Admin Dashboard</h1>
-          <p className="dashboard-subtitle">Overview of your IT asset management system</p>
+      {/* HEADER */}
+      <div className="admin-dash-header">
+        <div className="admin-dash-title-block">
+          <h1>Executive Dashboard</h1>
+          <p>Top-level overview of company assets, personnel, and system health</p>
         </div>
-        <div className="header-date">
-          <Clock size={16} />
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </div>
-      </header>
-
-      {/* --- TOP METRICS (KPIs) --- */}
-      <div className="kpi-grid">
-        {/* Active Employees */}
-        <div className="kpi-card" onClick={() => navigate('/admin/employees')}>
-          <div className="kpi-icon-wrapper blue">
-            <Users size={24} />
-          </div>
-          <div className="kpi-content">
-            <span className="kpi-label">Active Employees</span>
-            <span className="kpi-value">{stats.activeEmployees}</span>
-          </div>
-          <TrendingUp className="kpi-arrow" size={20} />
-        </div>
-
-        {/* Total Deployments */}
-        <div className="kpi-card" onClick={() => navigate('/admin/employee-devices')}>
-          <div className="kpi-icon-wrapper emerald">
-            <Package size={24} />
-          </div>
-          <div className="kpi-content">
-            <span className="kpi-label">Active Deployments</span>
-            <span className="kpi-value">{stats.laptopsDeployed + stats.pcsDeployed}</span>
-          </div>
-          <Activity className="kpi-arrow" size={20} />
-        </div>
-
-        {/* Pending Repairs */}
-        <div className="kpi-card" onClick={() => navigate('/admin/maintenance')}>
-          <div className="kpi-icon-wrapper amber">
-            <AlertCircle size={24} />
-          </div>
-          <div className="kpi-content">
-            <span className="kpi-label">Pending Repairs</span>
-            <span className="kpi-value">{maintenanceStats.pendingRecords}</span>
-          </div>
-          {maintenanceStats.pendingRecords > 0 && (
-            <span className="kpi-badge pulse">Action Needed</span>
-          )}
-        </div>
-
-        {/* Completed This Month */}
-        <div className="kpi-card">
-          <div className="kpi-icon-wrapper emerald">
-            <CheckCircle size={24} />
-          </div>
-          <div className="kpi-content">
-            <span className="kpi-label">Completed This Month</span>
-            <span className="kpi-value">{maintenanceStats.completedThisMonth}</span>
-          </div>
-          <Clock className="kpi-arrow" size={20} />
+        <div className="admin-header-badge">
+          <ShieldCheck size={18} /> Admin Access
         </div>
       </div>
 
-      <div className="dashboard-main-grid">
+      {/* TOP ROW: KEY METRICS */}
+      <div className="admin-metrics-row">
+        <div className="admin-metric-card" onClick={() => navigate('/admin/employees')}>
+          <div className="admin-metric-icon bg-indigo-light">
+            <Users size={24} className="text-indigo" />
+          </div>
+          <div className="admin-metric-info">
+            <span className="admin-metric-title">Active Employees</span>
+            <span className="admin-metric-value">{stats.activeEmployees}</span>
+          </div>
+        </div>
+
+        <div className="admin-metric-card" onClick={() => navigate('/admin/laptops')}>
+          <div className="admin-metric-icon bg-blue-light">
+            <Server size={24} className="text-blue" />
+          </div>
+          <div className="admin-metric-info">
+            <span className="admin-metric-title">Total IT Fleet</span>
+            <span className="admin-metric-value">{totalFleet}</span>
+          </div>
+        </div>
+
+        <div className="admin-metric-card" onClick={() => navigate('/admin/employee-devices')}>
+          <div className="admin-metric-icon bg-teal-light">
+            <Package size={24} className="text-teal" />
+          </div>
+          <div className="admin-metric-info">
+            <span className="admin-metric-title">Active Deployments</span>
+            <span className="admin-metric-value">{stats.laptopsDeployed + stats.pcsDeployed}</span>
+          </div>
+        </div>
+
+        <div className="admin-metric-card" onClick={() => navigate('/admin/maintenance')}>
+          <div className="admin-metric-icon bg-amber-light">
+            <Wrench size={24} className="text-amber" />
+          </div>
+          <div className="admin-metric-info">
+            <span className="admin-metric-title">Pending Approvals</span>
+            <span className="admin-metric-value">{repairStats.awaitingApproval}</span>
+          </div>
+          {repairStats.awaitingApproval > 0 && <span className="admin-status-dot pulse-amber"></span>}
+        </div>
+      </div>
+
+      {/* MIDDLE ROW: UTILIZATION & QUICK LINKS */}
+      <div className="admin-middle-row">
         
-        {/* --- LEFT COLUMN: INVENTORY --- */}
-        <div className="dashboard-column">
-          <h2 className="section-header">Inventory Overview</h2>
+        {/* Fleet Utilization Panel */}
+        <div className="admin-panel admin-utilization-panel">
+          <div className="admin-panel-header">
+            <h3>Fleet Utilization</h3>
+            <button className="admin-link-text" onClick={() => navigate('/admin/laptops')}>View Inventory <ArrowRight size={14}/></button>
+          </div>
           
-          {/* Laptops */}
-          <div className="inventory-card" onClick={() => navigate('/admin/laptops')}>
-            <div className="inv-header">
-              <div className="inv-title">
-                <Laptop size={20} className="text-blue-500" />
-                <span>Laptops</span>
+          <div className="admin-utilization-grid">
+            {/* Laptops */}
+            <div className="admin-util-item">
+              <div className="admin-util-header">
+                <div className="admin-util-label"><Laptop size={16}/> Laptops</div>
+                <div className="admin-util-percent">{calculateUtilization(inventoryStats.issuedLaptops, inventoryStats.totalLaptops)}% Deployed</div>
               </div>
-              <div className="inv-total">{inventoryStats.totalLaptops} Units</div>
-            </div>
-            
-            {/* Utilization Metric */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '16px',
-              padding: '12px',
-              background: '#f8fafc',
-              borderRadius: '8px'
-            }}>
-              <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>
-                Utilization Rate
-              </span>
-              <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>
-                {calculateUtilization(inventoryStats.issuedLaptops, inventoryStats.totalLaptops)}%
-              </span>
-            </div>
-
-            {/* Status Breakdown */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: '12px',
-              marginBottom: '16px'
-            }}>
-              <div style={{ 
-                background: '#ecfdf5', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Available</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#10b981', margin: 0 }}>
-                  {inventoryStats.availableLaptops}
-                </p>
+              <div className="admin-util-track">
+                <div className="admin-util-bar issued" style={{ width: `${calculateUtilization(inventoryStats.issuedLaptops, inventoryStats.totalLaptops)}%` }}></div>
+                <div className="admin-util-bar maintenance" style={{ width: `${calculateUtilization(inventoryStats.maintenanceLaptops, inventoryStats.totalLaptops)}%` }}></div>
               </div>
-              <div style={{ 
-                background: '#eff6ff', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Deployed</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#3b82f6', margin: 0 }}>
-                  {inventoryStats.issuedLaptops}
-                </p>
-              </div>
-              <div style={{ 
-                background: '#fff7ed', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Maintenance</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#f97316', margin: 0 }}>
-                  {inventoryStats.maintenanceLaptops}
-                </p>
+              <div className="admin-util-stats">
+                <span><strong>{inventoryStats.issuedLaptops}</strong> Issued</span>
+                <span><strong>{inventoryStats.availableLaptops}</strong> Available</span>
+                <span className="text-amber"><strong>{inventoryStats.maintenanceLaptops}</strong> Repair</span>
               </div>
             </div>
 
-            <div className="inv-deploy-stat">
-              <span className="dot deployed"></span> {stats.laptopsDeployed} Currently Deployed
-            </div>
-          </div>
-
-          {/* Desktops */}
-          <div className="inventory-card" onClick={() => navigate('/admin/desktops')}>
-            <div className="inv-header">
-              <div className="inv-title">
-                <HardDrive size={20} className="text-indigo-500" />
-                <span>Desktops</span>
+            {/* Desktops */}
+            <div className="admin-util-item">
+              <div className="admin-util-header">
+                <div className="admin-util-label"><HardDrive size={16}/> Desktops</div>
+                <div className="admin-util-percent">{calculateUtilization(inventoryStats.issuedDesktops, inventoryStats.totalDesktops)}% Deployed</div>
               </div>
-              <div className="inv-total">{inventoryStats.totalDesktops} Units</div>
-            </div>
-            
-            {/* Utilization Metric */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '16px',
-              padding: '12px',
-              background: '#f8fafc',
-              borderRadius: '8px'
-            }}>
-              <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>
-                Utilization Rate
-              </span>
-              <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>
-                {calculateUtilization(inventoryStats.issuedDesktops, inventoryStats.totalDesktops)}%
-              </span>
-            </div>
-
-            {/* Status Breakdown */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: '12px',
-              marginBottom: '16px'
-            }}>
-              <div style={{ 
-                background: '#ecfdf5', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Available</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#10b981', margin: 0 }}>
-                  {inventoryStats.availableDesktops}
-                </p>
+              <div className="admin-util-track">
+                <div className="admin-util-bar issued" style={{ width: `${calculateUtilization(inventoryStats.issuedDesktops, inventoryStats.totalDesktops)}%` }}></div>
+                <div className="admin-util-bar maintenance" style={{ width: `${calculateUtilization(inventoryStats.maintenanceDesktops, inventoryStats.totalDesktops)}%` }}></div>
               </div>
-              <div style={{ 
-                background: '#eef2ff', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Deployed</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#6366f1', margin: 0 }}>
-                  {inventoryStats.issuedDesktops}
-                </p>
-              </div>
-              <div style={{ 
-                background: '#fff7ed', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Maintenance</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#f97316', margin: 0 }}>
-                  {inventoryStats.maintenanceDesktops}
-                </p>
+              <div className="admin-util-stats">
+                <span><strong>{inventoryStats.issuedDesktops}</strong> Issued</span>
+                <span><strong>{inventoryStats.availableDesktops}</strong> Available</span>
+                <span className="text-amber"><strong>{inventoryStats.maintenanceDesktops}</strong> Repair</span>
               </div>
             </div>
 
-            <div className="inv-deploy-stat">
-              <span className="dot deployed"></span> {stats.pcsDeployed} Currently Deployed
-            </div>
-          </div>
-
-          {/* Monitors */}
-          <div className="inventory-card" onClick={() => navigate('/admin/monitors')}>
-            <div className="inv-header">
-              <div className="inv-title">
-                <Monitor size={20} className="text-teal-500" />
-                <span>Monitors</span>
+            {/* Monitors */}
+            <div className="admin-util-item">
+              <div className="admin-util-header">
+                <div className="admin-util-label"><Monitor size={16}/> Monitors</div>
+                <div className="admin-util-percent">{calculateUtilization(inventoryStats.issuedMonitors, inventoryStats.totalMonitors)}% Deployed</div>
               </div>
-              <div className="inv-total">{inventoryStats.totalMonitors} Units</div>
-            </div>
-            
-            {/* Utilization Metric */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '16px',
-              padding: '12px',
-              background: '#f8fafc',
-              borderRadius: '8px'
-            }}>
-              <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>
-                Utilization Rate
-              </span>
-              <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>
-                {calculateUtilization(inventoryStats.issuedMonitors, inventoryStats.totalMonitors)}%
-              </span>
-            </div>
-
-            {/* Status Breakdown */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: '12px',
-              marginBottom: '16px'
-            }}>
-              <div style={{ 
-                background: '#ecfdf5', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Available</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#10b981', margin: 0 }}>
-                  {inventoryStats.availableMonitors}
-                </p>
+              <div className="admin-util-track">
+                <div className="admin-util-bar issued" style={{ width: `${calculateUtilization(inventoryStats.issuedMonitors, inventoryStats.totalMonitors)}%` }}></div>
+                <div className="admin-util-bar maintenance" style={{ width: `${calculateUtilization(inventoryStats.maintenanceMonitors, inventoryStats.totalMonitors)}%` }}></div>
               </div>
-              <div style={{ 
-                background: '#f0fdfa', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Deployed</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#14b8a6', margin: 0 }}>
-                  {inventoryStats.issuedMonitors}
-                </p>
-              </div>
-              <div style={{ 
-                background: '#fff7ed', 
-                padding: '12px', 
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Maintenance</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 700, color: '#f97316', margin: 0 }}>
-                  {inventoryStats.maintenanceMonitors}
-                </p>
+              <div className="admin-util-stats">
+                <span><strong>{inventoryStats.issuedMonitors}</strong> Issued</span>
+                <span><strong>{inventoryStats.availableMonitors}</strong> Available</span>
+                <span className="text-amber"><strong>{inventoryStats.maintenanceMonitors}</strong> Repair</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* --- RIGHT COLUMN: ACTIVITY & MAINTENANCE --- */}
-        <div className="dashboard-column">
+        {/* Right Column: Admin Actions & Maintenance Summary */}
+        <div className="admin-actions-column">
           
-          {/* Recent Deployments Feed */}
-          <div className="section-header-wrapper">
-            <h2 className="section-header">Recent Activity</h2>
-            <button className="btn-link" onClick={() => navigate('/admin/employee-devices')}>
-              View All
-            </button>
+          <div className="admin-panel">
+            <div className="admin-panel-header">
+              <h3>Admin Controls</h3>
+            </div>
+            <div className="admin-tools-grid">
+              <button className="admin-tool-btn" onClick={() => navigate('/admin/employees')}>
+                <Users size={20} className="text-indigo" />
+                <span>Personnel</span>
+              </button>
+              <button className="admin-tool-btn" onClick={() => navigate('/admin/departments')}>
+                <Building2 size={20} className="text-blue" />
+                <span>Departments</span>
+              </button>
+              {/* Changed from Reports to System Users so it links properly! */}
+              <button className="admin-tool-btn" onClick={() => navigate('/admin/users')}>
+                <ShieldCheck size={20} className="text-teal" />
+                <span>System Users</span>
+              </button>
+              <button className="admin-tool-btn" onClick={() => navigate('/admin/maintenance')}>
+                <Wrench size={20} className="text-amber" />
+                <span>Maintenance</span>
+              </button>
+            </div>
           </div>
 
-          <div className="activity-feed-card">
-            {recentActivity.length > 0 ? (
-              recentActivity.map((item, index) => (
-                <div key={index} className="activity-item">
-                  <div className={`activity-icon-box ${item.device_type === 'LAPTOP' ? 'bg-blue' : 'bg-indigo'}`}>
-                    {item.device_type === 'LAPTOP' ? <Laptop size={16} /> : <HardDrive size={16} />}
-                  </div>
-                  
-                  <div className="activity-details">
-                    <p className="activity-main-text">
-                      <strong>{item.employees?.full_name || item.employee_name}</strong> received a device
-                    </p>
-                    <p className="activity-sub-text">
-                      {item.employees?.departments?.department_name || 'No Department'}
-                    </p>
-                  </div>
-
-                  <div className="activity-meta">
-                    <span className="activity-date">
-                      {new Date(item.date_issued || item.date_deployed).toLocaleDateString()}
-                    </span>
-                    {item.employee_monitors?.length > 0 && (
-                      <span className="monitor-badge">
-                        +{item.employee_monitors.length} <Monitor size={10} />
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">
-                <Package size={48} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
-                <p>No recent activity recorded</p>
-              </div>
-            )}
-          </div>
-
-          {/* Maintenance Summary Widget */}
-          <div className="maintenance-summary-card" onClick={() => navigate('/admin/maintenance')}>
-            <div className="maint-icon">
-              <Wrench size={24} />
-            </div>
-            <div className="maint-content">
-              <h3>Maintenance Overview</h3>
-              <p>{maintenanceStats.inProgressRecords} repairs currently in progress</p>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                marginTop: '16px',
-                paddingTop: '16px',
-                borderTop: '1px solid rgba(255,255,255,0.1)'
-              }}>
+          <div className="admin-summary-card" onClick={() => navigate('/admin/maintenance')} style={{ cursor: 'pointer' }}>
+            <div className="admin-summary-content">
+              <h3>Maintenance Pipeline</h3>
+              <div className="admin-summary-stats">
                 <div>
-                  <p style={{ fontSize: '0.875rem', opacity: 0.7, margin: '0 0 4px 0' }}>Total Records</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                    {maintenanceStats.totalRecords}
-                  </p>
+                  <span className="summary-val">{repairStats.awaitingApproval}</span>
+                  <span className="summary-lbl">Needs Review</span>
                 </div>
+                <div className="summary-divider"></div>
                 <div>
-                  <p style={{ fontSize: '0.875rem', opacity: 0.7, margin: '0 0 4px 0' }}>Completed</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                    {maintenanceStats.completedThisMonth}
-                  </p>
+                  <span className="summary-val">{repairStats.completedThisMonth}</span>
+                  <span className="summary-lbl">Done this Month</span>
                 </div>
               </div>
-            </div>
-            <div className="maint-action">
-              <ArrowUpRight size={20} />
             </div>
           </div>
 
         </div>
       </div>
+
+      {/* BOTTOM ROW: COMPACT RECENT ACTIVITY */}
+      <div className="admin-panel admin-recent-panel">
+        <div className="admin-panel-header">
+          <h3>Recent Asset Assignments</h3>
+          <button className="admin-link-text" onClick={() => navigate('/admin/employee-devices')}>View All Activity <ArrowRight size={14}/></button>
+        </div>
+        
+        <div className="admin-compact-table-wrapper">
+          <table className="admin-compact-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Department</th>
+                <th>Device Tracked</th>
+                <th>Date Deployed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentActivity.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="admin-empty-table">No recent deployment activity.</td>
+                </tr>
+              ) : (
+                recentActivity.map((dep) => (
+                  <tr key={dep.employee_device_id}>
+                    <td className="font-medium">{dep.employees?.full_name || dep.employee_name || 'Unknown'}</td>
+                    <td className="text-subtle">{dep.employees?.departments?.department_name || 'N/A'}</td>
+                    <td>
+                      <div className="admin-table-device">
+                        {dep.device_type === 'LAPTOP' ? <Laptop size={14} className="text-blue"/> : <HardDrive size={14} className="text-indigo"/>}
+                        {dep.device_asset_id || dep.device_type}
+                        {dep.employee_monitors?.length > 0 && <span className="admin-mini-badge">+{dep.employee_monitors.length} Mon</span>}
+                      </div>
+                    </td>
+                    <td className="text-subtle">{new Date(dep.date_issued || dep.date_deployed).toLocaleDateString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
     </div>
   );
 }

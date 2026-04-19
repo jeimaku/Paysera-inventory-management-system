@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { 
-  Users, Package, RotateCcw, Calendar, Monitor, Eye, Search, HardDrive, 
-  Laptop, Building2, Zap, AlertTriangle, User
+  Users, RotateCcw, Calendar, Eye, Search, HardDrive, 
+  Laptop, Building2, Zap, AlertTriangle, User, MonitorSmartphone
 } from 'lucide-react';
 import { getCurrentDeployments, returnDevice, getDetailedDeviceSpecs } from '../../services/deploymentService';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
 
-// Import the new IT-themed CSS
 import '../../styles/it-employee-devices.css';
 import '../../styles/new_modal.css';
 
@@ -29,7 +28,7 @@ export default function EmployeeDevices() {
     department: '',
   });
 
-  // --- 1. ADD THESE STATES AND EFFECT ---
+  // Pagination & Sorting
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [sortOrder, setSortOrder] = useState('newest');
@@ -37,7 +36,6 @@ export default function EmployeeDevices() {
   useEffect(() => {
     setCurrentPage(1);
   }, [filters, sortOrder]);
-  // ------------------------------------
 
   const departments = [...new Set(deployments.map(d => d.employees?.departments?.department_name).filter(Boolean))];
 
@@ -70,43 +68,30 @@ export default function EmployeeDevices() {
           setDeleteConfirm(null);
           loadDeployments();
         } else {
-          alert(`Failed to return device: ${result.error}`);
+          alert(`Failed to log return: ${result.error}`);
         }
       } catch (error) {
-        console.error('Error returning device:', error);
+        console.error('Error logging return:', error);
       } finally {
         setReturning(null);
       }
     }
   };
 
-  // UPDATED: Added "Enrichment Logic" to fetch full monitor details (Serial No, Specs)
   const handleViewSpecs = async (deployment) => {
     try {
-      // 1. Fetch main device specs (Laptop/Desktop)
       const fullDeviceData = await getDetailedDeviceSpecs(deployment.device_type, deployment.device_id);
       
-      // 2. ENRICHMENT STEP: Fetch full details for attached monitors
       let enrichedDeployment = { ...deployment };
       
       if (deployment.employee_monitors && deployment.employee_monitors.length > 0) {
         try {
           const enrichedMonitors = await Promise.all(
             deployment.employee_monitors.map(async (em) => {
-              // Ensure we have a valid monitor ID to query
               if (!em.monitor_id) return em;
-
-              // Fetch detailed specs specifically for this monitor ID
               const response = await getDetailedDeviceSpecs('MONITOR', em.monitor_id);
-              
-              // Normalize: If Supabase returns an array, take the first item
               const fullSpecs = Array.isArray(response) ? response[0] : response;
-
-              // If fetch returned valid data, use it. Otherwise fallback to existing data.
-              return {
-                ...em,
-                monitors: fullSpecs || em.monitors 
-              };
+              return { ...em, monitors: fullSpecs || em.monitors };
             })
           );
           enrichedDeployment.employee_monitors = enrichedMonitors;
@@ -118,7 +103,7 @@ export default function EmployeeDevices() {
       if (fullDeviceData) {
         setViewSpecsDevice(fullDeviceData);
         setViewSpecsType(deployment.device_type.toLowerCase());
-        setSelectedDeployment(enrichedDeployment); // Pass the enriched data to the modal
+        setSelectedDeployment(enrichedDeployment);
         setIsSpecModalOpen(true);
       }
     } catch (error) {
@@ -126,16 +111,28 @@ export default function EmployeeDevices() {
     }
   };
 
-  // Calculate days deployed
-  const getDaysDeployed = (dateIssued) => {
-    if (!dateIssued) return 0;
+  // --- NEW LOGIC: Handles future dates to fix the "-11 days" bug ---
+  const getDeploymentStatus = (dateIssued) => {
+    if (!dateIssued) return { text: 'N/A', class: 'neutral' };
+    
+    // Strip the time off the dates to avoid timezone weirdness
     const issued = new Date(dateIssued);
+    issued.setHours(0,0,0,0);
     const today = new Date();
+    today.setHours(0,0,0,0);
+    
     const diffTime = today.getTime() - issued.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      const futureDays = Math.abs(diffDays);
+      return { text: `Starts in ${futureDays} day${futureDays > 1 ? 's' : ''}`, class: 'future' };
+    }
+    if (diffDays === 0) return { text: 'Started Today', class: 'recent' };
+    if (diffDays > 180) return { text: `${diffDays} days`, class: 'long-term' };
+    return { text: `${diffDays} days`, class: 'recent' };
   };
 
-  // Filter deployments
   const filteredDeployments = deployments.filter(deployment => {
     const matchesSearch = !filters.search || 
       deployment.employees?.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -148,7 +145,6 @@ export default function EmployeeDevices() {
     return matchesSearch && matchesDeviceType && matchesDepartment;
   });
 
-  // --- 2. ADD SORTING AND PAGINATION MATH ---
   const sortedDeployments = [...filteredDeployments].sort((a, b) => {
     if (sortOrder === 'newest') return new Date(b.date_issued) - new Date(a.date_issued);
     if (sortOrder === 'oldest') return new Date(a.date_issued) - new Date(b.date_issued);
@@ -160,7 +156,6 @@ export default function EmployeeDevices() {
   const currentDeployments = sortedDeployments.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(sortedDeployments.length / itemsPerPage);
 
-  // Get deployment statistics
   const stats = {
     total: deployments.length,
     laptops: deployments.filter(d => d.device_type === 'LAPTOP').length,
@@ -173,7 +168,7 @@ export default function EmployeeDevices() {
       <div className="it-employee-devices-container">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <span>Loading active deployments...</span>
+          <span>Loading assigned devices...</span>
         </div>
       </div>
     );
@@ -182,11 +177,10 @@ export default function EmployeeDevices() {
   return (
     <div className="it-employee-devices-container">
       
-      {/* Header Card - Matches Deploy Device Design */}
       <div className="it-header-card">
         <div className="header-title-group">
-          <h1>Employee Devices</h1>
-          <div className="header-meta">Monitor and manage active device deployments</div>
+          <h1>Assigned Devices</h1>
+          <div className="header-meta">Track and manage devices currently handed out to staff</div>
         </div>
         <div className="header-badge">
           <Zap size={16} />
@@ -194,25 +188,21 @@ export default function EmployeeDevices() {
         </div>
       </div>
 
-      {/* Info Banner - IT-specific guidance */}
       <div className="it-info-banner">
-        <Building2 className="info-banner-icon" size={20} />
+        <MonitorSmartphone className="info-banner-icon" size={24} />
         <div className="info-banner-content">
-          <h4>IT Role: Active Deployment Management</h4>
+          <h4>Track who has what</h4>
           <p>
-            Monitor all active device deployments and manage returns when needed. 
-            Use the device specifications view to access detailed technical information.
-            <strong> Device returns</strong> are tracked for inventory management and audit purposes.
+            Use this page to see exactly what equipment your active staff are holding. You can view the technical specs of any assigned device, or log a return when a staff member hands their equipment back to IT.
           </p>
         </div>
       </div>
 
-      {/* Statistics Cards - Green themed */}
       <div className="it-stats-grid">
         <div className="it-stat-card">
           <div className="stat-header">
             <Users size={20} />
-            <span>Active Deployments</span>
+            <span>Active Assignments</span>
           </div>
           <div className="stat-value">{stats.total}</div>
         </div>
@@ -220,7 +210,7 @@ export default function EmployeeDevices() {
         <div className="it-stat-card">
           <div className="stat-header">
             <Laptop size={20} />
-            <span>Deployed Laptops</span>
+            <span>Laptops Out</span>
           </div>
           <div className="stat-value laptops">{stats.laptops}</div>
         </div>
@@ -228,7 +218,7 @@ export default function EmployeeDevices() {
         <div className="it-stat-card">
           <div className="stat-header">
             <HardDrive size={20} />
-            <span>Deployed Desktops</span>
+            <span>Desktops Out</span>
           </div>
           <div className="stat-value desktops">{stats.desktops}</div>
         </div>
@@ -236,20 +226,19 @@ export default function EmployeeDevices() {
         <div className="it-stat-card">
           <div className="stat-header">
             <Building2 size={20} />
-            <span>Active Departments</span>
+            <span>Departments</span>
           </div>
           <div className="stat-value departments">{stats.departments}</div>
         </div>
       </div>
 
-      {/* Filters Bar - Matches Deploy Device Design */}
       <div className="it-filters-bar">
         <div className="filter-input-wrapper">
           <Search className="filter-icon" size={18} />
           <input
             type="text"
             className="it-search-input"
-            placeholder="Search employee name, code, or device ID..."
+            placeholder="Search by name, code, or Asset ID..."
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           />
@@ -266,7 +255,6 @@ export default function EmployeeDevices() {
           ))}
         </select>
 
-        {/* --- 3. ADD SORTING DROPDOWN --- */}
         <select 
           className="it-filter-select" 
           value={sortOrder} 
@@ -278,25 +266,23 @@ export default function EmployeeDevices() {
         </select>
       </div>
 
-      {/* Data Table - Green themed */}
       <div className="it-table-wrapper">
         <table className="it-table">
           <thead>
             <tr>
-              <th>Employee Profile</th>
-              <th>Device Information</th>
-              <th>Deployment Details</th>
+              <th>Who has it?</th>
+              <th>What do they have?</th>
+              <th>When was it assigned?</th>
               <th>Duration</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {/* Change to currentDeployments */}
             {currentDeployments.length === 0 ? (
-              <tr><td colSpan="5" className="it-empty-state">No active deployments found.</td></tr>
+              <tr><td colSpan="5" className="it-empty-state">No matching device assignments found.</td></tr>
             ) : (
               currentDeployments.map((deployment) => {
-                const daysDeployed = getDaysDeployed(deployment.date_issued);
+                const timeStatus = getDeploymentStatus(deployment.date_issued);
                 const monitors = deployment.employee_monitors || [];
                 
                 return (
@@ -326,7 +312,7 @@ export default function EmployeeDevices() {
                         <div>
                           <div className="device-id">{deployment.device_asset_id || 'Unknown'}</div>
                           <div className="device-details">
-                            {deployment.device_type}
+                            {deployment.device_type === 'LAPTOP' ? 'Laptop' : 'Desktop'}
                             {monitors.length > 0 && (
                               <span> • {monitors.length} Monitor{monitors.length > 1 ? 's' : ''}</span>
                             )}
@@ -341,13 +327,13 @@ export default function EmployeeDevices() {
                           <Calendar size={14} />
                           {new Date(deployment.date_issued).toLocaleDateString()}
                         </div>
-                        <div className="deployment-source">Deployed by IT</div>
+                        <div className="deployment-source">Logged by IT</div>
                       </div>
                     </td>
 
                     <td>
-                      <span className={`duration-badge ${daysDeployed > 180 ? 'long-term' : 'recent'}`}>
-                        {daysDeployed} days
+                      <span className={`duration-badge ${timeStatus.class}`}>
+                        {timeStatus.text}
                       </span>
                     </td>
 
@@ -356,7 +342,7 @@ export default function EmployeeDevices() {
                         <button 
                           className="action-btn btn-view" 
                           onClick={() => handleViewSpecs(deployment)}
-                          title="View Device Specs"
+                          title="View Technical Specs"
                         >
                           <Eye size={16} />
                         </button>
@@ -365,7 +351,7 @@ export default function EmployeeDevices() {
                           className="action-btn btn-return" 
                           onClick={() => handleReturnClick(deployment)}
                           disabled={returning === deployment.employee_device_id}
-                          title="Return Device"
+                          title="Log Device Return"
                         >
                           {returning === deployment.employee_device_id ? (
                             <div className="btn-spinner"></div>
@@ -383,7 +369,7 @@ export default function EmployeeDevices() {
         </table>
       </div>
 
-      {/* --- 4. ADD PAGINATION CONTROLS --- */}
+      {/* Pagination Controls Maintained */}
       {!loading && totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'white', borderRadius: '12px', marginTop: '16px', border: '1px solid #e2e8f0' }}>
           <button 
@@ -419,30 +405,23 @@ export default function EmployeeDevices() {
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="it-confirm-dialog" onClick={(e) => e.stopPropagation()}>
             
-            {/* Warning Icon */}
             <div className="confirm-icon-wrapper">
-              <AlertTriangle size={32} />
+              <RotateCcw size={32} />
             </div>
 
-            {/* Text Content */}
-            <h3 className="confirm-title">Return Device?</h3>
+            <h3 className="confirm-title">Log Device Return?</h3>
             <p className="confirm-desc">
-              You are about to return the device from <strong>{deleteConfirm.employees?.full_name}</strong>.
-              <br />This will make the device available for reassignment and cannot be undone.
+              You are about to log the return of equipment from <strong>{deleteConfirm.employees?.full_name}</strong>.
+              <br />This marks the device as available in your inventory.
             </p>
 
-            {/* Device Info */}
             <div className="confirm-device-info">
               <div className="device-summary">
-                {deleteConfirm.device_type === 'LAPTOP' ? 
-                  <Laptop size={16} /> : 
-                  <HardDrive size={16} />
-                }
-                <span>{deleteConfirm.device_asset_id} ({deleteConfirm.device_type})</span>
+                {deleteConfirm.device_type === 'LAPTOP' ? <Laptop size={16} /> : <HardDrive size={16} />}
+                <span>{deleteConfirm.device_asset_id}</span>
               </div>
             </div>
 
-            {/* Actions */}
             <div className="confirm-actions">
               <button 
                 className="btn-cancel-modern" 
@@ -455,7 +434,7 @@ export default function EmployeeDevices() {
                 onClick={handleReturnConfirm}
                 disabled={returning}
               >
-                {returning ? 'Returning...' : 'Return Device'}
+                {returning ? 'Saving...' : 'Confirm Return'}
               </button>
             </div>
 

@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { 
   Plus, Edit2, Trash2, Search, Monitor as MonitorIcon, Eye, AlertTriangle, 
   Printer, FileSpreadsheet, FileText,
-  Archive, RefreshCw, Info, X // <-- Added new icons
+  Archive, RefreshCw, Info, X, Wrench
 } from 'lucide-react';
+import { supabase } from '../../supabase/client';
 import MonitorModal from '../../components/Admin/MonitorModal';
 import NewSpecsModal_Admin from '../../components/Admin/NewSpecsModal_Admin';
+import QuickRepairModal from '../../components/Admin/QuickRepairModal';
 import { getMonitors, createMonitor, updateMonitor } from '../../services/deviceService';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
 import { exportMonitorsToExcel, exportMonitorsToPDF } from '../../utils/monitorExportUtils';
@@ -22,6 +24,7 @@ export default function MonitorInventory() {
   
   const [specsModalOpen, setSpecsModalOpen] = useState(false);
   const [viewSpecsDevice, setViewSpecsDevice] = useState(null);
+  const [repairDevice, setRepairDevice] = useState(null);
 
   const [fetchError, setFetchError] = useState(null);
 
@@ -54,7 +57,22 @@ export default function MonitorInventory() {
     fetchBrands();
   }, []);
 
-  useEffect(() => { loadMonitors(); }, [filters]);
+  useEffect(() => {
+    loadMonitors(); 
+
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'monitors' }, 
+        () => loadMonitors()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [filters]); 
 
   const loadMonitors = async () => {
     setLoading(true);
@@ -86,7 +104,6 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- UPDATED: Soft Delete (Retire) instead of Hard Delete ---
   const handleDeleteConfirm = async () => {
     if (deleteConfirm) {
       const result = await updateMonitor(deleteConfirm.monitor_id, { status: 'retired' });
@@ -101,7 +118,6 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- NEW: Restore functionality ---
   const handleRestoreConfirm = async (newStatus) => {
     if (restoreConfirm) {
       const result = await updateMonitor(restoreConfirm.monitor_id, { status: newStatus });
@@ -116,7 +132,6 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- EXPORT FUNCTIONALITY (Kept Exactly As Is) ---
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
@@ -141,7 +156,6 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- PRINT FUNCTIONALITY (Kept Exactly As Is) ---
   const handlePrint = async (monitor) => {
     try {
       const history = await getDeviceUsageHistory('MONITOR', monitor.monitor_id);
@@ -243,7 +257,6 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- NEW: Tooltip Helper ---
   const getStatusTooltip = (status) => {
     switch(status?.toLowerCase()) {
       case 'available': return "Device is in storage and ready for deployment.";
@@ -254,7 +267,6 @@ export default function MonitorInventory() {
     }
   };
 
-  // --- NEW: Smart Sorting Logic ---
   const sortedMonitors = [...monitors].sort((a, b) => {
     const cleanIdA = (a.asset_id || '').replace(/\s+/g, '');
     const cleanIdB = (b.asset_id || '').replace(/\s+/g, '');
@@ -262,7 +274,6 @@ export default function MonitorInventory() {
     return sortOrder === 'asc' ? comparison : -comparison;
   });
 
-  // --- NEW: Pagination Logic ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentMonitors = sortedMonitors.slice(indexOfFirstItem, indexOfLastItem); 
@@ -276,7 +287,6 @@ export default function MonitorInventory() {
           <div className="header-meta">Displays, Projectors, and Screens</div>
         </div>
         
-        {/* Export Action Buttons */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button 
             onClick={handleExportExcel} 
@@ -302,7 +312,6 @@ export default function MonitorInventory() {
         </div>
       </div>
 
-      {/* --- NEW: Quick Guide Info Banner --- */}
       {showBanner && (
         <div className="info-banner">
           <div className="info-banner-icon">
@@ -353,7 +362,6 @@ export default function MonitorInventory() {
           <option value="retired">Retired</option>
         </select>
 
-        {/* NEW: Sort Dropdown */}
         <select
           className="admin-select"
           value={sortOrder}
@@ -391,7 +399,15 @@ export default function MonitorInventory() {
                   style={{ cursor: 'pointer' }}
                 >
                   <td>
-                    <div className="col-asset">{monitor.asset_id}</div>
+                    <div className="col-asset" style={{ display: 'flex', alignItems: 'center' }}>
+                      {monitor.asset_id}
+                      {/* NEW: Permanent Repair Badge */}
+                      {monitor.repair_count > 0 && (
+                        <span title={`${monitor.repair_count} previous repairs`} style={{ background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', marginLeft: '8px' }}>
+                          <Wrench size={10} /> {monitor.repair_count}
+                        </span>
+                      )}
+                    </div>
                     <div className="col-main-text">{monitor.brand} {monitor.model}</div>
                     <div className="col-sub-text" style={{ fontSize: '12px', marginTop: '2px' }}>
                        <span style={{ color: '#64748b' }}>S/N: </span>
@@ -433,6 +449,18 @@ export default function MonitorInventory() {
                       >
                         <Printer size={16} />
                       </button>
+
+                      {/* ---> THE NEW QUICK REPAIR BUTTON <--- */}
+                      {monitor.status?.toLowerCase() !== 'maintenance' && monitor.status?.toLowerCase() !== 'retired' && (
+                        <button 
+                          className="action-btn" 
+                          onClick={(e) => { e.stopPropagation(); setRepairDevice(monitor); }} 
+                          title="Send to Maintenance"
+                          style={{ color: '#d97706', borderColor: '#fde68a', backgroundColor: '#fffbeb' }}
+                        >
+                          <Wrench size={16} />
+                        </button>
+                      )}
 
                       <button 
                         className="action-btn btn-edit" 
@@ -478,7 +506,6 @@ export default function MonitorInventory() {
         </table>
       </div>
 
-      {/* NEW: Pagination Controls */}
       {!loading && totalPages > 1 && (
         <div className="admin-pagination">
           <button 
@@ -500,7 +527,15 @@ export default function MonitorInventory() {
       <MonitorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleModalSubmit} monitor={selectedMonitor} />
       <NewSpecsModal_Admin isOpen={specsModalOpen} onClose={() => setSpecsModalOpen(false)} device={viewSpecsDevice} type="monitor" />
       
-      {/* Retire Confirm Modal */}
+      {/* Quick Repair Modal */}
+      <QuickRepairModal 
+        isOpen={!!repairDevice} 
+        onClose={() => setRepairDevice(null)} 
+        device={repairDevice} 
+        deviceType="MONITOR" 
+        onSuccess={() => { setRepairDevice(null); loadMonitors(); }} 
+      />
+
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
@@ -520,7 +555,6 @@ export default function MonitorInventory() {
         </div>
       )}
 
-      {/* Restore Device Modal */}
       {restoreConfirm && (
         <div className="modal-overlay" onClick={() => setRestoreConfirm(null)}>
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>

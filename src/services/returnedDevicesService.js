@@ -44,34 +44,46 @@ export async function getReturnedDevices() {
 
     if (error) throw error;
 
-    // Enrich data with device asset IDs
+// ENRICHMENT STEP: Fetch Asset ID for every device type
     const enrichedData = await Promise.all(
-      (data || []).map(async (device) => {
+      (data || []).map(async (record) => {
         try {
-          const tableName = device.device_type === 'LAPTOP' ? 'laptops' : 'desktops';
-          const idField = device.device_type === 'LAPTOP' ? 'laptop_id' : 'desktop_id';
-          
-          const { data: deviceData, error: deviceError } = await supabase
-            .from(tableName)
-            .select('asset_id, brand, model, status')
-            .eq(idField, device.device_id)
-            .single();
+          let tableName = '';
+          let idField = '';
 
-          if (!deviceError && deviceData) {
-            device.device_asset_id = deviceData.asset_id;
-            device.device_brand = deviceData.brand;
-            device.device_model = deviceData.model;
-            device.device_status = deviceData.status;
+          // Properly route all 3 device types
+          if (record.device_type === 'LAPTOP') {
+            tableName = 'laptops';
+            idField = 'laptop_id';
+          } else if (record.device_type === 'DESKTOP') {
+            tableName = 'desktops';
+            idField = 'desktop_id';
+          } else if (record.device_type === 'MONITOR') {
+            tableName = 'monitors';
+            idField = 'monitor_id';
+          }
+
+          // Fetch the Asset ID if we have a valid table
+          if (tableName && idField) {
+            const { data: deviceData, error: deviceError } = await supabase
+              .from(tableName)
+              .select('asset_id')
+              .eq(idField, record.device_id)
+              .single();
+
+            if (!deviceError && deviceData) {
+              record.device_asset_id = deviceData.asset_id;
+            }
           }
         } catch (err) {
-          console.warn('Could not fetch asset info for device:', device.device_id);
+          console.warn('Could not fetch asset_id for device:', record.device_id);
         }
         
-        return device;
+        return record;
       })
     );
 
-    return enrichedData;
+    return enrichedData;  
   } catch (error) {
     console.error('Error fetching returned devices:', error);
     return [];

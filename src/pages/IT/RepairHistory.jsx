@@ -1,494 +1,227 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Wrench, Clock, AlertCircle, CheckCircle, Eye, Edit2 } from 'lucide-react';
-import RepairRecordModal from '../../components/IT/RepairRecordModal.jsx';
-import RepairDetailsModal from '../../components/IT/RepairDetailsModal';
-import {
-  getAllRepairRecords,
-  createRepairRecord,
-  updateRepairRecord,
-  checkDeviceWarranty,
-  getRepairStatistics
-} from '../../services/repairService.js';
-import '../../styles/repairHistory.css';
+import { Wrench, CheckCircle, Search, AlertCircle, Clock, CheckSquare, X, Info, RefreshCw } from 'lucide-react';
+import { getAllRepairRecords, completeRepair } from '../../services/repairService';
+import '../../styles/it-returned-devices.css'; 
+import '../../styles/new_modal.css';
+import { supabase } from '../../supabase/client';
 
 export default function RepairHistory() {
-  const [repairRecords, setRepairRecords] = useState([]);
+  const [repairs, setRepairs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({});
+  const [activeTab, setActiveTab] = useState('active'); 
+  const [search, setSearch] = useState('');
+  const [showBanner, setShowBanner] = useState(true);
   
-  // Modal States
-  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [editingRecord, setEditingRecord] = useState(null);
-
-  // Filters
-  const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    device_type: '',
-    warranty_status: '',
-    admin_approval: '',
-    date_range: '30'
-  });
+  const [completionModal, setCompletionModal] = useState(null);
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    loadRepairRecords();
-    loadStatistics();
-  }, [filters]);
+    loadRepairs();
 
-  const loadRepairRecords = async () => {
-    setLoading(true);
-    try {
-      const data = await getAllRepairRecords(filters);
-      setRepairRecords(data);
-    } catch (error) {
-      console.error('Error loading repair records:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadStatistics = async () => {
-    try {
-      const statsData = await getRepairStatistics();
-      setStats(statsData);
-    } catch (error) {
-      console.error('Error loading statistics:', error);
-    }
-  };
-
-  const handleCreateRepair = () => {
-    setEditingRecord(null);
-    setIsRecordModalOpen(true);
-  };
-
-  const handleEditRepair = (record) => {
-    setEditingRecord(record);
-    setIsRecordModalOpen(true);
-  };
-
-  const handleViewDetails = (record) => {
-    setSelectedRecord(record);
-    setIsDetailsModalOpen(true);
-  };
-
-  const handleRecordSubmit = async (recordData) => {
-    try {
-      let result;
-      
-      if (editingRecord) {
-        // Update existing record
-        result = await updateRepairRecord(editingRecord.maintenance_id, recordData);
-      } else {
-        // Create new record with warranty check
-        const warrantyCheck = await checkDeviceWarranty(recordData.device_type, recordData.device_id);
-        
-        const enhancedData = {
-          ...recordData,
-          warranty_status_at_repair: warrantyCheck.is_under_warranty ? 'active' : 'expired',
-          warranty_check_date: new Date().toISOString().split('T')[0],
-          warranty_expires_on: warrantyCheck.warranty_end_date,
-          repair_location: warrantyCheck.is_under_warranty ? 'warranty' : 'internal',
-          technician_name: 'IT Staff'
-        };
-
-        result = await createRepairRecord(enhancedData);
-      }
-
-      if (result.success) {
-        setIsRecordModalOpen(false);
-        loadRepairRecords();
-        loadStatistics();
-        
-        if (!editingRecord && result.data?.warranty_status_at_repair === 'active') {
-          alert('⚠️ Device is under warranty! This repair should be sent to the manufacturer.');
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'device_maintenance' },
+        (payload) => {
+          console.log('Realtime update received!', payload);
+          loadRepairs(); 
         }
-      } else {
-        alert('Error: ' + result.error);
-      }
-    } catch (error) {
-      console.error('Error submitting repair record:', error);
-      alert('An error occurred while saving the repair record');
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+  
+  const loadRepairs = async () => {
+    setLoading(true);
+    const data = await getAllRepairRecords({});
+    setRepairs(data || []);
+    setLoading(false);
+  };
+
+  const handleMarkFixed = async (e) => {
+    e.preventDefault();
+    if (!resolutionNotes.trim()) return alert("Please enter resolution notes.");
+    
+    setIsSubmitting(true);
+    const result = await completeRepair(completionModal.maintenance_id, resolutionNotes);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      setCompletionModal(null);
+      setResolutionNotes('');
+      loadRepairs();
+    } else {
+      alert("Failed to submit: " + result.error);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return '#f59e0b';
-      case 'in_progress': return '#3b82f6';
-      case 'completed': return '#10b981';
-      case 'awaiting_approval': return '#8b5cf6';
-      case 'warranty_sent': return '#ef4444';
-      case 'cancelled': return '#6b7280';
-      default: return '#6b7280';
-    }
-  };
+  const activeRepairs = repairs.filter(r => r.status === 'pending' || r.status === 'in_progress');
+  const historyRepairs = repairs.filter(r => r.status === 'completed' || r.status === 'awaiting_approval' || r.status === 'cancelled');
 
-  const getApprovalColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return '#f59e0b';
-      case 'approved': return '#10b981';
-      case 'rejected': return '#ef4444';
-      default: return '#6b7280';
-    }
-  };
-
-  const getWarrantyBadge = (warrantyStatus) => {
-    const isActive = warrantyStatus === 'active';
-    return (
-      <span
-        className={`warranty-badge ${isActive ? 'active' : 'expired'}`}
-        style={{
-          backgroundColor: isActive ? '#dcfdf7' : '#fef2f2',
-          color: isActive ? '#065f46' : '#991b1b',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontSize: '0.75rem',
-          fontWeight: '500'
-        }}
-      >
-        {isActive ? 'Under Warranty' : 'Out of Warranty'}
-      </span>
-    );
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const getRepairDuration = (startDate, endDate) => {
-    if (!startDate) return 'Not started';
-    if (!endDate) return 'In progress';
-    
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-    return `${days} day${days !== 1 ? 's' : ''}`;
-  };
-
-  // Helper to format: "10:43 AM 1/21/26 – Ongoing"
-  const formatTimelineEntry = (dateString, label, color) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    
-    // Format Time: 10:43 AM
-    const time = date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit', 
-      hour12: true 
-    });
-    
-    // Format Date: 1/21/26
-    const day = date.toLocaleDateString('en-US', { 
-      month: 'numeric', 
-      day: 'numeric', 
-      year: '2-digit' 
-    });
-
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: color, marginBottom: '4px' }}>
-        <span style={{ fontWeight: '600' }}>{time} {day}</span>
-        <span style={{ color: '#64748b' }}>– {label}</span>
-      </div>
-    );
-  };
+  const displayedRepairs = (activeTab === 'active' ? activeRepairs : historyRepairs).filter(r => 
+    r.device_asset_id?.toLowerCase().includes(search.toLowerCase()) || 
+    r.issue_description?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="repair-history-container">
-      {/* Header */}
-      <header className="repair-header">
-        <div className="header-title">
-          <Wrench size={32} className="header-icon" />
-          <div>
-            <h1>Repair History</h1>
-            <p className="subtitle">Manage device repairs and maintenance records</p>
-          </div>
+    <div className="it-returned-container">
+      
+      <div className="it-header-card">
+        <div className="header-title-group">
+          <h1>IT Repair Center</h1>
+          <div className="header-meta">Diagnose and resolve hardware issues</div>
         </div>
-        <button className="btn-primary" onClick={handleCreateRepair}>
-          <Plus size={18} />
-          Start New Repair
+        <div className="header-badge">
+          <Wrench size={16} />
+          <span>IT Operations</span>
+        </div>
+      </div>
+
+      {/* --- NEW: IT Workflow Instructions --- */}
+      {showBanner && (
+        <div className="info-banner" style={{ background: '#ecfdf5', borderColor: '#a7f3d0' }}>
+          <div className="info-banner-icon" style={{ color: '#059669' }}>
+            <Info size={24} />
+          </div>
+          <div className="info-banner-content" style={{ flex: 1, color: '#064e3b' }}>
+            <h4 style={{ color: '#064e3b' }}>Maintenance Workflow: IT Department</h4>
+            <ol style={{ margin: '8px 0 0 16px', padding: 0, fontSize: '0.9rem', lineHeight: '1.5' }}>
+              <li><strong>Receive:</strong> Devices sent to maintenance appear here automatically.</li>
+              <li><strong>Resolve:</strong> Fix the device, click "Mark Fixed", and detail what you changed.</li>
+              <li><strong>Handover:</strong> The ticket is sent to the Admin queue for final testing and approval.</li>
+            </ol>
+          </div>
+          <button 
+            onClick={() => setShowBanner(false)} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#059669', padding: '4px' }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* Tabs & Refresh */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', alignItems: 'center' }}>
+        <button 
+          onClick={() => setActiveTab('active')}
+          style={{ padding: '12px 24px', borderRadius: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: activeTab === 'active' ? '#1DB584' : 'white', color: activeTab === 'active' ? 'white' : '#64748b', boxShadow: activeTab === 'active' ? '0 4px 12px rgba(29,181,132,0.3)' : '0 1px 3px rgba(0,0,0,0.1)' }}
+        >
+          Active Repairs ({activeRepairs.length})
         </button>
-      </header>
+        <button 
+          onClick={() => setActiveTab('history')}
+          style={{ padding: '12px 24px', borderRadius: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', background: activeTab === 'history' ? '#1DB584' : 'white', color: activeTab === 'history' ? 'white' : '#64748b', boxShadow: activeTab === 'history' ? '0 4px 12px rgba(29,181,132,0.3)' : '0 1px 3px rgba(0,0,0,0.1)' }}
+        >
+          Repair History
+        </button>
 
-      {/* Statistics Cards */}
-      <div className="repair-stats">
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: '#fef3c7' }}>
-            <Clock size={20} style={{ color: '#d97706' }} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-value">{stats.pendingRepairs || 0}</span>
-            <span className="stat-label">Pending Repairs</span>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: '#dbeafe' }}>
-            <Wrench size={20} style={{ color: '#2563eb' }} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-value">{stats.inProgressRepairs || 0}</span>
-            <span className="stat-label">In Progress</span>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: '#f3e8ff' }}>
-            <AlertCircle size={20} style={{ color: '#7c3aed' }} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-value">{stats.awaitingApproval || 0}</span>
-            <span className="stat-label">Awaiting Approval</span>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: '#d1fae5' }}>
-            <CheckCircle size={20} style={{ color: '#059669' }} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-value">{stats.completedThisMonth || 0}</span>
-            <span className="stat-label">Completed This Month</span>
-          </div>
-        </div>
+        {/* --- NEW: Manual Refresh Button --- */}
+        <button 
+          onClick={loadRepairs}
+          title="Force Refresh Data"
+          style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', background: 'white', border: '1px solid #cbd5e1', padding: '10px 16px', borderRadius: '8px', color: '#475569', fontWeight: 600, cursor: 'pointer' }}
+        >
+          <RefreshCw size={16} className={loading ? 'spin-animation' : ''} />
+          Refresh Data
+        </button>
       </div>
 
-      {/* Filters and Controls */}
-      <div className="repair-controls">
-        <div className="search-box">
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="Search by device ID, issue, or technician..."
-            value={filters.search}
-            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-          />
-        </div>
-
-        <div className="filter-group">
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-          >
-            <option value="">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="awaiting_approval">Awaiting Approval</option>
-            <option value="warranty_sent">Warranty Sent</option>
-          </select>
-
-          <select
-            value={filters.device_type}
-            onChange={(e) => setFilters(prev => ({ ...prev, device_type: e.target.value }))}
-          >
-            <option value="">All Devices</option>
-            <option value="LAPTOP">Laptops</option>
-            <option value="DESKTOP">Desktops</option>
-            <option value="MONITOR">Monitors</option>
-          </select>
-
-          <select
-            value={filters.warranty_status}
-            onChange={(e) => setFilters(prev => ({ ...prev, warranty_status: e.target.value }))}
-          >
-            <option value="">All Warranty Status</option>
-            <option value="active">Under Warranty</option>
-            <option value="expired">Out of Warranty</option>
-          </select>
-
-          <select
-            value={filters.admin_approval}
-            onChange={(e) => setFilters(prev => ({ ...prev, admin_approval: e.target.value }))}
-          >
-            <option value="">All Approvals</option>
-            <option value="pending">Pending Approval</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Repair Records Table */}
-      <div className="repair-table-card">
-        {loading ? (
-          <div className="loading-state">
-            <div className="loading-spinner"></div>
-            <span>Loading repair records...</span>
-          </div>
-        ) : repairRecords.length === 0 ? (
-          <div className="empty-state">
-            <Wrench size={64} className="empty-icon" />
-            <h3>No Repair Records Found</h3>
-            <p>Start by creating your first repair record</p>
-            <button className="btn-primary" onClick={handleCreateRepair}>
-              <Plus size={18} />
-              Start New Repair
-            </button>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="repair-table">
-              <thead>
-                <tr>
-                  <th>Device</th>
-                  <th>Issue</th>
-                  <th>Warranty</th>
-                  <th>Status</th>
-                  <th>Repair Timeline</th>
-                  <th>Admin Approval</th>
-                  <th>Actions</th>
+      <div className="it-table-wrapper">
+        <table className="it-table">
+          <thead>
+            <tr>
+              <th>Device</th>
+              <th>Issue Description</th>
+              <th>Status</th>
+              <th>Reported On</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan="5" className="it-empty-state">Loading repairs...</td></tr>
+            ) : displayedRepairs.length === 0 ? (
+              <tr><td colSpan="5" className="it-empty-state">No repairs found. Great job!</td></tr>
+            ) : (
+              displayedRepairs.map((repair) => (
+                <tr key={repair.maintenance_id}>
+                  <td>
+                    <div style={{ fontWeight: 600, color: '#1e293b' }}>{repair.device_asset_id}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{repair.device_type}</div>
+                  </td>
+                  <td style={{ maxWidth: '300px' }}>
+                    <div style={{ fontWeight: 600, color: '#1e293b', textTransform: 'capitalize', marginBottom: '4px' }}>{repair.maintenance_type}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{repair.issue_description}</div>
+                  </td>
+                  <td>
+                    {repair.status === 'awaiting_approval' ? (
+                      <span style={{ background: '#fef3c7', color: '#d97706', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}>Awaiting Admin</span>
+                    ) : repair.status === 'completed' ? (
+                      <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}>Resolved</span>
+                    ) : (
+                      <span style={{ background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}>Needs Repair</span>
+                    )}
+                  </td>
+                  <td>{new Date(repair.date_reported).toLocaleDateString()}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {activeTab === 'active' && (
+                      <button 
+                        onClick={() => setCompletionModal(repair)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#1DB584', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        <CheckSquare size={16} /> Mark Fixed
+                      </button>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {repairRecords.map((record) => (
-                  <tr key={record.maintenance_id}>
-                    <td>
-                      <div className="device-info">
-                        <strong>{record.device_asset_id || `${record.device_type}-${record.device_id}`}</strong>
-                        <div className="device-meta">
-                          {record.device_brand && `${record.device_brand} ${record.device_model || ''}`}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="issue-info">
-                        <span className="issue-type">{record.maintenance_type}</span>
-                        <div className="issue-desc" title={record.issue_description}>
-                          {record.issue_description?.substring(0, 50)}
-                          {record.issue_description?.length > 50 && '...'}
-                        </div>
-                      </div>
-                    </td>
-                    <td>{getWarrantyBadge(record.warranty_status_at_repair)}</td>
-                    <td>
-                      <span
-                        className="status-badge"
-                        style={{
-                          backgroundColor: `${getStatusColor(record.status)}20`,
-                          color: getStatusColor(record.status),
-                        }}
-                      >
-                        {record.status?.replace('_', ' ').toUpperCase()}
-                      </span>
-                    </td>
-                    {/* COMPREHENSIVE REPAIR TIMELINE */}
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {/* 1. Reported Date */}
-                        {formatTimelineEntry(record.date_reported, 'Reported', '#64748b')}
-                        
-                        {/* 2. Started Date */}
-                        {record.date_started && 
-                          formatTimelineEntry(record.date_started, 'Started', '#3b82f6')
-                        }
-                        
-                        {/* 3. Completed Date (IT Finished Work) */}
-                        {record.date_completed && 
-                          formatTimelineEntry(record.date_completed, 'Work Done', '#10b981')
-                        }
-
-                        {/* 4. Admin Decision (The Final Step) */}
-                        {record.admin_approval_date && (
-                          <>
-                            {record.admin_approval_status === 'approved' && 
-                              formatTimelineEntry(record.admin_approval_date, 'Admin Approved', '#059669')
-                            }
-                            {record.admin_approval_status === 'rejected' && 
-                              formatTimelineEntry(record.admin_approval_date, 'Admin Rejected', '#dc2626')
-                            }
-                          </>
-                        )}
-
-                        {/* 5. Cancelled State (If cancelled manually without rejection) */}
-                        {record.status === 'cancelled' && record.admin_approval_status !== 'rejected' && 
-                          <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', marginTop: '4px' }}>
-                            ⛔ Cancelled
-                          </div>
-                        }
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        className="approval-badge"
-                        style={{
-                          backgroundColor: `${getApprovalColor(record.admin_approval_status)}20`,
-                          color: getApprovalColor(record.admin_approval_status),
-                        }}
-                      >
-                        {record.admin_approval_status?.toUpperCase() || 'PENDING'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="action-buttons">
-                        {/* VIEW BUTTON - Always visible */}
-                        <button
-                          className="btn-icon btn-view"
-                          onClick={() => handleViewDetails(record)}
-                          title="View Details"
-                          style={{
-                            padding: '6px',
-                            border: '1px solid #3b82f6',
-                            borderRadius: '6px',
-                            background: 'white',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#3b82f6'
-                          }}
-                        >
-                          <Eye size={16} />
-                        </button>
-
-                        {/* EDIT BUTTON - Always show for IT (regardless of approval status) */}
-                        <button
-                          className="btn-icon btn-edit"
-                          onClick={() => handleEditRepair(record)}
-                          title="Update Repair Status"
-                          style={{
-                            padding: '6px',
-                            border: '1px solid #f59e0b',
-                            borderRadius: '6px',
-                            background: 'white',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#f59e0b'
-                          }}
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Modals */}
-      <RepairRecordModal
-        isOpen={isRecordModalOpen}
-        onClose={() => setIsRecordModalOpen(false)}
-        onSubmit={handleRecordSubmit}
-        editingRecord={editingRecord}
-      />
-
-      <RepairDetailsModal
-        isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
-        record={selectedRecord}
-      />
+      {completionModal && (
+        <div className="nm-overlay" onClick={() => setCompletionModal(null)}>
+          <div className="nm-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ width: '500px', height: 'auto', maxHeight: '90vh' }}>
+            <div className="nm-modal-header" style={{ background: '#F8FDF9', borderBottom: '1px solid #E8F8F3' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1DB584' }}>
+                <CheckCircle size={20} /> Resolve Ticket
+              </h2>
+              <button type="button" className="nm-close-btn" style={{ background: 'transparent' }} onClick={() => setCompletionModal(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleMarkFixed} className="nm-modal-form" style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Original Issue ({completionModal.device_asset_id}):</span>
+                <div style={{ fontWeight: '500', color: '#1e293b', marginTop: '4px', fontStyle: 'italic' }}>"{completionModal.issue_description}"</div>
+              </div>
+              <div className="nm-input-group" style={{ marginBottom: '24px' }}>
+                <label>Resolution Notes (Sent to Admin) <span style={{ color: '#ef4444' }}>*</span></label>
+                <textarea 
+                  rows="4" 
+                  placeholder="What was fixed? (e.g. Replaced faulty RAM stick, tested OS...)"
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  required
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button type="button" className="nm-btn-cancel" onClick={() => setCompletionModal(null)}>Cancel</button>
+                <button type="submit" className="nm-btn-save" disabled={isSubmitting} style={{ background: '#1DB584' }}>
+                  {isSubmitting ? 'Saving...' : 'Send to Admin for Approval'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import {
   Search, HardDrive, Eye, Shield, Printer,
   Info, X, CheckCircle, Users, Wrench 
 } from 'lucide-react';
+import { supabase } from '../../supabase/client';
 import { getDesktops } from '../../services/deviceService';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
 import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
@@ -50,8 +51,21 @@ export default function DesktopInventory() {
   }, [filters, sortOrder]);
 
   useEffect(() => {
-    loadDesktops();
-  }, [filters]);
+    loadDesktops(); // or loadDesktops();
+
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'desktops' }, // change to 'desktops' for that file
+        () => loadDesktops()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [filters]); // Keep filters here so search still works
 
   const loadDesktops = async () => {
     setLoading(true);

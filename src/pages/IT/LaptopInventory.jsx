@@ -3,6 +3,7 @@ import {
   Search, Laptop as LaptopIcon, Eye, Shield, Printer,
   Info, X, CheckCircle, Users, Wrench 
 } from 'lucide-react';
+import { supabase } from '../../supabase/client';
 import { getLaptops } from '../../services/deviceService';
 import { getDeviceUsageHistory } from '../../services/deploymentService';
 import NewSpecsModal_IT from '../../components/IT/NewSpecsModal_IT'; 
@@ -49,8 +50,21 @@ export default function LaptopInventory() {
   }, [filters, sortOrder]);
 
   useEffect(() => {
-    loadLaptops();
-  }, [filters]);
+    loadLaptops(); // or loadDesktops();
+
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'laptops' }, // change to 'desktops' for that file
+        () => loadLaptops()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [filters]); // Keep filters here so search still works
 
   const loadLaptops = async () => {
     setLoading(true);
