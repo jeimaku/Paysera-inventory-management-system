@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, UserCheck, UserX, Shield, Mail, Search, Trash2, Lock, AlertTriangle, Info } from 'lucide-react';
-import { getUsers, createUser, toggleUserStatus, deleteUser, verifyAdminPassword } from '../../services/userService';
+import { Plus, UserCheck, UserX, Shield, Mail, Search, Trash2, Lock, AlertTriangle, Info, Key } from 'lucide-react';
+import { getUsers, createUser, toggleUserStatus, deleteUser, verifyAdminPassword, changeUserPassword } from '../../services/userService';
 import UserModal from '../../components/Admin/UserModal';
+import ChangePasswordModal from '../../components/Admin/ChangePasswordModal'; // <-- NEW IMPORT
 import '../../styles/admin-inventory.css'; 
 
 export default function UserManagement() {
@@ -10,8 +11,11 @@ export default function UserManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // --- PASSWORD MODAL STATE ---
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordUser, setPasswordUser] = useState(null);
+
   // --- UNIFIED CONFIRMATION STATE ---
-  // Stores { user: object, type: 'delete' | 'toggle' }
   const [confirmData, setConfirmData] = useState(null); 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -38,6 +42,11 @@ export default function UserManagement() {
     }
   };
 
+  // --- HANDLE PASSWORD CHANGE ---
+  const handlePasswordSubmit = async (accountId, newPassword) => {
+    return await changeUserPassword(accountId, newPassword);
+  };
+
   // --- OPEN CONFIRMATION MODALS ---
   const initiateToggleStatus = (user) => {
     setConfirmData({ user, type: 'toggle' });
@@ -49,14 +58,12 @@ export default function UserManagement() {
     setConfirmPassword('');
   };
 
-  // --- UNIFIED SUBMIT HANDLER ---
   const handleConfirmSubmit = async (e) => {
     e.preventDefault();
     if (!confirmData) return;
 
     setIsProcessing(true);
 
-    // 1. Verify Password
     const isValid = await verifyAdminPassword(confirmPassword);
     if (!isValid) {
       alert('Incorrect password. Please try again.');
@@ -66,15 +73,12 @@ export default function UserManagement() {
 
     let result;
     
-    // 2. Perform Action based on Type
     if (confirmData.type === 'delete') {
       result = await deleteUser(confirmData.user.account_id);
     } else {
-      // Toggle Status
       result = await toggleUserStatus(confirmData.user.account_id, confirmData.user.is_active);
     }
     
-    // 3. Handle Result
     if (result.success) {
       setConfirmData(null);
       loadUsers();
@@ -95,14 +99,13 @@ export default function UserManagement() {
       <div className="admin-header-card">
         <div className="header-title-group">
           <h1>User Management</h1>
-          <div className="header-meta">Manage Admin and IT access accounts</div>
+          <div className="header-meta">Manage Admin, IT, & HR access accounts</div>
         </div>
         <button className="btn-add-device" onClick={() => setIsModalOpen(true)}>
           <Plus size={20} /> Add New User
         </button>
       </div>
 
-      {/* --- NEW INFO BANNER --- */}
       <div className="info-banner">
         <Info className="info-banner-icon" size={20} />
         <div className="info-banner-content">
@@ -114,7 +117,6 @@ export default function UserManagement() {
           </p>
         </div>
       </div>
-      {/* ----------------------- */}
 
       <div className="admin-filters-bar">
         <div className="filter-input-wrapper" style={{ flex: 1 }}>
@@ -167,6 +169,7 @@ export default function UserManagement() {
                 </td>
                 <td>
                   <div className="admin-actions" style={{ justifyContent: 'flex-end' }}>
+                    
                     {/* TOGGLE BUTTON */}
                     <button 
                       className={`action-btn ${user.is_active ? 'btn-edit' : 'btn-view'}`}
@@ -181,6 +184,20 @@ export default function UserManagement() {
                       {user.is_active ? <UserX size={16} /> : <UserCheck size={16} />}
                     </button>
 
+                    {/* --- NEW: CHANGE PASSWORD BUTTON --- */}
+                    <button 
+                      className="action-btn"
+                      onClick={() => { setPasswordUser(user); setIsPasswordModalOpen(true); }}
+                      title="Reset Password"
+                      style={{ 
+                        color: '#0284c7', 
+                        borderColor: '#bae6fd',
+                        background: '#f0f9ff' 
+                      }}
+                    >
+                      <Key size={16} />
+                    </button>
+
                     {/* DELETE BUTTON */}
                     <button 
                       className="action-btn btn-delete"
@@ -189,6 +206,7 @@ export default function UserManagement() {
                     >
                       <Trash2 size={16} />
                     </button>
+
                   </div>
                 </td>
               </tr>
@@ -201,6 +219,14 @@ export default function UserManagement() {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         onSubmit={handleCreateUser} 
+      />
+
+      {/* --- NEW: PASSWORD MODAL --- */}
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => { setIsPasswordModalOpen(false); setPasswordUser(null); }}
+        user={passwordUser}
+        onSubmit={handlePasswordSubmit}
       />
 
       {/* --- UNIFIED SECURITY MODAL --- */}

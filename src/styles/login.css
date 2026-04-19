@@ -1,460 +1,172 @@
-/* Enhanced Login Page Styles */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
-/* Main Page Layout with "Water Wave" Gradient Effect */
-.login-page {
+/* Main Background */
+.login-container {
   min-height: 100vh;
   width: 100vw;
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  
-  /* Water Wave Gradient Scheme:
-     Light Green -> Teal -> Sky Blue -> White Blue
-     Replaced Deep Blue with #d4eaff (White Blue) for an airy feel.
-  */
-  background: linear-gradient(
-    -45deg, 
-    #69f0ae, /* Light Green */
-    #7dd4b8, /* Teal */
-    #5eb3ff, /* Sky Blue */
-    #d4eaff  /* White Blue */
-  );
-  
-  /* Large background size is key to the "wave" effect */
-  background-size: 400% 400%;
-  
-  /* Smooth flowing animation */
-  animation: waterWave 15s ease-in-out infinite;
-  overflow: hidden;
-  position: relative;
-}
-
-/* Animation moves the gradient diagonally to mimic flowing water */
-@keyframes waterWave {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-.login-left {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 60px 40px 40px;
-  position: relative;
-  z-index: 2;
-  gap: 24px;
+  /* Smooth, modern blue-to-green gradient matching your reference */
+  background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
+  font-family: 'Poppins', sans-serif;
+  padding: 20px;
 }
 
-.login-right {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 40px 40px 20px;
-  position: relative;
-  z-index: 2;
-}
-
-/* Glassmorphism Login Form Card */
-.login-card {
-  background: rgba(255, 255, 255, 0.85);
-  /* Alternative to backdrop-filter using enhanced background layers */
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%);
-  width: 580px;
-  min-height: 500px; 
-  padding: 64px 48px;
+/* The Main White Card */
+.modern-login-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 440px;
+  padding: 48px 40px;
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.6); /* Slightly more visible border for contrast */
-  box-shadow: 
-    0 32px 80px rgba(0, 50, 150, 0.1), 
-    0 8px 32px rgba(0, 50, 150, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  text-align: center;
-  position: relative;
-  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  animation: slideInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.login-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  /* Subtle internal sheen */
-  background: linear-gradient(
-    135deg, 
-    rgba(255, 255, 255, 0.4) 0%, 
-    rgba(255, 255, 255, 0) 100%
-  );
-  pointer-events: none;
-  z-index: 1;
-}
-
-.login-card > * {
-  position: relative;
-  z-index: 2;
-}
-
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(40px) scale(0.95);
-    filter: blur(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
-
-/* Team Credits Section */
-.team-credits-section {
-  width: 100%;
-  max-width: 580px;
-  animation: slideInUp 1s ease-out 0.6s both;
-}
-
-.team-credits-button {
-  background: rgba(255, 255, 255, 0.9);
-  /* Alternative to backdrop-filter using layered backgrounds */
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%);
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  border-radius: 16px;
-  padding: 16px 24px;
-  width: 100%;
-  font-family: 'Poppins', sans-serif;
-  font-size: 15px;
-  font-weight: 500;
-  color: #4a4a6a;
-  cursor: pointer;
-  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  overflow: hidden;
-  box-shadow: 
-    0 8px 24px rgba(0, 50, 150, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  text-decoration: none !important;
-  outline: none;
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.team-credits-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 50%, #69f0ae 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  z-index: 1;
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.team-credits-button:hover {
-  transform: translateY(-2px);
-  border-color: rgba(0, 212, 255, 0.4);
-  box-shadow: 
-    0 16px 32px rgba(0, 50, 150, 0.12),
-    0 0 0 1px rgba(0, 212, 255, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-  color: white !important;
-  text-decoration: none !important;
+/* Logo & Title */
+.login-logo {
+  width: 180px; /* Adjust this based on your logo's aspect ratio */
+  height: auto;
+  margin-bottom: 16px;
 }
 
-.team-credits-button:hover::before {
-  opacity: 1;
-}
-
-.team-credits-button:hover * {
-  color: white !important;
-}
-
-.team-credits-button:active {
-  transform: translateY(0);
-}
-
-.team-credits-button:focus {
-  outline: none;
-  border-color: rgba(0, 212, 255, 0.4);
-  box-shadow: 
-    0 8px 24px rgba(0, 50, 150, 0.08),
-    0 0 0 3px rgba(0, 212, 255, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-}
-
-.team-credits-button:focus:not(:hover) {
-  color: #4a4a6a;
-}
-
-.team-icon {
-  transition: transform 0.3s ease;
-  position: relative;
-  z-index: 2;
-}
-
-.team-credits-button:hover .team-icon {
-  transform: scale(1.1);
-}
-
-.team-credits-button > * {
-  position: relative;
-  z-index: 2;
-}
-
-/* Headers */
-.login-card h2 {
-  font-family: 'Poppins', sans-serif;
-  font-size: 32px;
+.login-title {
+  font-size: 24px;
   font-weight: 700;
-  margin-bottom: 48px;
-  /* Text gradient: Dark Blue to Cyan for readability against light card */
-  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: titleSlide 1s ease-out 0.2s both;
+  color: #0284c7; /* Brand Blue */
+  margin-bottom: 32px;
+  text-align: center;
 }
 
-@keyframes titleSlide {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Form Inputs */
+.login-form-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-/* Form Elements */
-.login-card label {
+.form-group label {
   display: block;
-  font-family: 'Poppins', sans-serif;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
-  color: #4a4a6a;
+  color: #475569;
   margin-bottom: 8px;
-  text-align: left;
-  transform: translateX(2px);
-  transition: color 0.3s ease;
 }
 
-.form-group {
-  position: relative;
-  margin-bottom: 24px;
-  animation: inputSlide 1s ease-out both;
-}
-
-.form-group:nth-child(2) { animation-delay: 0.1s; }
-.form-group:nth-child(3) { animation-delay: 0.2s; }
-
-@keyframes inputSlide {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.login-card input {
+.form-group input {
   width: 100%;
-  padding: 16px 20px;
-  margin-bottom: 0;
-  border-radius: 14px;
-  border: 2px solid #e8e8f0;
-  background: rgba(248, 248, 252, 0.7);
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
   font-family: 'Poppins', sans-serif;
-  font-size: 15px;
-  font-weight: 400;
-  color: #2d2d42;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 14px;
+  color: #1e293b;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
-.login-card input::placeholder {
-  color: #9090a8;
-  font-weight: 300;
+.form-group input::placeholder {
+  color: #94a3b8;
 }
 
-.login-card input:focus {
+.form-group input:focus {
   outline: none;
-  border-color: #00d4ff;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 
-    0 0 0 4px rgba(0, 212, 255, 0.15),
-    0 8px 24px rgba(0, 212, 255, 0.1);
-  transform: translateY(-2px);
+  border-color: #06b6d4; /* Cyan focus ring from your reference */
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15);
 }
 
-.form-group:focus-within label {
-  color: #00d4ff;
+/* Error Message Box */
+.error-message {
+  background: #fecdd3; /* Light red */
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 8px;
+  border: 1px solid #fda4af;
 }
 
-/* Button */
-.login-button {
+/* Sign In Button */
+.login-submit-btn {
   width: 100%;
-  padding: 18px;
-  margin-top: 24px;
+  padding: 16px;
+  margin-top: 12px;
   border: none;
-  border-radius: 14px;
-  /* Button gradient including the Light Green touch */
-  background: linear-gradient(135deg, #0a0aa6 0%, #00d4ff 50%, #69f0ae 100%);
-  background-size: 200% auto;
+  border-radius: 12px;
+  /* Gradient matching your reference button */
+  background: linear-gradient(to right, #1d4ed8, #06b6d4); 
   color: white;
   font-family: 'Poppins', sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  letter-spacing: 0.5px;
-  box-shadow: 
-    0 12px 32px rgba(10, 10, 166, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  animation: buttonSlide 1s ease-out 0.4s both;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 8px 20px rgba(6, 182, 212, 0.3);
 }
 
-@keyframes buttonSlide {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.login-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(6, 182, 212, 0.4);
 }
 
-.login-button:hover {
-  background-position: right center;
-  transform: translateY(-3px);
-  box-shadow: 
-    0 16px 40px rgba(10, 10, 166, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-.login-button:active {
-  transform: translateY(-1px);
-}
-
-.login-button:disabled {
-  background: #9ca3af;
+.login-submit-btn:disabled {
+  opacity: 0.7;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.login-button.loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
 }
 
 .loading-spinner {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-.error-message {
-  color: #dc2626;
+/* Footer "Know More" Button (The pill below the card) */
+.team-credits-pill {
+  margin-top: 24px;
+  background: #ffffff;
+  border: none;
+  padding: 14px 28px;
+  border-radius: 30px;
+  font-family: 'Poppins', sans-serif;
   font-size: 14px;
   font-weight: 500;
-  margin-top: 16px;
-  padding: 12px;
-  background: rgba(220, 38, 38, 0.1);
-  border-radius: 10px;
-  animation: errorShake 0.5s ease-in-out;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; /* Delayed animation */
 }
 
-@keyframes errorShake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
-}
-
-/* Logo */
-.paysera-logo {
-  width: 100%;
-  max-width: 600px;
-  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.15));
-  animation: logoFloat 6s ease-in-out infinite;
-}
-
-@keyframes logoFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-15px); }
-}
-
-/* Responsive */
-@media (max-width: 1200px) {
-  .login-page {
-    grid-template-columns: 1fr;
-  }
-  .login-right {
-    display: none;
-  }
-  .login-card {
-    width: 90%;
-    max-width: 480px;
-  }
-  .team-credits-section {
-    max-width: 480px;
-  }
-}
-
-@media (max-width: 480px) {
-  .login-left {
-    padding: 24px;
-  }
-  
-  .login-card {
-    padding: 40px 24px;
-  }
-  
-  .login-card h2 {
-    font-size: 26px;
-  }
-  
-  .team-credits-button {
-    padding: 14px 20px;
-    font-size: 14px;
-  }
-  
-  .team-icon {
-    width: 18px;
-    height: 18px;
-  }
+.team-credits-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  color: #0ea5e9;
 }

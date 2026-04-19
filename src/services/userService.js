@@ -110,3 +110,22 @@ export async function verifyAdminPassword(password) {
     return false;
   }
 }
+
+// Add this to your userService.js
+export async function changeUserPassword(accountId, newPassword) {
+  try {
+    // Note: If you are using Supabase's built-in Auth, you need an RPC or Edge Function to change another user's password.
+    // If you are storing a custom password_hash in your 'accounts' table, it looks like this:
+    const { error } = await supabase
+      .from('accounts')
+      .update({ password_hash: newPassword }) // Ensure you hash this in production!
+      .eq('account_id', accountId);
+
+    if (error) throw error;
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error changing password:', error);
+    return { success: false, error: error.message };
+  }
+}

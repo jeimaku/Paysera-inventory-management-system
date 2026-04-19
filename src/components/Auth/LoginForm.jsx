@@ -3,6 +3,7 @@ import { supabase } from '../../supabase/client';
 import { getUserRole } from '../../auth/getUserRole';
 import { sessionManager } from '../../auth/SessionManager';
 import { useNavigate } from 'react-router-dom';
+import logo from '../../assets/logo.png'; 
 
 export default function LoginForm() {
   const navigate = useNavigate();
@@ -10,12 +11,13 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // NEW: State to toggle the forgot password message
+  const [showForgotMsg, setShowForgotMsg] = useState(false);
 
-  // Auto-redirect if already logged in
   useEffect(() => {
     if (sessionManager.isValid()) {
        const role = sessionManager.getCurrentRole();
-       // NEW: Added 'HR': '/hr' to the routes object
        const routes = { 'ADMIN': '/admin', 'IT': '/it', 'HR': '/hr', 'EMPLOYEE': '/employee' };
        if (routes[role]) navigate(routes[role], { replace: true });
     }
@@ -27,7 +29,6 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      // 1. Supabase Auth
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password,
@@ -35,78 +36,96 @@ export default function LoginForm() {
 
       if (authError) throw authError;
 
-      // 2. Get User Role
       const role = await getUserRole(data.user.email);
       if (!role) throw new Error('Role not found for user');
 
-      // 3. Initialize Session Manager
       const sessionResult = sessionManager.initializeSession(data.user.email, role);
       if (!sessionResult.success) throw new Error(sessionResult.error);
 
-      console.log(`✅ Login success: ${role}`);
-
-      // 4. Redirect based on role
       setTimeout(() => {
         const routes = {
           'ADMIN': '/admin',
           'IT': '/it',
-          'HR': '/hr',             // <-- Added HR here!
+          'HR': '/hr',
           'EMPLOYEE': '/employee'
         };
-        // Changed fallback to /login just in case a role is missing
         navigate(routes[role] || '/login', { replace: true }); 
       }, 500);
       
     } catch (error) {
       console.error('Login error:', error);
-      setError(error.message || 'Login failed');
-      sessionManager.clearSession(); // Clean up if failed
+      setError('Invalid login credentials'); 
+      sessionManager.clearSession(); 
       await supabase.auth.signOut();
       setLoading(false); 
     }
   };
 
   return (
-    <form className="login-card" onSubmit={handleLogin}>
-      {/* Icon removed as requested */}
-      <h2>Inventory System</h2>
+    <div className="modern-login-card">
+      <img src={logo} alt="Paysera Logo" className="login-logo" />
+      <h2 className="login-title">Inventory System</h2>
 
-      <div className="form-group">
-        <label>Email Address</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          disabled={loading}
-          placeholder="Enter your email"
-        />
-      </div>
+      <form className="login-form-wrapper" onSubmit={handleLogin}>
+        <div className="form-group">
+          <label>Email Address</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            placeholder="hr@paysera.com"
+          />
+        </div>
 
-      <div className="form-group">
-        <label>Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          disabled={loading}
-          placeholder="Enter your password"
-        />
-      </div>
+        <div className="form-group" style={{ marginBottom: '8px' }}>
+          <label>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            placeholder="Enter your password"
+          />
+        </div>
 
-      {error && <div className="error-message">{error}</div>}
+        {/* --- NEW: Forgot Password Link --- */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+          <button 
+            type="button" 
+            onClick={() => setShowForgotMsg(!showForgotMsg)}
+            style={{ 
+              background: 'none', border: 'none', color: '#0ea5e9', 
+              fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: 0 
+            }}
+          >
+            Forgot password?
+          </button>
+        </div>
 
-      <button type="submit" className={`login-button ${loading ? 'loading' : ''}`} disabled={loading}>
-        {loading ? (
-          <>
-            <div className="loading-spinner"></div>
-            <span>Signing in...</span>
-          </>
-        ) : (
-          'Sign In'
+        {/* --- NEW: Forgot Password Alert Box --- */}
+        {showForgotMsg && (
+          <div style={{ 
+            background: '#f0fdfa', border: '1px solid #ccfbf1', color: '#0f766e', 
+            padding: '12px', borderRadius: '8px', fontSize: '12px', 
+            textAlign: 'center', marginBottom: '12px', animation: 'slideUp 0.3s ease' 
+          }}>
+            Please contact your <strong>IT Administrator</strong> to request a secure password reset for your account.
+          </div>
         )}
-      </button>
-    </form>
+
+        {error && <div className="error-message">{error}</div>}
+
+        <button type="submit" className="login-submit-btn" disabled={loading}>
+          {loading ? (
+            <><span className="loading-spinner"></span> Signing in...</>
+          ) : (
+            'Sign In'
+          )}
+        </button>
+      </form>
+    </div>
   );
 }
