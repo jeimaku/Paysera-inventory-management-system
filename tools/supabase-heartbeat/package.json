@@ -1,0 +1,17 @@
+{
+  "name": "supabase-heartbeat",
+  "version": "1.0.0",
+  "description": "",
+  "main": "heartbeat.js",
+  "scripts": {
+    "start": "node heartbeat.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "dotenv": "^16.6.1"
+  }
+}
