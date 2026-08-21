@@ -153,7 +153,7 @@ This approach improves:
 
 - Git & GitHub
 - REST API Integration
-- Vercel Deployment
+- On-premises Deployment
 
 
 ---
