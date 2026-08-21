@@ -1,54 +1,92 @@
 # 📦 Paysera Inventory Management System
 
-> A full-stack inventory management platform developed to streamline product tracking, inventory records, and operational workflows.
+> A full-stack internal asset management platform developed to track company hardware devices, employee assignments, maintenance activities, and operational workflows.
 
-This system was designed to help organizations efficiently manage inventory information through a centralized platform with structured data management and workflow automation.
+The **Paysera Inventory Management System** was developed to improve the management of company-owned hardware assets deployed to employees.
+
+The platform provides a centralized solution for monitoring device records, deployment history, return schedules, warranty information, repair activities, and user access permissions.
 
 ---
 
-# 🎥 System Overview
+# 🎥 System Walkthrough
 
-The application provides a digital workflow for managing inventory operations including:
+A demonstration of the complete system workflow:
 
-- Product tracking
-- Inventory record management
-- Data organization
-- Operational workflow improvement
-- Administrative management
+- User authentication
+- Dashboard overview
+- Device inventory management
+- Employee assignment tracking
+- Device deployment monitoring
+- Repair history management
+- Warranty monitoring
+- User and role management
 
+
+![System Walkthrough](docs/system-walkthrough.gif)
 
 ---
 
 # 🚀 Key Features
 
+## 🔐 Authentication & Access Control
 
-## 📋 Inventory Management
-
-- Create and manage product records
-- Track inventory information
-- Update product details
-- Maintain organized inventory data
+- Implemented secure user authentication using Supabase Authentication.
+- Developed role-based access control to manage user permissions.
+- Protected system modules based on assigned user roles.
 
 
-## 📊 Operational Dashboard
+---
 
-- View inventory information
-- Monitor product records
-- Support decision-making through organized data presentation
+## 💻 Device Inventory Management
+
+- Developed CRUD operations for hardware asset records.
+- Added device registration, editing, deletion, and search functionality.
+- Maintained structured information including:
+  - Device type
+  - Serial number
+  - Asset information
+  - Deployment status
+  - Warranty details
 
 
-## 👥 User Management
+---
 
-- Authentication workflow
-- Role-based access handling
-- Secure system interaction
+## 👥 Employee Device Assignment
+
+- Connected hardware assets with assigned employees.
+- Tracked device deployment history.
+- Improved visibility of currently assigned and available devices.
 
 
-## 🔄 Workflow Management
+---
 
-- Structured inventory processes
-- Centralized record management
-- Improved operational efficiency
+## 🛠️ Maintenance & Repair Tracking
+
+- Created maintenance tracking workflows for hardware issues.
+- Recorded repair history and device condition updates.
+- Supported easier monitoring of device lifecycle activities.
+
+
+---
+
+## 📅 Warranty & Return Monitoring
+
+- Stored warranty information for hardware assets.
+- Monitored device return schedules.
+- Helped identify devices requiring maintenance, replacement, or follow-up.
+
+
+---
+
+## 📊 Administrative Management
+
+- Provided administrative tools for managing:
+  - Devices
+  - Employees
+  - Maintenance records
+  - User accounts
+
+- Improved organization of internal hardware records compared to manual tracking.
 
 
 ---
@@ -57,17 +95,39 @@ The application provides a digital workflow for managing inventory operations in
 
 
 ```
-React Frontend
-       |
-       |
-Application Logic
-       |
-       |
-Database Layer
+React.js Frontend
+
+        |
+        |
+
+Service Layer
+(Device Service,
+Employee Service,
+Maintenance Service,
+Repair Service,
+User Service)
+
+        |
+        |
+
+Supabase Backend
+
+(PostgreSQL Database
++
+Authentication)
+
 ```
 
 
-The system follows a modern frontend architecture where user interactions are processed through application logic and connected to structured data storage.
+The application follows a modular frontend structure where business logic is separated into reusable service modules.
+
+This approach improves:
+
+- Maintainability
+- Code organization
+- Scalability
+- Feature development
+
 
 ---
 
@@ -77,22 +137,23 @@ The system follows a modern frontend architecture where user interactions are pr
 ## Frontend
 
 - React.js
-- Vite
 - JavaScript
+- Vite
 - CSS
 
 
-## Backend / Data Management
+## Backend & Database
 
-- Database Integration
-- API-based workflows
+- Supabase
+- PostgreSQL
+- Supabase Authentication
 
 
 ## Development Tools
 
 - Git & GitHub
+- REST API Integration
 - Vercel Deployment
-- Modern JavaScript Development
 
 
 ---
@@ -101,35 +162,93 @@ The system follows a modern frontend architecture where user interactions are pr
 
 
 ```
-paysera-inventory-management-system
+src
 
+├── auth
 │
-├── src
-│   ├── components
-│   ├── pages
-│   └── assets
+├── components
 │
-├── public
+├── pages
 │
-├── package.json
-├── vite.config.js
-└── README.md
+│   └── Admin
+│
+├── services
+│
+│   ├── deviceService.js
+│   ├── employeeService.js
+│   ├── maintenanceService.js
+│   ├── repairService.js
+│   └── userService.js
+│
+├── supabase
+│   └── client.js
+│
+└── utils
+
 ```
 
 
 ---
 
-# 💡 Development Purpose
+# 💡 Development Highlights
 
 
-This project was developed to improve inventory-related business processes by replacing manual tracking methods with a centralized digital solution.
+## Modular Service Architecture
 
-The system demonstrates practical application of:
+Implemented dedicated service modules to handle application logic:
 
-- Full-stack development
-- Database-driven application design
-- Business workflow automation
-- User-focused system development
+- Device management
+- Employee management
+- Maintenance workflows
+- Repair tracking
+- User management
+
+
+This structure separates frontend components from database operations, making the application easier to maintain and extend.
+
+
+---
+
+## Database Integration
+
+Designed database-driven workflows using Supabase PostgreSQL.
+
+Implemented data handling for:
+
+- Hardware inventory records
+- Employee assignments
+- Maintenance history
+- User authentication
+- Role-based permissions
+
+
+---
+
+## Business Workflow Digitization
+
+Converted manual hardware tracking processes into a centralized internal platform.
+
+The system improved:
+
+- Asset visibility
+- Record accuracy
+- Device lifecycle monitoring
+- Operational efficiency
+
+
+---
+
+# 🎯 Project Purpose
+
+This project demonstrates practical full-stack development applied to a real business environment.
+
+The system combines:
+
+- Frontend application development
+- Database-driven architecture
+- Authentication systems
+- Internal workflow automation
+- Business process improvement
 
 
 ---
@@ -139,13 +258,17 @@ The system demonstrates practical application of:
 
 **Jay Mark Apelado**
 
-BS Information Technology Graduate
+Bachelor of Science in Information Technology
 
+Areas of interest:
 
-Focused on:
-
-- Full-stack Development
+- Full Stack Development
 - Business Application Development
 - IT Support Engineering
-- Workflow Automation
-- System Improvement
+- System Automation
+- Enterprise Workflow Solutions
+
+
+---
+
+⭐ Developed as part of an internship-based software development project.
