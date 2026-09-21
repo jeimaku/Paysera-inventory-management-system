@@ -19,7 +19,7 @@ async function heartbeat() {
         .limit(1);
 
 
-    if(error){
+    if (error) {
       throw error;
     }
 
@@ -30,12 +30,16 @@ async function heartbeat() {
     );
 
 
-  } catch(error){
+    process.exit(0);
+
+
+  } catch(error) {
 
     console.error(
       "Supabase heartbeat failed:",
       error.message
     );
+
 
     process.exit(1);
 
